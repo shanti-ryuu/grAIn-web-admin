@@ -1,60 +1,54 @@
-import { NextRequest, NextResponse } from 'next/server'
-import jwt from 'jsonwebtoken'
+import { NextRequest } from 'next/server'
 import dbConnect from '@/lib/db'
 import Device from '@/lib/models/Device'
 import User from '@/lib/models/User'
+import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
+import { getUserFromRequest } from '@/lib/utils/auth'
+import { validateDeviceRequest } from '@/lib/utils/validation'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-
-function getUserFromToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any
-    return decoded
-  } catch {
-    return null
-  }
+export async function OPTIONS(request: NextRequest) {
+  return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
 }
 
 export async function GET(request: NextRequest) {
   try {
     await dbConnect()
 
-    const user = getUserFromToken(request)
+    const user = getUserFromRequest(request)
     if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     let devices
     if (user.role === 'admin') {
-      // Admin can see all devices
       devices = await Device.find({})
         .populate('assignedUser', 'name email')
         .sort({ createdAt: -1 })
     } else {
-      // Farmers can only see their own devices
       devices = await Device.find({ assignedUser: user.userId })
         .populate('assignedUser', 'name email')
         .sort({ createdAt: -1 })
     }
 
-    return NextResponse.json(devices)
+    const formattedDevices = devices.map((d: any) => ({
+      id: d._id,
+      deviceId: d.deviceId,
+      status: d.status,
+      location: d.location,
+      lastActive: d.lastActive?.toISOString?.() || d.lastActive,
+      assignedUser: d.assignedUser,
+      createdAt: d.createdAt?.toISOString?.() || d.createdAt,
+    }))
+
+    const response = successResponse(formattedDevices)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {
     console.error('Get devices error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }
 }
 
@@ -62,39 +56,43 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect()
 
-    const user = getUserFromToken(request)
+    const user = getUserFromRequest(request)
     if (!user || user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
+      const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    const { deviceId, assignedUser, location } = await request.json()
+    const body = await request.json()
+    const { deviceId, assignedUser, location } = body
 
-    if (!deviceId || !assignedUser) {
-      return NextResponse.json(
-        { error: 'Device ID and assigned user are required' },
-        { status: 400 }
+    // Validate
+    const validation = validateDeviceRequest(body)
+    if (!validation.valid) {
+      const response = errorResponse(
+        Object.values(validation.errors).join(', '),
+        ErrorCodes.INVALID_INPUT,
+        400
       )
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    }
+
+    if (!assignedUser) {
+      const response = errorResponse('Assigned user is required', ErrorCodes.INVALID_INPUT, 400)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     // Check if device already exists
     const existingDevice = await Device.findOne({ deviceId })
     if (existingDevice) {
-      return NextResponse.json(
-        { error: 'Device with this ID already exists' },
-        { status: 400 }
-      )
+      const response = errorResponse('Device with this ID already exists', ErrorCodes.CONFLICT, 400)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     // Check if user exists
     const userExists = await User.findById(assignedUser)
     if (!userExists) {
-      return NextResponse.json(
-        { error: 'Assigned user not found' },
-        { status: 400 }
-      )
+      const response = errorResponse('Assigned user not found', ErrorCodes.USER_NOT_FOUND, 400)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     // Create device
@@ -105,16 +103,24 @@ export async function POST(request: NextRequest) {
       status: 'offline',
     })
 
-    // Populate user data
     await newDevice.populate('assignedUser', 'name email')
 
-    return NextResponse.json(newDevice, { status: 201 })
+    const formattedDevice = {
+      id: newDevice._id,
+      deviceId: newDevice.deviceId,
+      status: newDevice.status,
+      location: newDevice.location,
+      lastActive: newDevice.lastActive?.toISOString?.() || newDevice.lastActive,
+      assignedUser: newDevice.assignedUser,
+      createdAt: newDevice.createdAt?.toISOString?.() || newDevice.createdAt,
+    }
+
+    const response = successResponse(formattedDevice, 201)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {
     console.error('Create device error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }
 }

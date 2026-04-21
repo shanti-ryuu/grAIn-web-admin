@@ -23,25 +23,27 @@ export default function DeviceDetailPage() {
   const deviceId = params.id as string
 
   const { data: device, isLoading: deviceLoading, error: deviceError } = useDevice(deviceId)
-  const { data: sensorData, isLoading: sensorLoading } = useSensorData(deviceId)
+  const { data: sensorData, isLoading: sensorLoading } = useSensorData(device?.deviceId || '')
   const startDryer = useStartDryer()
   const stopDryer = useStopDryer()
 
-  const [isRunning, setIsRunning] = useState(false)
+  const [isRunning, setIsRunning] = useState(device?.status === 'online')
 
   const handleToggleDevice = async () => {
     try {
+      // Use device.deviceId (e.g. "GR-001") for dryer commands, not the MongoDB _id
+      const commandDeviceId = device?.deviceId || deviceId
       if (isRunning) {
-        await stopDryer.mutateAsync(deviceId)
+        await stopDryer.mutateAsync(commandDeviceId)
         toast({
           title: 'Device stopped',
-          description: `Device ${device?.deviceId || 'Device'} has been stopped.`,
+          description: `Device ${commandDeviceId} has been stopped.`,
         })
       } else {
-        await startDryer.mutateAsync(deviceId)
+        await startDryer.mutateAsync(commandDeviceId)
         toast({
           title: 'Device started',
-          description: `Device ${device?.deviceId || 'Device'} has been started.`,
+          description: `Device ${commandDeviceId} has been started.`,
         })
       }
       setIsRunning(!isRunning)

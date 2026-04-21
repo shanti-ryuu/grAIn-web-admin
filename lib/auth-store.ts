@@ -4,7 +4,7 @@ export interface AuthUser {
   id: string
   email: string
   name: string
-  role: 'admin' | 'user'
+  role: 'admin' | 'farmer'
 }
 
 export interface AuthStore {

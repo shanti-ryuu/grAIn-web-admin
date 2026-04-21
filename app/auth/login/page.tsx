@@ -28,7 +28,7 @@ export default function LoginPage() {
       await login.mutateAsync({ email, password })
       router.push('/dashboard')
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to login. Please check your credentials.')
+      setError(err?.response?.data?.error || err?.message || 'Failed to login. Please check your credentials.')
     }
   }
 

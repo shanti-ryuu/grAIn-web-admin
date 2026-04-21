@@ -1,49 +1,44 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
 import dbConnect from '@/lib/db'
 import User from '@/lib/models/User'
+import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
+import { getUserFromRequest } from '@/lib/utils/auth'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-
-function getUserFromToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any
-    return decoded
-  } catch {
-    return null
-  }
+export async function OPTIONS(request: NextRequest) {
+  return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
 }
 
 export async function GET(request: NextRequest) {
   try {
     await dbConnect()
 
-    const user = getUserFromToken(request)
+    const user = getUserFromRequest(request)
     if (!user || user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
+      const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     const users = await User.find({}).select('-password').sort({ createdAt: -1 })
 
-    return NextResponse.json(users)
+    const formattedUsers = users.map((u: any) => ({
+      id: u._id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      status: u.status,
+      lastActive: u.updatedAt?.toISOString?.() || u.updatedAt,
+      createdAt: u.createdAt?.toISOString?.() || u.createdAt,
+    }))
+
+    const response = successResponse(formattedUsers)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {
     console.error('Get users error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }
 }
 
@@ -51,30 +46,24 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect()
 
-    const user = getUserFromToken(request)
+    const user = getUserFromRequest(request)
     if (!user || user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
+      const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     const { name, email, password, role } = await request.json()
 
     if (!name || !email || !password) {
-      return NextResponse.json(
-        { error: 'Name, email, and password are required' },
-        { status: 400 }
-      )
+      const response = errorResponse('Name, email, and password are required', ErrorCodes.INVALID_INPUT, 400)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email })
     if (existingUser) {
-      return NextResponse.json(
-        { error: 'User with this email already exists' },
-        { status: 400 }
-      )
+      const response = errorResponse('User with this email already exists', ErrorCodes.CONFLICT, 400)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     // Hash password
@@ -88,23 +77,21 @@ export async function POST(request: NextRequest) {
       role: role || 'farmer',
     })
 
-    // Return user without password
     const userData = {
       id: newUser._id,
       name: newUser.name,
       email: newUser.email,
       role: newUser.role,
       status: newUser.status,
-      createdAt: newUser.createdAt,
+      createdAt: newUser.createdAt?.toISOString?.() || newUser.createdAt,
     }
 
-    return NextResponse.json(userData, { status: 201 })
+    const response = successResponse(userData, 201)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {
     console.error('Create user error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }
 }

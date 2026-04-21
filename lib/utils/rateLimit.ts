@@ -22,7 +22,7 @@ export function checkRateLimit(
   const {
     windowMs,
     maxRequests,
-    keyGenerator = (r) => r.headers.get('x-forwarded-for') || r.ip || 'unknown',
+    keyGenerator = (r) => r.headers.get('x-forwarded-for') || r.headers.get('x-real-ip') || 'unknown',
   } = options
 
   const key = keyGenerator(req)
@@ -86,6 +86,6 @@ export const RateLimits = {
   // Auth endpoints
   AUTH: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 5, // 5 login attempts per 15 minutes
+    maxRequests: 20, // 20 login attempts per 15 minutes
   },
 } as const

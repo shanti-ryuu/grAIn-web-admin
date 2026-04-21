@@ -18,7 +18,7 @@ import {
 
 export default function AnalyticsPage() {
   const [dateRange, setDateRange] = useState('7d')
-  const { data: analytics, isLoading, error, refetch } = useAnalyticsOverview()
+  const { data: analyticsData, isLoading, error, refetch } = useAnalyticsOverview()
 
   if (isLoading) {
     return (
@@ -59,7 +59,15 @@ export default function AnalyticsPage() {
     )
   }
 
-  const chartData = analytics || []
+  const { analytics = [], summary = {} } = analyticsData || {}
+
+  // Transform analytics data for charts
+  const chartData = analytics.map((item: any) => ({
+    time: item._id.date,
+    temperature: Math.round(item.avgTemperature * 10) / 10,
+    moisture: Math.round(item.avgMoisture * 10) / 10,
+    humidity: Math.round(item.avgHumidity * 10) / 10,
+  }))
 
   return (
     <div className="space-y-8">
@@ -102,6 +110,51 @@ export default function AnalyticsPage() {
         </Card>
       ) : (
         <>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-[#6b7280]">Total Devices</p>
+                  <p className="text-2xl font-bold text-[#111827]">{summary.deviceCount || 0}</p>
+                </div>
+                <div className="w-12 h-12 bg-[#f0fdf4] rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-[#16a34a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-[#6b7280]">Online Devices</p>
+                  <p className="text-2xl font-bold text-[#111827]">{summary.onlineDeviceCount || 0}</p>
+                </div>
+                <div className="w-12 h-12 bg-[#f0fdf4] rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-[#16a34a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-[#6b7280]">Total Readings</p>
+                  <p className="text-2xl font-bold text-[#111827]">{summary.totalReadings || 0}</p>
+                </div>
+                <div className="w-12 h-12 bg-[#f0fdf4] rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-[#16a34a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+              </div>
+            </Card>
+          </div>
+
           {/* Historical Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Temperature Trends */}

@@ -1,6 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 
+// Auth
+export const useLogin = () => {
+  return useMutation({
+    mutationFn: async (credentials: { email: string; password: string }) => {
+      const { data } = await api.post('/auth/login', credentials)
+      return data
+    },
+  })
+}
+
+export const useMe = () => {
+  return useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: async () => {
+      const { data } = await api.get('/auth/me')
+      return data
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 // Devices
 export const useDevices = () => {
   return useQuery({
@@ -27,8 +48,8 @@ export const useDevice = (id: string) => {
 export const useRegisterDevice = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: any) => {
-      const { data } = await api.post('/devices/register', payload)
+    mutationFn: async (payload: { deviceId: string; assignedUser: string; location?: string }) => {
+      const { data } = await api.post('/devices', payload)
       return data
     },
     onSuccess: () => {
@@ -49,15 +70,54 @@ export const useUsers = () => {
   })
 }
 
-export const useUpdateUserStatus = () => {
+export const useUpdateUser = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { data } = await api.patch(`/users/${id}/status`, { status })
+    mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
+      const { data } = await api.patch(`/users/${id}`, updates)
       return data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+  })
+}
+
+// Sensor Data
+export const useSensorData = (deviceId: string) => {
+  return useQuery({
+    queryKey: ['sensors', deviceId],
+    queryFn: async () => {
+      const { data } = await api.get(`/sensors/${deviceId}`)
+      return data
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  })
+}
+
+// Commands
+export const useStartDryer = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (deviceId: string) => {
+      const { data } = await api.post(`/dryer/${deviceId}/start`)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+    },
+  })
+}
+
+export const useStopDryer = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (deviceId: string) => {
+      const { data } = await api.post(`/dryer/${deviceId}/stop`)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
     },
   })
 }
@@ -74,46 +134,14 @@ export const useAnalyticsOverview = () => {
   })
 }
 
-export const useDeviceAnalytics = (deviceId: string) => {
-  return useQuery({
-    queryKey: ['analytics', 'device', deviceId],
-    queryFn: async () => {
-      const { data } = await api.get(`/analytics/device/${deviceId}`)
-      return data
-    },
-    staleTime: 5 * 60 * 1000,
-  })
-}
-
-// Alerts
+// Alerts (placeholder - not implemented yet)
 export const useAlerts = () => {
   return useQuery({
     queryKey: ['alerts'],
     queryFn: async () => {
-      try {
-        const { data } = await api.get('/alerts')
-        return data
-      } catch (error: any) {
-        // If endpoint doesn't exist (404), return empty array
-        if (error.response?.status === 404) {
-          return []
-        }
-        throw error
-      }
+      // TODO: Implement alerts API
+      return []
     },
-    staleTime: 2 * 60 * 1000,
-  })
-}
-
-export const useAcknowledgeAlert = () => {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async (alertId: string) => {
-      const { data } = await api.patch(`/alerts/${alertId}/acknowledge`)
-      return data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['alerts'] })
-    },
+    staleTime: 5 * 60 * 1000,
   })
 }

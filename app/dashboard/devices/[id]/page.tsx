@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ArrowLeft, Play, Pause, Thermometer, Droplets, Activity, Clock } from 'lucide-react'
 import Card from '@/components/Card'
-import { useDevice, useDeviceAnalytics } from '@/hooks/useApi'
+import { useDevice, useSensorData, useStartDryer, useStopDryer } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import {
   LineChart,
@@ -23,19 +23,38 @@ export default function DeviceDetailPage() {
   const deviceId = params.id as string
 
   const { data: device, isLoading: deviceLoading, error: deviceError } = useDevice(deviceId)
-  const { data: analytics, isLoading: analyticsLoading } = useDeviceAnalytics(deviceId)
+  const { data: sensorData, isLoading: sensorLoading } = useSensorData(deviceId)
+  const startDryer = useStartDryer()
+  const stopDryer = useStopDryer()
 
   const [isRunning, setIsRunning] = useState(false)
 
   const handleToggleDevice = async () => {
-    setIsRunning(!isRunning)
-    toast({
-      title: isRunning ? 'Device stopped' : 'Device started',
-      description: `${device?.id || 'Device'} has been ${isRunning ? 'stopped' : 'started'}.`,
-    })
+    try {
+      if (isRunning) {
+        await stopDryer.mutateAsync(deviceId)
+        toast({
+          title: 'Device stopped',
+          description: `Device ${device?.deviceId || 'Device'} has been stopped.`,
+        })
+      } else {
+        await startDryer.mutateAsync(deviceId)
+        toast({
+          title: 'Device started',
+          description: `Device ${device?.deviceId || 'Device'} has been started.`,
+        })
+      }
+      setIsRunning(!isRunning)
+    } catch (error) {
+      toast({
+        title: 'Command failed',
+        description: 'Failed to send command to device.',
+        variant: 'destructive',
+      })
+    }
   }
 
-  if (deviceLoading || analyticsLoading) {
+  if (deviceLoading || sensorLoading) {
     return (
       <div className="space-y-8">
         <div className="animate-pulse">
@@ -72,7 +91,12 @@ export default function DeviceDetailPage() {
     )
   }
 
-  const chartData = analytics || []
+  const chartData = (sensorData || []).map((data: any) => ({
+    time: new Date(data.timestamp).toLocaleTimeString(),
+    temperature: data.temperature,
+    moisture: data.moisture,
+    humidity: data.humidity,
+  }))
 
   return (
     <div className="space-y-8">
@@ -87,9 +111,9 @@ export default function DeviceDetailPage() {
         </button>
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-[#111827] mb-2">{device?.id || 'Device Details'}</h1>
+            <h1 className="text-3xl font-bold text-[#111827] mb-2">{device?.deviceId || 'Device Details'}</h1>
             <p className="text-base text-[#6b7280]">
-              {device?.location || 'Unknown Location'} • Assigned to {device?.assignedUser || 'Unassigned'}
+              {device?.location || 'Unknown Location'} • Assigned to {device?.assignedUser?.name || 'Unassigned'}
             </p>
           </div>
           <button

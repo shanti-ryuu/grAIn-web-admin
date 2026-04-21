@@ -18,7 +18,7 @@ export interface AuthStore {
   hydrate: () => void
 }
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
+export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   token: null,
   isLoading: true,

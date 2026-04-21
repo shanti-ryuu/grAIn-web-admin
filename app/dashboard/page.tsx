@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { Cpu, Activity, AlertTriangle, Clock } from 'lucide-react'
 import MetricCard from '@/components/MetricCard'
-import { useDevices, useAlerts, useAnalyticsOverview } from '@/hooks/useApi'
+import { useDevices, useAnalyticsOverview } from '@/hooks/useApi'
 import ErrorState from '@/components/ErrorState'
 import {
   LineChart,
@@ -18,15 +18,14 @@ import {
 export default function DashboardPage() {
   const router = useRouter()
   const { data: devices, isLoading: devicesLoading, error: devicesError, refetch: refetchDevices } = useDevices()
-  const { data: alerts, isLoading: alertsLoading, error: alertsError, refetch: refetchAlerts } = useAlerts()
-  const { data: analytics, isLoading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useAnalyticsOverview()
+  const { data: analyticsData, isLoading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useAnalyticsOverview()
 
   const totalDevices = devices?.length || 0
   const activeDryers = devices?.filter((d: any) => d.status === 'online').length || 0
-  const activeAlerts = alerts?.filter((a: any) => a.severity === 'critical').length || 0
-  const avgDryingTime = analytics?.[0]?.temperature || '4.9h'
+  const activeAlerts = 0 // TODO: Implement alerts system
+  const avgDryingTime = '4.9h' // TODO: Calculate from analytics
 
-  if (devicesLoading || alertsLoading || analyticsLoading) {
+  if (devicesLoading || analyticsLoading) {
     return (
       <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -50,9 +49,14 @@ export default function DashboardPage() {
     )
   }
 
-  const chartData = analytics || []
+  const { analytics = [] } = analyticsData || []
+  const chartData = analytics.slice(0, 10).map((item: any) => ({
+    time: item._id.date.split(' ')[1], // Just the time part
+    temperature: Math.round(item.avgTemperature * 10) / 10,
+    moisture: Math.round(item.avgMoisture * 10) / 10,
+  }))
 
-  if (devicesError || alertsError || analyticsError) {
+  if (devicesError || analyticsError) {
     return (
       <div className="space-y-8">
         <div>
@@ -65,7 +69,6 @@ export default function DashboardPage() {
           message="Failed to load dashboard data. Please try again."
           onRetry={() => {
             refetchDevices()
-            refetchAlerts()
             refetchAnalytics()
           }}
         />
@@ -73,7 +76,7 @@ export default function DashboardPage() {
     )
   }
 
-  if (totalDevices === 0 && !devicesLoading && !alertsLoading && !analyticsLoading) {
+  if (totalDevices === 0 && !devicesLoading && !analyticsLoading) {
     return (
       <div className="space-y-8">
         <div>
@@ -125,7 +128,7 @@ export default function DashboardPage() {
         <MetricCard
           title="Active Alerts"
           value={activeAlerts.toString()}
-          subtitle={`${alerts?.filter((a: any) => a.severity === 'warning').length || 0} warnings`}
+          subtitle="System alerts"
           trend={{ value: 1, isPositive: false }}
           icon={<AlertTriangle className="w-5 h-5" />}
         />
@@ -194,69 +197,6 @@ export default function DashboardPage() {
               />
             </LineChart>
           </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Recent Alerts */}
-      <div className="bg-[#ffffff] rounded-lg border border-[#e5e7eb] p-6">
-        <h3 className="text-lg font-semibold text-[#111827] mb-6">Recent Alerts</h3>
-        <div className="space-y-3">
-          {(alerts || []).slice(0, 5).map((alert: any) => {
-            const severityConfig: any = {
-              critical: {
-                bgColor: '#fef2f2',
-                textColor: '#dc2626',
-                borderColor: '#fecaca',
-                dotColor: '#dc2626',
-              },
-              warning: {
-                bgColor: '#fffbeb',
-                textColor: '#d97706',
-                borderColor: '#fde68a',
-                dotColor: '#d97706',
-              },
-              info: {
-                bgColor: '#eff6ff',
-                textColor: '#2563eb',
-                borderColor: '#bfdbfe',
-                dotColor: '#2563eb',
-              },
-            }
-
-            const config = severityConfig[alert.severity] || severityConfig.info
-
-            return (
-              <div
-                key={alert.id}
-                className="flex items-start gap-4 p-4 rounded-lg border transition-colors duration-200"
-                style={{
-                  backgroundColor: config.bgColor,
-                  borderColor: config.borderColor,
-                }}
-              >
-                <div
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1"
-                  style={{ backgroundColor: config.dotColor }}
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#111827]">{alert.message}</p>
-                  <p className="text-xs mt-1" style={{ color: config.textColor }}>
-                    {alert.timestamp}
-                  </p>
-                </div>
-                <span
-                  className="px-3 py-1 rounded text-xs font-medium whitespace-nowrap border"
-                  style={{
-                    backgroundColor: config.bgColor,
-                    color: config.textColor,
-                    borderColor: config.dotColor,
-                  }}
-                >
-                  {alert.severity}
-                </span>
-              </div>
-            )
-          })}
         </div>
       </div>
     </div>

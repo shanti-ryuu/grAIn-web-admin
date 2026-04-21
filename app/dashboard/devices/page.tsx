@@ -21,7 +21,7 @@ export default function DevicesPage() {
   const [registerForm, setRegisterForm] = useState({
     deviceId: '',
     location: '',
-    serialNumber: '',
+    assignedUser: '',
   })
   
   // Assign Device Form State
@@ -49,9 +49,9 @@ export default function DevicesPage() {
 
   const filteredDevices = (devices || []).filter(
     (device: any) =>
-      device.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      device.deviceId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       device.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.assignedUser?.toLowerCase().includes(searchTerm.toLowerCase())
+      device.assignedUser?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const handleRegisterDevice = async (e: React.FormEvent) => {
@@ -63,7 +63,7 @@ export default function DevicesPage() {
         description: `Device ${registerForm.deviceId} has been registered successfully.`,
       })
       setShowRegisterModal(false)
-      setRegisterForm({ deviceId: '', location: '', serialNumber: '' })
+      setRegisterForm({ deviceId: '', location: '', assignedUser: '' })
     } catch (error) {
       toast({
         title: 'Registration failed',
@@ -137,15 +137,23 @@ export default function DevicesPage() {
   }
 
   const columns = [
-    { key: 'id', label: 'Device ID' },
+    { key: 'deviceId', label: 'Device ID' },
     {
       key: 'status',
       label: 'Status',
       render: (value: string) => statusBadge(value),
     },
     { key: 'location', label: 'Location' },
-    { key: 'lastActive', label: 'Last Active' },
-    { key: 'assignedUser', label: 'Assigned User' },
+    {
+      key: 'lastActive',
+      label: 'Last Active',
+      render: (value: Date) => new Date(value).toLocaleString(),
+    },
+    {
+      key: 'assignedUser',
+      label: 'Assigned User',
+      render: (value: any) => value?.name || 'Unassigned',
+    },
     {
       key: 'actions',
       label: 'Actions',
@@ -252,19 +260,6 @@ export default function DevicesPage() {
                   value={registerForm.location}
                   onChange={(e) => setRegisterForm({ ...registerForm, location: e.target.value })}
                   placeholder="e.g., Warehouse A"
-                  required
-                  className="w-full px-4 py-2.5 border border-[#e5e7eb] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#166534] bg-[#ffffff]"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[#111827] mb-2">
-                  Serial Number
-                </label>
-                <input
-                  type="text"
-                  value={registerForm.serialNumber}
-                  onChange={(e) => setRegisterForm({ ...registerForm, serialNumber: e.target.value })}
-                  placeholder="e.g., SN-123456"
                   required
                   className="w-full px-4 py-2.5 border border-[#e5e7eb] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#166534] bg-[#ffffff]"
                 />

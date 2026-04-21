@@ -3,6 +3,7 @@
 import { ReactNode, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from '@/lib/auth-store'
+import { initFirebaseAnalytics } from '@/lib/firebase'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,6 +19,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     hydrate()
+    initFirebaseAnalytics()
   }, [hydrate])
 
   return (

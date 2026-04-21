@@ -1,24 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import jwt from 'jsonwebtoken'
+import { NextRequest } from 'next/server'
 import dbConnect from '@/lib/db'
 import Device from '@/lib/models/Device'
+import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
+import { getUserFromRequest } from '@/lib/utils/auth'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-
-function getUserFromToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any
-    return decoded
-  } catch {
-    return null
-  }
+export async function OPTIONS(request: NextRequest) {
+  return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
 }
 
 export async function GET(
@@ -28,12 +16,10 @@ export async function GET(
   try {
     await dbConnect()
 
-    const user = getUserFromToken(request)
+    const user = getUserFromRequest(request)
     if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     const { id } = await params
@@ -41,27 +27,32 @@ export async function GET(
     const device = await Device.findById(id).populate('assignedUser', 'name email')
 
     if (!device) {
-      return NextResponse.json(
-        { error: 'Device not found' },
-        { status: 404 }
-      )
+      const response = errorResponse('Device not found', ErrorCodes.DEVICE_NOT_FOUND, 404)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     // Check if user can access this device
-    if (user.role !== 'admin' && device.assignedUser._id.toString() !== user.userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
+    if (user.role !== 'admin' && device.assignedUser?._id?.toString() !== user.userId) {
+      const response = errorResponse('Forbidden', ErrorCodes.FORBIDDEN, 403)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    return NextResponse.json(device)
+    const deviceData = {
+      id: device._id,
+      deviceId: device.deviceId,
+      status: device.status,
+      location: device.location,
+      lastActive: device.lastActive?.toISOString?.() || device.lastActive,
+      assignedUser: device.assignedUser,
+      createdAt: device.createdAt?.toISOString?.() || device.createdAt,
+    }
+
+    const response = successResponse(deviceData)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {
     console.error('Get device error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }
 }

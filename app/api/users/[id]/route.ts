@@ -1,24 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import jwt from 'jsonwebtoken'
+import { NextRequest } from 'next/server'
 import dbConnect from '@/lib/db'
 import User from '@/lib/models/User'
+import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
+import { getUserFromRequest } from '@/lib/utils/auth'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
-
-function getUserFromToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null
-  }
-
-  const token = authHeader.substring(7)
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any
-    return decoded
-  } catch {
-    return null
-  }
+export async function OPTIONS(request: NextRequest) {
+  return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
 }
 
 export async function PATCH(
@@ -28,12 +16,10 @@ export async function PATCH(
   try {
     await dbConnect()
 
-    const user = getUserFromToken(request)
+    const user = getUserFromRequest(request)
     if (!user || user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
+      const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     const { id } = await params
@@ -52,19 +38,25 @@ export async function PATCH(
     ).select('-password')
 
     if (!updatedUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+      const response = errorResponse('User not found', ErrorCodes.USER_NOT_FOUND, 404)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    return NextResponse.json(updatedUser)
+    const userData = {
+      id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      status: updatedUser.status,
+      createdAt: updatedUser.createdAt?.toISOString?.() || updatedUser.createdAt,
+    }
+
+    const response = successResponse(userData)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {
     console.error('Update user error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }
 }

@@ -1,37 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+type CorsableResponse = NextResponse | Response
+
 /**
  * Add CORS headers to response for mobile/frontend apps
  */
-export function addCorsHeaders(response: NextResponse, origin?: string): NextResponse {
-  // List of allowed origins - configure based on your frontend deployments
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:8081',
-    'http://localhost:19000',
-    'http://localhost:19001',
-    // Add your deployed frontend URLs here
-    process.env.NEXT_PUBLIC_ADMIN_URL || '',
-    process.env.NEXT_PUBLIC_APP_URL || '',
-  ].filter(Boolean)
+export function addCorsHeaders(response: CorsableResponse, origin?: string): NextResponse {
+  const res = response instanceof NextResponse ? response : new NextResponse(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  })
 
-  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
+  // In development, allow all origins; in production, restrict to known origins
+  if (process.env.NODE_ENV === 'development') {
+    res.headers.set('Access-Control-Allow-Origin', origin || '*')
+  } else {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      process.env.NEXT_PUBLIC_ADMIN_URL || '',
+      process.env.NEXT_PUBLIC_APP_URL || '',
+    ].filter(Boolean)
 
-  response.headers.set('Access-Control-Allow-Origin', corsOrigin)
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
-  response.headers.set(
+    const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
+    res.headers.set('Access-Control-Allow-Origin', corsOrigin)
+  }
+
+  res.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+  res.headers.set(
     'Access-Control-Allow-Headers',
     'Content-Type, Authorization, X-Requested-With, X-Device-Id'
   )
-  response.headers.set('Access-Control-Allow-Credentials', 'true')
-  response.headers.set('Access-Control-Max-Age', '86400')
+  res.headers.set('Access-Control-Allow-Credentials', 'true')
+  res.headers.set('Access-Control-Max-Age', '86400')
 
-  return response
+  return res
 }
 
 /**
- * Handle CORS preflight requests
+ * Handle CORS preflight requests - returns NextResponse for OPTIONS, null otherwise
  */
 export function handleCorsPrelight(request: NextRequest): NextResponse | null {
   if (request.method === 'OPTIONS') {
@@ -39,6 +47,13 @@ export function handleCorsPrelight(request: NextRequest): NextResponse | null {
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }
   return null
+}
+
+/**
+ * Convenience: build an OPTIONS response with CORS headers
+ */
+export function corsOptionsResponse(request: NextRequest): NextResponse {
+  return addCorsHeaders(new NextResponse(null, { status: 200 }), request.headers.get('origin') || undefined)
 }
 
 /**

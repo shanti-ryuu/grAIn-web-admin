@@ -15,7 +15,7 @@ export interface LoginResponse {
     id: string
     email: string
     name: string
-    role: 'admin' | 'user'
+    role: 'admin' | 'farmer'
   }
 }
 
@@ -24,6 +24,16 @@ export interface User {
   email: string
   name: string
   role: string
+  status?: string
+}
+
+// All API responses are wrapped in { success, data } or { success, error }
+interface ApiResponse<T> {
+  success: boolean
+  data?: T
+  error?: string
+  errorCode?: string
+  timestamp: string
 }
 
 export function useLogin() {
@@ -31,13 +41,14 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: async (credentials: LoginCredentials): Promise<LoginResponse> => {
-      const { data } = await api.post<LoginResponse>('/auth/login', credentials)
-      return data
+      const { data: responseData } = await api.post<ApiResponse<LoginResponse>>('/auth/login', credentials)
+      if (!responseData.success || !responseData.data) {
+        throw new Error(responseData.error || 'Login failed')
+      }
+      return responseData.data
     },
     onSuccess: (data) => {
-      // Store token in localStorage
       localStorage.setItem('auth_token', data.token)
-      // Update Zustand store with both token and user
       login(data.token, data.user)
     },
   })
@@ -48,14 +59,11 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      await api.post('/auth/logout')
+      // No server-side logout endpoint; just clear local state
     },
     onSuccess: () => {
-      // Clear token from localStorage
       localStorage.removeItem('auth_token')
-      // Clear Zustand store
       logout()
-      // Redirect to login page
       if (typeof window !== 'undefined') {
         window.location.href = '/auth/login'
       }
@@ -67,10 +75,13 @@ export function useGetCurrentUser() {
   return useQuery({
     queryKey: ['auth', 'user'],
     queryFn: async (): Promise<User> => {
-      const { data } = await api.get<User>('/auth/me')
-      return data
+      const { data: responseData } = await api.get<ApiResponse<{ user: User }>>('/auth/me')
+      if (!responseData.success || !responseData.data?.user) {
+        throw new Error(responseData.error || 'Failed to get user')
+      }
+      return responseData.data.user
     },
     retry: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
   })
 }

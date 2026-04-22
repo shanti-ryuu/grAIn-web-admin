@@ -48,9 +48,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
     if (token && userStr) {
       try {
+        // Check if JWT is expired before restoring session
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          localStorage.removeItem('auth_token')
+          localStorage.removeItem('auth_user')
+          set({ isLoading: false })
+          return
+        }
         const user = JSON.parse(userStr)
         set({ token, user, isAuthenticated: true, isLoading: false })
       } catch {
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_user')
         set({ isLoading: false })
       }
     } else {

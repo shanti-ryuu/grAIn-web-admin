@@ -1,11 +1,5 @@
 import mongoose from 'mongoose'
 
-const MONGO_URI = process.env.MONGO_URI!
-
-if (!MONGO_URI) {
-  throw new Error('MONGO_URI is not defined in environment variables')
-}
-
 interface MongooseCache {
   conn: typeof mongoose | null
   promise: Promise<typeof mongoose> | null
@@ -28,6 +22,11 @@ export async function connectDB() {
   if (cached.conn) return cached.conn
 
   if (!cached.promise) {
+    const MONGO_URI = process.env.MONGO_URI
+    if (!MONGO_URI) {
+      throw new Error('MONGO_URI is not defined in environment variables')
+    }
+
     const opts = {
       bufferCommands: false,
       maxPoolSize: 10,

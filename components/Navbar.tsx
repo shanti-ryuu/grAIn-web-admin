@@ -39,7 +39,7 @@ export default function Topbar() {
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-medium text-[#111827]">{user?.name || 'Admin'}</p>
-            <p className="text-xs text-[#6b7280]">Administrator</p>
+            <p className="text-xs text-[#6b7280]">{user?.role === 'admin' ? 'Administrator' : 'Farmer'}</p>
           </div>
           <div className="w-8 h-8 bg-[#166534] rounded-full flex items-center justify-center text-white text-xs font-bold">
             {user?.name?.charAt(0).toUpperCase() || 'A'}

@@ -25,9 +25,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login
+      // Clear auth state and redirect to login
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_user')
         window.location.href = '/auth/login'
       }
     }

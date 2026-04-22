@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
+import { useLogout } from '@/hooks/useAuth'
 import { useAuthStore } from '@/lib/auth-store'
 import {
   LayoutDashboard,
@@ -26,12 +27,11 @@ const menuItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore()
+  const logoutMutation = useLogout()
 
   const handleLogout = () => {
-    logout()
-    router.push('/auth/login')
+    logoutMutation.mutate()
   }
 
   return (

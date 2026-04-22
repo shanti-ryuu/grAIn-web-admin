@@ -48,7 +48,6 @@ export function useLogin() {
       return responseData.data
     },
     onSuccess: (data) => {
-      localStorage.setItem('auth_token', data.token)
       login(data.token, data.user)
     },
   })

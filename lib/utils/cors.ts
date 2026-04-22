@@ -19,11 +19,17 @@ export function addCorsHeaders(response: CorsableResponse, origin?: string): Nex
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost:8081',
+      'exp://localhost:8081',
       process.env.NEXT_PUBLIC_ADMIN_URL || '',
       process.env.NEXT_PUBLIC_APP_URL || '',
     ].filter(Boolean)
 
-    const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0]
+    // Check exact match or LAN pattern (192.168.x.x)
+    const isLanOrigin = /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin || '')
+    const isAllowed = origin && (allowedOrigins.includes(origin) || isLanOrigin)
+
+    const corsOrigin = isAllowed ? origin : allowedOrigins[0]
     res.headers.set('Access-Control-Allow-Origin', corsOrigin)
   }
 

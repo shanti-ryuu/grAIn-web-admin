@@ -107,6 +107,9 @@ export async function GET(
       temperature: data.temperature,
       humidity: data.humidity,
       moisture: data.moisture,
+      fanSpeed: data.fanSpeed,
+      energy: data.energy,
+      status: data.status,
       timestamp: data.timestamp.toISOString(),
       createdAt: data.createdAt.toISOString(),
     }))

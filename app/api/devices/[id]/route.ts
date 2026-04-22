@@ -24,6 +24,12 @@ export async function GET(
 
     const { id } = await params
 
+    // Validate id is a valid ObjectId format
+    if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
+      const response = errorResponse('Invalid device ID format', ErrorCodes.INVALID_INPUT, 400)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    }
+
     const device = await Device.findById(id).populate('assignedUser', 'name email')
 
     if (!device) {

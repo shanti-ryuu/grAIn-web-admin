@@ -18,11 +18,17 @@ export function middleware(request: NextRequest) {
       const allowedOrigins = [
         'http://localhost:3000',
         'http://localhost:3001',
+        'http://localhost:8081',
+        'exp://localhost:8081',
         process.env.NEXT_PUBLIC_ADMIN_URL || '',
         process.env.NEXT_PUBLIC_APP_URL || '',
       ].filter(Boolean)
 
-      if (allowedOrigins.includes(origin)) {
+      // Check exact match or LAN pattern (192.168.x.x)
+      const isLanOrigin = /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin)
+      const isAllowed = allowedOrigins.includes(origin) || isLanOrigin
+
+      if (isAllowed) {
         response.headers.set('Access-Control-Allow-Origin', origin)
       } else {
         response.headers.set('Access-Control-Allow-Origin', allowedOrigins[0])
@@ -46,11 +52,17 @@ export function middleware(request: NextRequest) {
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
+      'http://localhost:8081',
+      'exp://localhost:8081',
       process.env.NEXT_PUBLIC_ADMIN_URL || '',
       process.env.NEXT_PUBLIC_APP_URL || '',
     ].filter(Boolean)
 
-    if (allowedOrigins.includes(origin)) {
+    // Check exact match or LAN pattern (192.168.x.x)
+    const isLanOrigin = /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin)
+    const isAllowed = allowedOrigins.includes(origin) || isLanOrigin
+
+    if (isAllowed) {
       response.headers.set('Access-Control-Allow-Origin', origin)
     }
   }

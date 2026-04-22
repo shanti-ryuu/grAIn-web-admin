@@ -1,51 +1,57 @@
 import mongoose from 'mongoose'
-import dotenv from 'dotenv'
 
-// Load environment variables if not already loaded
-if (!process.env.MONGO_URI) {
-  dotenv.config({ path: '.env.local' })
+const MONGO_URI = process.env.MONGO_URI!
+
+if (!MONGO_URI) {
+  throw new Error('MONGO_URI is not defined in environment variables')
 }
 
-const MONGODB_URI = process.env.MONGO_URI!
-
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGO_URI environment variable inside .env.local')
+interface MongooseCache {
+  conn: typeof mongoose | null
+  promise: Promise<typeof mongoose> | null
 }
 
-/**
- * Global is used here to maintain a cached connection across hot reloads
- * in development. This prevents connections growing exponentially
- * during API Route usage.
- */
-let cached = (global as any).mongoose
-
-if (!cached) {
-  cached = (global as any).mongoose = { conn: null, promise: null }
+declare global {
+  var mongoose: MongooseCache | undefined
 }
 
-async function dbConnect() {
-  if (cached.conn) {
-    return cached.conn
-  }
+const cached: MongooseCache = global.mongoose ?? {
+  conn: null,
+  promise: null
+}
+
+if (!global.mongoose) {
+  global.mongoose = cached
+}
+
+export async function connectDB() {
+  if (cached.conn) return cached.conn
 
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4,
+      dbName: 'grain',
     }
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose
-    })
+    cached.promise = mongoose
+      .connect(MONGO_URI, opts)
+      .then((mongoose) => {
+        console.log('✅ MongoDB Atlas connected — grain database')
+        return mongoose
+      })
+      .catch((err) => {
+        console.error('❌ MongoDB Atlas connection error:', err.message)
+        cached.promise = null
+        throw err
+      })
   }
 
-  try {
-    cached.conn = await cached.promise
-  } catch (e) {
-    cached.promise = null
-    throw e
-  }
-
+  cached.conn = await cached.promise
   return cached.conn
 }
 
-export default dbConnect
+export default connectDB

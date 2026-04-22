@@ -1,7 +1,8 @@
-import dotenv from 'dotenv'
+import * as dotenv from 'dotenv'
+import { resolve } from 'path'
 
 // Load environment variables from .env.local
-dotenv.config({ path: '.env.local' })
+dotenv.config({ path: resolve(process.cwd(), '.env.local') })
 
 import bcrypt from 'bcryptjs'
 import dbConnect from '../lib/db'
@@ -74,12 +75,16 @@ async function generateSensorData(deviceId: string, count: number = 24) {
   
   for (let i = count - 1; i >= 0; i--) {
     const timestamp = new Date(now - i * 60 * 60 * 1000) // 1 hour intervals
+    const isRunning = Math.random() > 0.3 // 70% chance of running
     
     data.push({
       deviceId,
       temperature: 28 + Math.random() * 20, // 28-48°C
       humidity: 50 + Math.random() * 40, // 50-90%
       moisture: 20 + Math.random() * 30, // 20-50%
+      fanSpeed: isRunning ? 60 + Math.floor(Math.random() * 30) : 0, // 60-90% when running, 0 when idle
+      energy: isRunning ? 1.5 + Math.random() * 3 : 0, // 1.5-4.5 kWh when running, 0 when idle
+      status: isRunning ? 'running' : 'idle',
       timestamp,
     })
   }

@@ -74,11 +74,23 @@ export async function POST(
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    // Create START command
+    // Parse request body for optional parameters
+    let body: any = {}
+    try {
+      body = await request.json()
+    } catch {
+      // Body is optional for start command
+    }
+
+    const { mode, temperature, fanSpeed } = body
+
+    // Create START command with optional temperature/fanSpeed
     const command = await Command.create({
       deviceId,
       command: 'START',
-      mode: 'MANUAL',
+      mode: mode && ['AUTO', 'MANUAL'].includes(mode) ? mode : 'MANUAL',
+      temperature: temperature !== undefined ? Number(temperature) : undefined,
+      fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : undefined,
       status: 'pending',
     })
 
@@ -87,6 +99,8 @@ export async function POST(
       deviceId: command.deviceId,
       command: command.command,
       mode: command.mode,
+      temperature: command.temperature,
+      fanSpeed: command.fanSpeed,
       status: command.status,
       createdAt: command.createdAt.toISOString(),
     }, 201)

@@ -24,7 +24,20 @@
  */
 
 import axios, { AxiosInstance, AxiosError } from 'axios'
-import * as SecureStore from 'expo-secure-store'
+
+// SecureStore stub — replace with expo-secure-store in the Expo mobile app
+const SecureStore = {
+  getItemAsync: async (key: string): Promise<string | null> => {
+    if (typeof window !== 'undefined') return localStorage.getItem(key)
+    return null
+  },
+  setItemAsync: async (key: string, value: string): Promise<void> => {
+    if (typeof window !== 'undefined') localStorage.setItem(key, value)
+  },
+  deleteItemAsync: async (key: string): Promise<void> => {
+    if (typeof window !== 'undefined') localStorage.removeItem(key)
+  },
+}
 
 export interface User {
   id: string
@@ -90,10 +103,8 @@ export interface ApiError {
 
 class GrainApiClient {
   private client: AxiosInstance
-  private baseURL: string
 
   constructor(baseURL: string = 'http://localhost:3000/api') {
-    this.baseURL = baseURL
 
     this.client = axios.create({
       baseURL,
@@ -182,7 +193,7 @@ class GrainApiClient {
 
         throw new Error('Invalid login response')
       } catch (error) {
-        throw this.handleError(error as AxiosError)
+        throw this.handleError(error as AxiosError<any>)
       }
     },
 
@@ -196,7 +207,7 @@ class GrainApiClient {
 
         throw new Error('Invalid user response')
       } catch (error) {
-        throw this.handleError(error as AxiosError)
+        throw this.handleError(error as AxiosError<any>)
       }
     },
 
@@ -242,7 +253,7 @@ class GrainApiClient {
 
         throw new Error('Invalid sensor data response')
       } catch (error) {
-        throw this.handleError(error as AxiosError)
+        throw this.handleError(error as AxiosError<any>)
       }
     },
 
@@ -251,7 +262,7 @@ class GrainApiClient {
         const response = await this.sensors.getData(deviceId, { limit: 1 })
         return response.data[0] || null
       } catch (error) {
-        throw this.handleError(error as AxiosError)
+        throw this.handleError(error as AxiosError<any>)
       }
     },
 
@@ -268,7 +279,7 @@ class GrainApiClient {
 
         throw new Error('Invalid post response')
       } catch (error) {
-        throw this.handleError(error as AxiosError)
+        throw this.handleError(error as AxiosError<any>)
       }
     },
   }
@@ -290,7 +301,7 @@ class GrainApiClient {
 
         throw new Error('Invalid start response')
       } catch (error) {
-        throw this.handleError(error as AxiosError)
+        throw this.handleError(error as AxiosError<any>)
       }
     },
 
@@ -307,7 +318,7 @@ class GrainApiClient {
 
         throw new Error('Invalid stop response')
       } catch (error) {
-        throw this.handleError(error as AxiosError)
+        throw this.handleError(error as AxiosError<any>)
       }
     },
 
@@ -323,7 +334,7 @@ class GrainApiClient {
 
         throw new Error('Invalid commands response')
       } catch (error) {
-        throw this.handleError(error as AxiosError)
+        throw this.handleError(error as AxiosError<any>)
       }
     },
 
@@ -347,7 +358,7 @@ class GrainApiClient {
 
         throw new Error('Invalid devices response')
       } catch (error) {
-        throw this.handleError(error as AxiosError)
+        throw this.handleError(error as AxiosError<any>)
       }
     },
 
@@ -361,7 +372,7 @@ class GrainApiClient {
 
         throw new Error('Invalid device response')
       } catch (error) {
-        throw this.handleError(error as AxiosError)
+        throw this.handleError(error as AxiosError<any>)
       }
     },
   }

@@ -21,9 +21,12 @@ export default function DashboardPage() {
   const { data: analyticsData, isLoading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useAnalyticsOverview()
 
   const totalDevices = devices?.length || 0
-  const activeDryers = devices?.filter((d: any) => d.status === 'online').length || 0
-  const activeAlerts = 0 // TODO: Implement alerts system
-  const avgDryingTime = '4.9h' // TODO: Calculate from analytics
+  const onlineDevices = devices?.filter((d: any) => d.status === 'online').length || 0
+  const activeAlerts = 0 // TODO: Implement alerts count from useAlerts
+  const dryingCycles = analyticsData?.dryingCycles || []
+  const avgDryingTime = dryingCycles.length > 0
+    ? `${(dryingCycles.reduce((sum: number, c: any) => sum + (c.duration || 0), 0) / dryingCycles.length).toFixed(1)}h`
+    : '0h'
 
   if (devicesLoading || analyticsLoading) {
     return (
@@ -49,11 +52,12 @@ export default function DashboardPage() {
     )
   }
 
-  const { analytics = [] } = analyticsData || []
-  const chartData = analytics.slice(0, 10).map((item: any) => ({
-    time: item._id.date.split(' ')[1], // Just the time part
-    temperature: Math.round(item.avgTemperature * 10) / 10,
-    moisture: Math.round(item.avgMoisture * 10) / 10,
+  const moistureTrend = analyticsData?.moistureTrend || []
+
+  // Transform moisture trend data for charts
+  const chartData = moistureTrend.map((item: any) => ({
+    time: item.time,
+    moisture: item.value,
   }))
 
   if (devicesError || analyticsError) {
@@ -120,8 +124,8 @@ export default function DashboardPage() {
         />
         <MetricCard
           title="Active Dryers"
-          value={activeDryers.toString()}
-          subtitle={`${Math.round((activeDryers / totalDevices) * 100) || 0}% online`}
+          value={onlineDevices.toString()}
+          subtitle={`${Math.round((onlineDevices / totalDevices) * 100) || 0}% online`}
           trend={{ value: 5, isPositive: true }}
           icon={<Activity className="w-5 h-5" />}
         />
@@ -145,36 +149,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Temperature Chart */}
         <div className="bg-[#ffffff] rounded-lg border border-[#e5e7eb] p-6">
-          <h3 className="text-lg font-semibold text-[#111827] mb-1">Temperature Trend</h3>
-          <p className="text-sm text-[#6b7280] mb-6">Last 24 hours</p>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="time" stroke="#6b7280" style={{ fontSize: '12px' }} />
-              <YAxis stroke="#6b7280" style={{ fontSize: '12px' }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#ffffff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="temperature"
-                stroke="#166534"
-                strokeWidth={2}
-                dot={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Moisture Chart */}
-        <div className="bg-[#ffffff] rounded-lg border border-[#e5e7eb] p-6">
-          <h3 className="text-lg font-semibold text-[#111827] mb-1">Moisture Levels</h3>
-          <p className="text-sm text-[#6b7280] mb-6">Last 24 hours</p>
+          <h3 className="text-lg font-semibold text-[#111827] mb-1">Moisture Trend</h3>
+          <p className="text-sm text-[#6b7280] mb-6">Last 24 hours (hourly avg)</p>
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -191,9 +167,42 @@ export default function DashboardPage() {
               <Line
                 type="monotone"
                 dataKey="moisture"
+                stroke="#166534"
+                strokeWidth={2}
+                dot={false}
+                name="Moisture (%)"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Energy Consumption Chart */}
+        <div className="bg-[#ffffff] rounded-lg border border-[#e5e7eb] p-6">
+          <h3 className="text-lg font-semibold text-[#111827] mb-1">Energy Consumption</h3>
+          <p className="text-sm text-[#6b7280] mb-6">Last 7 days (daily total)</p>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={(analyticsData?.energyConsumption || []).map((item: any) => ({
+              time: item.day,
+              energy: item.value,
+            }))}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="time" stroke="#6b7280" style={{ fontSize: '12px' }} />
+              <YAxis stroke="#6b7280" style={{ fontSize: '12px' }} />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                }}
+              />
+              <Line
+                type="monotone"
+                dataKey="energy"
                 stroke="#22c55e"
                 strokeWidth={2}
                 dot={false}
+                name="Energy (kWh)"
               />
             </LineChart>
           </ResponsiveContainer>

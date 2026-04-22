@@ -7,6 +7,7 @@ import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
 import { isValidDeviceId } from '@/lib/utils/validation'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
+import { pushCommandToFirebase } from '@/lib/utils/firebase-sync'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -93,6 +94,18 @@ export async function POST(
       fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : undefined,
       status: 'pending',
     })
+
+    // Push command to Firebase for ESP32 to poll
+    try {
+      await pushCommandToFirebase(deviceId, command._id.toString(), {
+        command: 'START',
+        mode: mode && ['AUTO', 'MANUAL'].includes(mode) ? mode : 'MANUAL',
+        temperature: temperature !== undefined ? Number(temperature) : undefined,
+        fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : undefined,
+      })
+    } catch (firebaseError) {
+      console.warn('Firebase command push failed:', firebaseError)
+    }
 
     const response = successResponse({
       id: command._id,

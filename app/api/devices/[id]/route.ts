@@ -24,13 +24,13 @@ export async function GET(
 
     const { id } = await params
 
-    // Validate id is a valid ObjectId format
-    if (!id || !/^[0-9a-fA-F]{24}$/.test(id)) {
-      const response = errorResponse('Invalid device ID format', ErrorCodes.INVALID_INPUT, 400)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    // Support both MongoDB ObjectId and business deviceId (e.g., GR-001)
+    let device
+    if (/^[0-9a-fA-F]{24}$/.test(id)) {
+      device = await Device.findById(id).populate('assignedUser', 'name email')
+    } else {
+      device = await Device.findOne({ deviceId: id }).populate('assignedUser', 'name email')
     }
-
-    const device = await Device.findById(id).populate('assignedUser', 'name email')
 
     if (!device) {
       const response = errorResponse('Device not found', ErrorCodes.DEVICE_NOT_FOUND, 404)

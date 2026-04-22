@@ -159,7 +159,7 @@ export default function DeviceDetailPage() {
           </div>
           <div className="text-right">
             <p className="text-sm font-medium text-[#111827]">Last Active</p>
-            <p className="text-xs text-[#6b7280]">{device?.lastActive || 'Never'}</p>
+            <p className="text-xs text-[#6b7280]">{device?.lastActive ? new Date(device.lastActive).toLocaleString() : 'Never'}</p>
           </div>
         </div>
       </Card>

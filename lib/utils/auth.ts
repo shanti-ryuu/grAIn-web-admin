@@ -50,6 +50,9 @@ export function getUserFromRequest(request: NextRequest): TokenPayload | null {
 /**
  * Generate JWT token
  */
-export function generateToken(payload: Omit<TokenPayload, 'iat' | 'exp'>, expiresIn: string = '7d'): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn })
+export function generateToken(payload: Omit<TokenPayload, 'iat' | 'exp'>, expiresIn: number | string = '7d'): string {
+  const opts = typeof expiresIn === 'number'
+    ? { expiresIn } as jwt.SignOptions
+    : { expiresIn: expiresIn as any }
+  return jwt.sign(payload, JWT_SECRET, opts)
 }

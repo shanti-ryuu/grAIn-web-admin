@@ -1,13 +1,14 @@
-import dotenv from 'dotenv'
-dotenv.config({ path: '.env.local' })
+import * as dotenv from 'dotenv'
+import { resolve } from 'path'
+dotenv.config({ path: resolve(process.cwd(), '.env.local') })
 
-import mongoose from 'mongoose'
+import connectDB from '../lib/db'
 import User from '../lib/models/User'
 
 async function checkUsers() {
   try {
-    await mongoose.connect(process.env.MONGO_URI!)
-    console.log('✓ Connected to MongoDB')
+    await connectDB()
+    console.log('✓ Connected to MongoDB Atlas')
     
     const users = await User.find({}, 'email role password').lean()
     console.log('✓ Users in database:')

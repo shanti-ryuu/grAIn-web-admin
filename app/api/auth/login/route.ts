@@ -5,7 +5,7 @@ import User from '@/lib/models/User'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
-import { validateLoginRequest, getQueryParams } from '@/lib/utils/validation'
+import { validateLoginRequest } from '@/lib/utils/validation'
 import { generateToken } from '@/lib/utils/auth'
 
 export async function OPTIONS(request: NextRequest) {

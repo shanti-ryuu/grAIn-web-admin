@@ -59,14 +59,23 @@ export default function AnalyticsPage() {
     )
   }
 
-  const { analytics = [], summary = {} } = analyticsData || {}
+  const moistureTrend = analyticsData?.moistureTrend || []
+  const energyConsumption = analyticsData?.energyConsumption || []
+  const dryingCycles = analyticsData?.dryingCycles || []
+  const avgTemperature = analyticsData?.avgTemperature || 0
+  const totalCycles = analyticsData?.totalCycles || 0
+  const activeDryers = analyticsData?.activeDryers || 0
 
-  // Transform analytics data for charts
-  const chartData = analytics.map((item: any) => ({
-    time: item._id.date,
-    temperature: Math.round(item.avgTemperature * 10) / 10,
-    moisture: Math.round(item.avgMoisture * 10) / 10,
-    humidity: Math.round(item.avgHumidity * 10) / 10,
+  // Transform moisture trend data for charts
+  const chartData = moistureTrend.map((item: any) => ({
+    time: item.time,
+    moisture: item.value,
+  }))
+
+  // Transform energy consumption data
+  const energyData = energyConsumption.map((item: any) => ({
+    time: item.day,
+    energy: item.value,
   }))
 
   return (
@@ -115,8 +124,8 @@ export default function AnalyticsPage() {
             <Card className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[#6b7280]">Total Devices</p>
-                  <p className="text-2xl font-bold text-[#111827]">{summary.deviceCount || 0}</p>
+                  <p className="text-sm font-medium text-[#6b7280]">Total Drying Cycles</p>
+                  <p className="text-2xl font-bold text-[#111827]">{totalCycles}</p>
                 </div>
                 <div className="w-12 h-12 bg-[#f0fdf4] rounded-full flex items-center justify-center">
                   <svg className="w-6 h-6 text-[#16a34a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -129,8 +138,8 @@ export default function AnalyticsPage() {
             <Card className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[#6b7280]">Online Devices</p>
-                  <p className="text-2xl font-bold text-[#111827]">{summary.onlineDeviceCount || 0}</p>
+                  <p className="text-sm font-medium text-[#6b7280]">Active Dryers</p>
+                  <p className="text-2xl font-bold text-[#111827]">{activeDryers}</p>
                 </div>
                 <div className="w-12 h-12 bg-[#f0fdf4] rounded-full flex items-center justify-center">
                   <svg className="w-6 h-6 text-[#16a34a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -143,8 +152,8 @@ export default function AnalyticsPage() {
             <Card className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-[#6b7280]">Total Readings</p>
-                  <p className="text-2xl font-bold text-[#111827]">{summary.totalReadings || 0}</p>
+                  <p className="text-sm font-medium text-[#6b7280]">Avg Temperature</p>
+                  <p className="text-2xl font-bold text-[#111827]">{avgTemperature.toFixed(1)}°C</p>
                 </div>
                 <div className="w-12 h-12 bg-[#f0fdf4] rounded-full flex items-center justify-center">
                   <svg className="w-6 h-6 text-[#16a34a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -159,36 +168,7 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Temperature Trends */}
             <ChartCard
-              title="Temperature Trends"
-              description="Temperature measurements over time"
-            >
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="time" stroke="#6b7280" />
-                  <YAxis stroke="#6b7280" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="temperature"
-                    stroke="#16a34a"
-                    strokeWidth={2}
-                    dot={false}
-                    name="Temperature (°C)"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartCard>
-
-            {/* Moisture Reduction */}
-            <ChartCard
-              title="Moisture Reduction"
+              title="Moisture Trends"
               description="Grain moisture content over time"
             >
               <ResponsiveContainer width="100%" height={300}>
@@ -214,17 +194,46 @@ export default function AnalyticsPage() {
                 </LineChart>
               </ResponsiveContainer>
             </ChartCard>
+
+            {/* Moisture Reduction */}
+            <ChartCard
+              title="Energy Consumption"
+              description="Daily energy usage over time"
+            >
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={energyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="time" stroke="#6b7280" />
+                  <YAxis stroke="#6b7280" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="energy"
+                    stroke="#16a34a"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Energy (kWh)"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartCard>
           </div>
 
           {/* Drying Duration Chart */}
           <ChartCard
             title="Drying Duration"
-            description="Average drying time per device"
+            description="Duration of recent drying cycles (minutes)"
           >
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData}>
+              <LineChart data={dryingCycles.map((c: any) => ({ cycle: `Cycle ${c.cycle}`, duration: c.duration }))}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="time" stroke="#6b7280" />
+                <XAxis dataKey="cycle" stroke="#6b7280" />
                 <YAxis stroke="#6b7280" />
                 <Tooltip
                   contentStyle={{
@@ -235,11 +244,11 @@ export default function AnalyticsPage() {
                 />
                 <Line
                   type="monotone"
-                  dataKey="temperature"
+                  dataKey="duration"
                   stroke="#16a34a"
                   strokeWidth={2}
                   dot={false}
-                  name="Duration (hours)"
+                  name="Duration (min)"
                 />
               </LineChart>
             </ResponsiveContainer>

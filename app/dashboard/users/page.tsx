@@ -107,7 +107,7 @@ export default function UsersPage() {
           </p>
         </div>
       ) : (
-        <Table columns={columns} data={users} title="All Users" />
+        <Table columns={columns} data={users || []} title="All Users" />
       )}
     </div>
   )

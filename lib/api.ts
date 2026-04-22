@@ -1,6 +1,10 @@
 import axios from 'axios'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''
+// Default to '/api' so calls like api.post('/auth/login') resolve to /api/auth/login.
+// This works on any port (no hardcoded localhost:3000) and avoids the mismatch
+// that occurs when NEXT_PUBLIC_API_URL points to a different port.
+// Override NEXT_PUBLIC_API_URL only if the API is on a completely different host.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api'
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

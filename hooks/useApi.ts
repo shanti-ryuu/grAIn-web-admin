@@ -152,13 +152,13 @@ export const useAnalyticsOverview = () => {
   })
 }
 
-// Alerts (placeholder - not implemented yet)
+// Alerts
 export const useAlerts = () => {
   return useQuery({
     queryKey: ['alerts'],
     queryFn: async () => {
-      // TODO: Implement alerts API
-      return []
+      const { data: responseData } = await api.get<ApiResponse<any[]>>('/alerts')
+      return unwrapResponse(responseData)
     },
     staleTime: 5 * 60 * 1000,
   })

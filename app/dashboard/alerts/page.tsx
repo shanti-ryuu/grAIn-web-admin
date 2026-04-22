@@ -82,7 +82,7 @@ export default function AlertsPage() {
               }
 
               const config =
-                severityConfig[alert.severity as keyof typeof severityConfig] || severityConfig.info
+                severityConfig[alert.type as keyof typeof severityConfig] || severityConfig.info
 
               return (
                 <div
@@ -97,14 +97,14 @@ export default function AlertsPage() {
                     <p className="text-sm font-medium text-[#111827] break-words">
                       {alert.message}
                     </p>
-                    <p className="text-xs text-[#6b7280] mt-1">{alert.timestamp}</p>
+                    <p className="text-xs text-[#6b7280] mt-1">{alert.createdAt ? new Date(alert.createdAt).toLocaleString() : ''}</p>
                   </div>
 
                   {/* Badge */}
                   <span
                     className={`px-3 py-1 rounded text-xs font-semibold border capitalize whitespace-nowrap ${config.badge}`}
                   >
-                    {alert.severity}
+                    {alert.type}
                   </span>
                 </div>
               )

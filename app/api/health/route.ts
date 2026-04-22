@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import dbConnect from '@/lib/db'
+import mongoose from 'mongoose'
+import connectDB from '@/lib/db'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 
 export async function OPTIONS(request: NextRequest) {
@@ -8,25 +9,35 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    await dbConnect()
-
+    await connectDB()
+    const state = mongoose.connection.readyState
+    const states: Record<number, string> = {
+      0: 'disconnected',
+      1: 'connected',
+      2: 'connecting',
+      3: 'disconnecting'
+    }
     const response = NextResponse.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV,
-      version: '1.0.0',
+      success: true,
+      data: {
+        status: 'ok',
+        database: states[state] ?? 'unknown',
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString(),
+        version: '1.0.0'
+      }
     })
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
-  } catch (error) {
-    console.error('Health check failed:', error)
-    const response = NextResponse.json(
-      {
+  } catch (error: any) {
+    const response = NextResponse.json({
+      success: false,
+      data: {
         status: 'error',
-        message: 'Database connection failed',
-        timestamp: new Date().toISOString(),
-      },
-      { status: 503 }
-    )
+        database: 'disconnected',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }
+    }, { status: 503 })
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }
 }

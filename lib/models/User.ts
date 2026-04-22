@@ -41,7 +41,4 @@ const UserSchema: Schema = new Schema({
   timestamps: true,
 })
 
-// Index for faster queries
-UserSchema.index({ email: 1 })
-
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema)

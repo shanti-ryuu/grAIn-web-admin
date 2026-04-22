@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    const { deviceId, temperature, humidity, moisture } = body
+    const { deviceId, temperature, humidity, moisture, fanSpeed, energy, status } = body
 
     // Check if device exists
     const device = await Device.findOne({ deviceId })
@@ -58,6 +58,9 @@ export async function POST(request: NextRequest) {
       temperature: Number(temperature),
       humidity: Number(humidity),
       moisture: Number(moisture),
+      fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
+      energy: energy !== undefined ? Number(energy) : 0,
+      status: status && ['running', 'idle', 'paused', 'error'].includes(status) ? status : 'idle',
       timestamp: new Date(), // Ensure consistent timestamp
     })
 
@@ -73,6 +76,9 @@ export async function POST(request: NextRequest) {
       temperature: sensorData.temperature,
       humidity: sensorData.humidity,
       moisture: sensorData.moisture,
+      fanSpeed: sensorData.fanSpeed,
+      energy: sensorData.energy,
+      status: sensorData.status,
       timestamp: sensorData.timestamp.toISOString(),
       createdAt: sensorData.createdAt.toISOString(),
     }, 201)

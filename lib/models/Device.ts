@@ -40,7 +40,6 @@ const DeviceSchema: Schema = new Schema({
 })
 
 // Index for faster queries
-DeviceSchema.index({ deviceId: 1 })
 DeviceSchema.index({ assignedUser: 1 })
 
 export default mongoose.models.Device || mongoose.model<IDevice>('Device', DeviceSchema)

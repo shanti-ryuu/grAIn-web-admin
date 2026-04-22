@@ -5,6 +5,9 @@ export interface ISensorData extends Document {
   temperature: number
   humidity: number
   moisture: number
+  fanSpeed: number
+  energy: number
+  status: 'running' | 'idle' | 'paused' | 'error'
   timestamp: Date
   createdAt: Date
   updatedAt: Date
@@ -27,6 +30,22 @@ const SensorDataSchema: Schema = new Schema({
   moisture: {
     type: Number,
     required: true,
+  },
+  fanSpeed: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 100,
+  },
+  energy: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  status: {
+    type: String,
+    enum: ['running', 'idle', 'paused', 'error'],
+    default: 'idle',
   },
   timestamp: {
     type: Date,

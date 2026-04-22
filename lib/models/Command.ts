@@ -4,7 +4,9 @@ export interface ICommand extends Document {
   deviceId: string
   command: 'START' | 'STOP'
   mode: 'AUTO' | 'MANUAL'
-  status: 'pending' | 'executed'
+  temperature?: number
+  fanSpeed?: number
+  status: 'pending' | 'executed' | 'failed' | 'error'
   executedAt?: Date
   createdAt: Date
   updatedAt: Date
@@ -26,9 +28,17 @@ const CommandSchema: Schema = new Schema({
     enum: ['AUTO', 'MANUAL'],
     default: 'MANUAL',
   },
+  temperature: {
+    type: Number,
+  },
+  fanSpeed: {
+    type: Number,
+    min: 0,
+    max: 100,
+  },
   status: {
     type: String,
-    enum: ['pending', 'executed'],
+    enum: ['pending', 'executed', 'failed', 'error'],
     default: 'pending',
   },
   executedAt: {

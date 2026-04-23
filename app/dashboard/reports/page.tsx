@@ -1,161 +1,125 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, FileText, Calendar } from 'lucide-react'
-import Table from '@/components/Table'
 import Card from '@/components/Card'
+import Table from '@/components/Table'
+import MetricCard from '@/components/MetricCard'
+import ErrorState from '@/components/ErrorState'
 import { useToast } from '@/hooks/useToast'
+import { useCommandHistory, useAnalyticsOverview, useDevices } from '@/hooks/useApi'
+import { FileText, Activity, Zap, Cpu, Download } from 'lucide-react'
 
 export default function ReportsPage() {
   const { toast } = useToast()
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
-  const handleGenerateReport = async () => {
-    setIsGenerating(true)
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      toast({
-        title: 'Report generated',
-        description: 'Your new report has been generated successfully.',
-      })
-    } catch (error) {
-      toast({
-        title: 'Generation failed',
-        description: 'Failed to generate report. Please try again.',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsGenerating(false)
+  const { data: commands, isLoading: cmdLoading, error: cmdError, refetch } = useCommandHistory(undefined, 20)
+  const { data: analytics } = useAnalyticsOverview('monthly')
+  const { data: devices } = useDevices()
+
+  const isLoading = cmdLoading
+  const error = cmdError
+
+  const totalCycles = analytics?.totalCycles || 0
+  const avgMoisture = analytics?.moistureTrend?.length
+    ? (analytics.moistureTrend.reduce((s: number, r: any) => s + r.value, 0) / analytics.moistureTrend.length).toFixed(1)
+    : '--'
+  const totalEnergy = analytics?.energyConsumption?.reduce((s: number, r: any) => s + r.value, 0).toFixed(1) || '--'
+  const activeDevices = (devices || []).filter((d: any) => d.status === 'online').length
+
+  const filteredCommands = (commands || []).filter((cmd: any) => {
+    if (!dateFrom && !dateTo) return true
+    const cmdDate = new Date(cmd.createdAt)
+    if (dateFrom && cmdDate < new Date(dateFrom)) return false
+    if (dateTo && cmdDate > new Date(dateTo + 'T23:59:59')) return false
+    return true
+  })
+
+  const handleExportCSV = () => {
+    if (filteredCommands.length === 0) {
+      toast({ title: 'No data', description: 'No commands to export.', variant: 'destructive' })
+      return
     }
-  }
-
-  const handleDownload = (reportName: string) => {
-    toast({
-      title: 'Download started',
-      description: `Downloading ${reportName}...`,
+    const rows = ['DeviceID,Command,Mode,Status,Temperature,FanSpeed,Timestamp']
+    filteredCommands.forEach((cmd: any) => {
+      rows.push(`${cmd.deviceId},${cmd.command},${cmd.mode},${cmd.status},${cmd.temperature ?? ''},${cmd.fanSpeed ?? ''},${cmd.createdAt}`)
     })
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `report-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
+    URL.revokeObjectURL(url)
+    toast({ title: 'Report exported', description: 'CSV downloaded successfully.' })
   }
 
-  const columns = [
-    { key: 'name', label: 'Report Name' },
-    { key: 'date', label: 'Date' },
-    {
-      key: 'type',
-      label: 'Type',
-      render: (value: string) => (
-        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-600 capitalize">
-          {value}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Action',
-      render: (_value: string, row: any) => (
-        <button
-          onClick={() => handleDownload(row.name)}
-          className="flex items-center gap-2 text-[#166534] text-sm font-semibold hover:text-[#15803d] transition-colors"
-        >
-          <Download className="w-4 h-4" />
-          Download
-        </button>
-      ),
-    },
+  const commandColumns = [
+    { key: 'deviceId', label: 'Device ID' },
+    { key: 'command', label: 'Command' },
+    { key: 'mode', label: 'Mode' },
+    { key: 'status', label: 'Status', render: (v: string) => (
+      <span className={`px-2 py-1 rounded text-xs font-semibold ${v === 'executed' ? 'bg-green-50 text-green-600' : v === 'pending' ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600'}`}>{v}</span>
+    )},
+    { key: 'createdAt', label: 'Timestamp', render: (v: string) => new Date(v).toLocaleString() },
   ]
 
-  const mockReports = [
-    { id: '1', name: 'Monthly Performance Report', date: '2024-03-15', type: 'performance' },
-    { id: '2', name: 'Device Analytics Summary', date: '2024-03-10', type: 'analytics' },
-    { id: '3', name: 'Alert History Report', date: '2024-03-05', type: 'alerts' },
-    { id: '4', name: 'User Activity Log', date: '2024-02-28', type: 'users' },
-  ]
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-32 mb-2" /><div className="h-4 bg-gray-200 rounded w-96" /></div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">{[1,2,3,4].map(i => <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse"><div className="h-6 bg-gray-200 rounded w-24 mb-4" /></div>)}</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <div><h1 className="text-3xl font-bold text-gray-900 mb-2">Reports</h1><p className="text-base text-gray-500">Generate and download detailed reports.</p></div>
+        <ErrorState message="Failed to load report data." onRetry={refetch} />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-[#111827] mb-2">Reports</h1>
-        <p className="text-base text-[#6b7280]">
-          Generate and download system reports and analytics summaries.
-        </p>
+      <div className="flex items-start justify-between">
+        <div><h1 className="text-3xl font-bold text-gray-900 mb-2">Reports</h1><p className="text-base text-gray-500">Generate and download detailed reports on drying operations.</p></div>
+        <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+          <Download className="w-4 h-4" /> Export CSV
+        </button>
       </div>
 
-      {/* Generate Report Button */}
-      <Card className="p-6 bg-gradient-to-r from-[#f0fdf4] to-[#dcfce7] border-[#bbf7d0]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-[#166534] rounded-lg flex items-center justify-center">
-              <FileText className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 className="font-bold text-[#166534] mb-1">Generate New Report</h3>
-              <p className="text-sm text-[#166534]">
-                Create a new custom report with the latest data.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={handleGenerateReport}
-            disabled={isGenerating}
-            className="px-6 py-2.5 bg-[#166534] text-white font-semibold rounded-lg hover:bg-[#15803d] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-          >
-            {isGenerating ? 'Generating...' : 'Generate'}
-          </button>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <MetricCard title="Total Drying Cycles" value={totalCycles} subtitle="Last 30 days" icon={<Activity className="w-5 h-5" />} />
+        <MetricCard title="Avg Moisture Achieved" value={`${avgMoisture}%`} subtitle="Target: 13-14%" icon={<Zap className="w-5 h-5" />} />
+        <MetricCard title="Total Energy Used" value={`${totalEnergy} kWh`} subtitle="Last 30 days" icon={<Zap className="w-5 h-5" />} />
+        <MetricCard title="Active Devices" value={activeDevices} subtitle="Currently online" icon={<Cpu className="w-5 h-5" />} />
+      </div>
+
+      <Card className="p-4 flex flex-col sm:flex-row gap-4 items-end">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
         </div>
       </Card>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-[#f0fdf4] rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-[#166534]" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-[#111827]">{mockReports.length}</p>
-              <p className="text-sm text-[#6b7280]">Total Reports</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-[#f0fdf4] rounded-lg flex items-center justify-center">
-              <Calendar className="w-5 h-5 text-[#166534]" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-[#111827]">Mar 2024</p>
-              <p className="text-sm text-[#6b7280]">Last Generated</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-[#f0fdf4] rounded-lg flex items-center justify-center">
-              <Download className="w-5 h-5 text-[#166534]" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-[#111827]">12</p>
-              <p className="text-sm text-[#6b7280]">Downloads</p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Reports Table */}
-      {mockReports.length === 0 ? (
+      {filteredCommands.length === 0 ? (
         <Card className="p-12 text-center">
-          <div className="w-16 h-16 bg-[#f0fdf4] rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-[#166534]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FileText className="w-8 h-8 text-green-800" />
           </div>
-          <h3 className="text-lg font-semibold text-[#111827] mb-2">No Reports Available</h3>
-          <p className="text-sm text-[#6b7280]">
-            Generate your first report to get started.
-          </p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Activity</h3>
+          <p className="text-sm text-gray-500">No commands recorded for the selected period.</p>
         </Card>
       ) : (
-        <Table columns={columns} data={mockReports} title="Available Reports" />
+        <Table columns={commandColumns} data={filteredCommands} title="Recent Activity" />
       )}
     </div>
   )

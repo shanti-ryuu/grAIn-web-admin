@@ -1,68 +1,87 @@
 'use client'
 
+import { useState } from 'react'
+import { SearchIcon, Plus, X } from 'lucide-react'
 import Table from '@/components/Table'
-import { useUsers } from '@/hooks/useApi'
+import Card from '@/components/Card'
+import { useUsers, useCreateUser, useUpdateUser } from '@/hooks/useApi'
+import { useToast } from '@/hooks/useToast'
 import ErrorState from '@/components/ErrorState'
 
 export default function UsersPage() {
+  const { toast } = useToast()
+  const [searchTerm, setSearchTerm] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: 'farmer' })
+
   const { data: users, isLoading, error, refetch } = useUsers()
+  const createUser = useCreateUser()
+  const updateUser = useUpdateUser()
 
-  const statusBadge = (status: string) => {
-    const isActive = status === 'active'
-    return (
-      <span
-        className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
-          isActive
-            ? 'bg-green-50 text-green-600'
-            : 'bg-gray-100 text-gray-600'
-        }`}
-      >
-        {status}
-      </span>
-    )
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      await createUser.mutateAsync(addForm)
+      toast({ title: 'User created', description: `${addForm.name} has been added.` })
+      setShowAddModal(false)
+      setAddForm({ name: '', email: '', password: '', role: 'farmer' })
+    } catch {
+      toast({ title: 'Creation failed', description: 'Failed to create user.', variant: 'destructive' })
+    }
   }
 
-  const roleBadge = (role: string) => {
-    const isAdmin = role === 'admin'
-    return (
-      <span
-        className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${
-          isAdmin
-            ? 'bg-purple-50 text-purple-600'
-            : 'bg-blue-50 text-blue-600'
-        }`}
-      >
-        {role}
-      </span>
-    )
+  const handleToggleStatus = async (userId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'inactive' : 'active'
+    try {
+      await updateUser.mutateAsync({ id: userId, status: newStatus })
+      toast({ title: 'Status updated', description: `User is now ${newStatus}.` })
+    } catch {
+      toast({ title: 'Update failed', description: 'Failed to update user status.', variant: 'destructive' })
+    }
   }
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      await updateUser.mutateAsync({ id: userId, role: newRole })
+      toast({ title: 'Role updated', description: `Role changed to ${newRole}.` })
+    } catch {
+      toast({ title: 'Update failed', description: 'Failed to update role.', variant: 'destructive' })
+    }
+  }
+
+  const filteredUsers = (users || [])
+    .filter((u: any) => roleFilter === 'all' || u.role === roleFilter)
+    .filter((u: any) =>
+      u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+
+  const statusBadge = (status: string) => (
+    <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${status === 'active' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>{status}</span>
+  )
 
   const columns = [
     { key: 'name', label: 'Name' },
-    {
-      key: 'role',
-      label: 'Role',
-      render: (value: string) => roleBadge(value),
-    },
     { key: 'email', label: 'Email' },
-    { key: 'lastActive', label: 'Last Active' },
-    {
-      key: 'status',
-      label: 'Status',
-      render: (value: string) => statusBadge(value),
-    },
+    { key: 'role', label: 'Role', render: (value: string, row: any) => (
+      <select value={value} onChange={(e) => handleRoleChange(row.id, e.target.value)}
+        className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-green-800">
+        <option value="admin">Admin</option>
+        <option value="farmer">Farmer</option>
+      </select>
+    )},
+    { key: 'status', label: 'Status', render: (value: string, row: any) => (
+      <button onClick={() => handleToggleStatus(row.id, value)} className="cursor-pointer">{statusBadge(value)}</button>
+    )},
+    { key: 'createdAt', label: 'Created', render: (value: any) => value ? new Date(value).toLocaleDateString() : '--' },
   ]
 
   if (isLoading) {
     return (
       <div className="space-y-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-64 mb-2" />
-          <div className="h-4 bg-gray-200 rounded w-96" />
-        </div>
-        <div className="animate-pulse">
-          <div className="h-64 bg-gray-200 rounded" />
-        </div>
+        <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-64 mb-2" /><div className="h-4 bg-gray-200 rounded w-96" /></div>
+        <div className="animate-pulse"><div className="h-64 bg-gray-200 rounded" /></div>
       </div>
     )
   }
@@ -70,44 +89,88 @@ export default function UsersPage() {
   if (error) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-[#111827] mb-2">User Management</h1>
-          <p className="text-base text-[#6b7280]">
-            Manage administrator and farmer accounts in the system.
-          </p>
-        </div>
-        <ErrorState
-          message="Failed to load users. Please try again."
-          onRetry={refetch}
-        />
+        <div><h1 className="text-3xl font-bold text-gray-900 mb-2">User Management</h1><p className="text-base text-gray-500">Manage administrator and farmer accounts.</p></div>
+        <ErrorState message="Failed to load users." onRetry={refetch} />
       </div>
     )
   }
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-[#111827] mb-2">User Management</h1>
-        <p className="text-base text-[#6b7280]">
-          Manage administrator and farmer accounts in the system.
-        </p>
+      <div className="flex items-start justify-between">
+        <div><h1 className="text-3xl font-bold text-gray-900 mb-2">User Management</h1><p className="text-base text-gray-500">Manage administrator and farmer accounts.</p></div>
+        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+          <Plus className="w-4 h-4" /> Add User
+        </button>
       </div>
 
-      {(users || []).length === 0 ? (
-        <div className="bg-[#ffffff] rounded-lg border border-[#e5e7eb] p-12 text-center">
-          <div className="w-16 h-16 bg-[#f0fdf4] rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-[#166534]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-[#111827] mb-2">No Users Found</h3>
-          <p className="text-sm text-[#6b7280]">
-            There are no users in the system yet. Add your first user to get started.
-          </p>
+      <Card className="p-4 flex flex-col sm:flex-row gap-4">
+        <div className="flex-1 relative">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input type="text" placeholder="Search by name or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white" />
         </div>
+        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
+          className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
+          <option value="all">All Roles</option>
+          <option value="admin">Admin</option>
+          <option value="farmer">Farmer</option>
+        </select>
+      </Card>
+
+      {filteredUsers.length === 0 ? (
+        <Card className="p-12 text-center">
+          <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Users Found</h3>
+          <p className="text-sm text-gray-500">Add your first user to get started.</p>
+        </Card>
       ) : (
-        <Table columns={columns} data={users || []} title="All Users" />
+        <Table columns={columns} data={filteredUsers} title="All Users" />
+      )}
+
+      {/* Add User Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg border border-gray-200 p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Add User</h2>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleAddUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                <input type="text" value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} required
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input type="email" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} required
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input type="password" value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} required minLength={6}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                <select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
+                  <option value="farmer">Farmer</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+                <button type="submit" disabled={createUser.isPending} className="flex-1 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                  {createUser.isPending ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   )

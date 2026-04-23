@@ -1,7 +1,8 @@
+'use client'
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 
-// All API responses are wrapped in { success, data } or { success, error }
 interface ApiResponse<T> {
   success: boolean
   data?: T
@@ -10,7 +11,6 @@ interface ApiResponse<T> {
   timestamp: string
 }
 
-// Helper to unwrap the standardized API response
 function unwrapResponse<T>(responseData: ApiResponse<T>): T {
   if (!responseData.success || responseData.data === undefined) {
     throw new Error(responseData.error || 'Request failed')
@@ -39,6 +39,15 @@ export const useMe = () => {
   })
 }
 
+export const useRegister = () => {
+  return useMutation({
+    mutationFn: async (payload: { name: string; email: string; password: string; role?: string }) => {
+      const { data: responseData } = await api.post<ApiResponse<{ token: string; user: any }>>('/auth/register', payload)
+      return unwrapResponse(responseData)
+    },
+  })
+}
+
 // Devices
 export const useDevices = () => {
   return useQuery({
@@ -59,6 +68,7 @@ export const useDevice = (id: string) => {
       return unwrapResponse(responseData)
     },
     staleTime: 5 * 60 * 1000,
+    enabled: !!id,
   })
 }
 
@@ -87,10 +97,23 @@ export const useUsers = () => {
   })
 }
 
+export const useCreateUser = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { name: string; email: string; password: string; role?: string }) => {
+      const { data: responseData } = await api.post<ApiResponse<any>>('/users', payload)
+      return unwrapResponse(responseData)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+    },
+  })
+}
+
 export const useUpdateUser = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
       const { data: responseData } = await api.patch<ApiResponse<any>>(`/users/${id}`, updates)
       return unwrapResponse(responseData)
     },
@@ -100,16 +123,16 @@ export const useUpdateUser = () => {
   })
 }
 
-// Sensor Data (returns array from paginated response)
-export const useSensorData = (deviceId: string) => {
+// Sensor Data
+export const useSensorData = (deviceId: string, hours: number = 24) => {
   return useQuery({
-    queryKey: ['sensors', deviceId],
+    queryKey: ['sensors', deviceId, hours],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any[]> & { pagination?: any }>(`/sensors/${deviceId}`)
+      const { data: responseData } = await api.get<ApiResponse<any[]>>(`/sensors/${deviceId}?hours=${hours}`)
       return unwrapResponse(responseData)
     },
     staleTime: 2 * 60 * 1000,
-    enabled: !!deviceId, // Don't fetch if no deviceId
+    enabled: !!deviceId,
   })
 }
 
@@ -117,12 +140,13 @@ export const useSensorData = (deviceId: string) => {
 export const useStartDryer = () => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (deviceId: string) => {
-      const { data: responseData } = await api.post<ApiResponse<any>>(`/dryer/${deviceId}/start`)
+    mutationFn: async ({ deviceId, ...opts }: { deviceId: string; mode?: string; temperature?: number; fanSpeed?: number }) => {
+      const { data: responseData } = await api.post<ApiResponse<any>>(`/dryer/${deviceId}/start`, opts)
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
     },
   })
 }
@@ -136,16 +160,31 @@ export const useStopDryer = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
     },
   })
 }
 
-// Analytics
-export const useAnalyticsOverview = () => {
+export const useCommandHistory = (deviceId?: string, limit: number = 20) => {
   return useQuery({
-    queryKey: ['analytics', 'overview'],
+    queryKey: ['commands', deviceId, limit],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any>>('/analytics/overview')
+      const params = new URLSearchParams({ limit: String(limit) })
+      if (deviceId) params.set('deviceId', deviceId)
+      const { data: responseData } = await api.get<ApiResponse<any[]>>(`/commands/history?${params}`)
+      return unwrapResponse(responseData)
+    },
+    staleTime: 2 * 60 * 1000,
+  })
+}
+
+// Analytics
+export const useAnalyticsOverview = (period: string = 'weekly', deviceId: string = 'all') => {
+  return useQuery({
+    queryKey: ['analytics', 'overview', period, deviceId],
+    queryFn: async () => {
+      const params = new URLSearchParams({ period, deviceId })
+      const { data: responseData } = await api.get<ApiResponse<any>>(`/analytics/overview?${params}`)
       return unwrapResponse(responseData)
     },
     staleTime: 5 * 60 * 1000,
@@ -153,13 +192,40 @@ export const useAnalyticsOverview = () => {
 }
 
 // Alerts
-export const useAlerts = () => {
+export const useAlerts = (type?: string) => {
   return useQuery({
-    queryKey: ['alerts'],
+    queryKey: ['alerts', type],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any[]>>('/alerts')
+      const params = type ? `?type=${type}` : ''
+      const { data: responseData } = await api.get<ApiResponse<any[]>>(`/alerts${params}`)
       return unwrapResponse(responseData)
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
+  })
+}
+
+export const useMarkAlertRead = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (alertId: string) => {
+      const { data: responseData } = await api.patch<ApiResponse<any>>(`/alerts/${alertId}/read`)
+      return unwrapResponse(responseData)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alerts'] })
+    },
+  })
+}
+
+export const useClearAllAlerts = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async () => {
+      const { data: responseData } = await api.post<ApiResponse<any>>('/alerts/clear')
+      return unwrapResponse(responseData)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['alerts'] })
+    },
   })
 }

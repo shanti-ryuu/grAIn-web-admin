@@ -30,10 +30,13 @@ export async function connectDB() {
     const opts = {
       bufferCommands: false,
       maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
       family: 4,
       dbName: 'grain',
+      tls: true,
+      retryWrites: true,
+      w: 'majority' as const,
     }
 
     cached.promise = mongoose

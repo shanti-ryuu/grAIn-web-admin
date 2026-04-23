@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import bcrypt from 'bcryptjs'
 import dbConnect from '@/lib/db'
 import User from '@/lib/models/User'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
@@ -16,26 +17,63 @@ export async function PATCH(
   try {
     await dbConnect()
 
-    const user = getUserFromRequest(request)
-    if (!user || user.role !== 'admin') {
-      const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
+    const authUser = getUserFromRequest(request)
+    if (!authUser) {
+      const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     const { id } = await params
-    const { name, email, role, status } = await request.json()
+    const body = await request.json()
+    const { name, email, role, status, password, currentPassword } = body
+
+    // Allow users to update their own profile (password change) or admins to update any user
+    const isAdmin = authUser.role === 'admin'
+    const isSelf = authUser.userId === id
+
+    if (!isAdmin && !isSelf) {
+      const response = errorResponse('Forbidden', ErrorCodes.FORBIDDEN, 403)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    }
 
     const updateData: any = {}
+
+    // Profile fields (admin or self)
     if (name) updateData.name = name
     if (email) updateData.email = email
-    if (role) updateData.role = role
-    if (status) updateData.status = status
 
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true }
-    ).select('-password')
+    // Admin-only fields
+    if (isAdmin) {
+      if (role) updateData.role = role
+      if (status) updateData.status = status
+    }
+
+    // Password change requires current password verification
+    if (password) {
+      if (!currentPassword && !isAdmin) {
+        const response = errorResponse('Current password is required', ErrorCodes.INVALID_INPUT, 400)
+        return addCorsHeaders(response, request.headers.get('origin') || undefined)
+      }
+
+      const targetUser = await User.findById(id).select('+password')
+      if (!targetUser) {
+        const response = errorResponse('User not found', ErrorCodes.USER_NOT_FOUND, 404)
+        return addCorsHeaders(response, request.headers.get('origin') || undefined)
+      }
+
+      // Non-admin must verify current password
+      if (!isAdmin) {
+        const isValid = await bcrypt.compare(currentPassword, targetUser.password)
+        if (!isValid) {
+          const response = errorResponse('Current password is incorrect', ErrorCodes.INVALID_INPUT, 400)
+          return addCorsHeaders(response, request.headers.get('origin') || undefined)
+        }
+      }
+
+      updateData.password = await bcrypt.hash(password, 12)
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(id, updateData, { new: true }).select('-password')
 
     if (!updatedUser) {
       const response = errorResponse('User not found', ErrorCodes.USER_NOT_FOUND, 404)

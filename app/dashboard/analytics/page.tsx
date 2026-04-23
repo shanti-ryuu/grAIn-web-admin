@@ -1,42 +1,46 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar } from 'lucide-react'
-import ChartCard from '@/components/ChartCard'
 import Card from '@/components/Card'
-import { useAnalyticsOverview } from '@/hooks/useApi'
+import ChartCard from '@/components/ChartCard'
+import MetricCard from '@/components/MetricCard'
 import ErrorState from '@/components/ErrorState'
+import { useAnalyticsOverview, useDevices } from '@/hooks/useApi'
+import { Thermometer, Droplets, Zap, Activity, Download, FileText } from 'lucide-react'
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
+  LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 
+const PIE_COLORS = ['#166534', '#6b7280', '#22c55e']
+
 export default function AnalyticsPage() {
-  const [dateRange, setDateRange] = useState('7d')
-  const { data: analyticsData, isLoading, error, refetch } = useAnalyticsOverview()
+  const [period, setPeriod] = useState('weekly')
+  const [deviceId, setDeviceId] = useState('all')
+  const { data: analytics, isLoading, error, refetch } = useAnalyticsOverview(period, deviceId)
+  const { data: devices } = useDevices()
+
+  const handleExportCSV = () => {
+    if (!analytics) return
+    const rows: string[] = ['Type,Time/Label,Value']
+    analytics.moistureTrend?.forEach((r: any) => rows.push(`Moisture,${r.time},${r.value}`))
+    analytics.energyConsumption?.forEach((r: any) => rows.push(`Energy,${r.day},${r.value}`))
+    analytics.dryingCycles?.forEach((r: any) => rows.push(`Cycle,${r.cycle},${r.duration}`))
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `analytics-${period}-${deviceId}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportPDF = () => { window.print() }
 
   if (isLoading) {
     return (
       <div className="space-y-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-32 mb-2" />
-          <div className="h-4 bg-gray-200 rounded w-96" />
-        </div>
-        <Card className="p-4 animate-pulse">
-          <div className="h-10 bg-gray-200 rounded" />
-        </Card>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {[1, 2].map((i) => (
-            <Card key={i} className="p-6 animate-pulse">
-              <div className="h-8 bg-gray-200 rounded mb-4" />
-              <div className="h-64 bg-gray-200 rounded" />
-            </Card>
-          ))}
+        <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-32 mb-2" /><div className="h-4 bg-gray-200 rounded w-96" /></div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (<div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse"><div className="h-6 bg-gray-200 rounded w-24 mb-4" /><div className="h-10 bg-gray-200 rounded w-16 mb-2" /></div>))}
         </div>
       </div>
     )
@@ -45,216 +49,106 @@ export default function AnalyticsPage() {
   if (error) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-[#111827] mb-2">Analytics</h1>
-          <p className="text-base text-[#6b7280]">
-            View historical data and performance metrics of your devices.
-          </p>
-        </div>
-        <ErrorState
-          message="Failed to load analytics. Please try again."
-          onRetry={refetch}
-        />
+        <div><h1 className="text-3xl font-bold text-gray-900 mb-2">Analytics</h1><p className="text-base text-gray-500">Insights and trends across all dryer operations.</p></div>
+        <ErrorState message="Failed to load analytics." onRetry={refetch} />
       </div>
     )
   }
 
-  const moistureTrend = analyticsData?.moistureTrend || []
-  const energyConsumption = analyticsData?.energyConsumption || []
-  const dryingCycles = analyticsData?.dryingCycles || []
-  const avgTemperature = analyticsData?.avgTemperature || 0
-  const totalCycles = analyticsData?.totalCycles || 0
-  const activeDryers = analyticsData?.activeDryers || 0
-
-  // Transform moisture trend data for charts
-  const chartData = moistureTrend.map((item: any) => ({
-    time: item.time,
-    moisture: item.value,
-  }))
-
-  // Transform energy consumption data
-  const energyData = energyConsumption.map((item: any) => ({
-    time: item.day,
-    energy: item.value,
-  }))
+  const { moistureTrend = [], dryingCycles = [], energyConsumption = [], avgTemperature = 0, avgHumidity = 0, totalCycles = 0, activeDryers = 0, deviceStatusDistribution = [] } = analytics || {}
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-[#111827] mb-2">Analytics</h1>
-        <p className="text-base text-[#6b7280]">
-          View historical data and performance metrics of your devices.
-        </p>
+      <div className="flex items-start justify-between">
+        <div><h1 className="text-3xl font-bold text-gray-900 mb-2">Analytics</h1><p className="text-base text-gray-500">Insights and trends across all dryer operations.</p></div>
+        <div className="flex gap-2">
+          <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            <Download className="w-4 h-4" /> CSV
+          </button>
+          <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+            <FileText className="w-4 h-4" /> PDF
+          </button>
+        </div>
       </div>
 
-      {/* Date Range Filter */}
-      <Card className="p-4">
-        <div className="flex items-center gap-4">
-          <Calendar className="w-5 h-5 text-[#6b7280]" />
-          <select
-            value={dateRange}
-            onChange={(e) => setDateRange(e.target.value)}
-            className="text-sm border border-[#e5e7eb] rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#166534] font-medium bg-[#ffffff]"
-          >
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-            <option value="30d">Last 30 Days</option>
-            <option value="90d">Last 90 Days</option>
+      <Card className="p-4 flex flex-col sm:flex-row gap-4">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-gray-700">Period:</span>
+          {['daily', 'weekly', 'monthly'].map((p) => (
+            <button key={p} onClick={() => setPeriod(p)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${period === p ? 'bg-green-800 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}>
+              {p.charAt(0).toUpperCase() + p.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-gray-700">Device:</span>
+          <select value={deviceId} onChange={(e) => setDeviceId(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
+            <option value="all">All Devices</option>
+            {(devices || []).map((d: any) => (<option key={d.deviceId} value={d.deviceId}>{d.deviceId}</option>))}
           </select>
         </div>
       </Card>
 
-      {chartData.length === 0 ? (
-        <Card className="p-12 text-center">
-          <div className="w-16 h-16 bg-[#f0fdf4] rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-[#166534]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-[#111827] mb-2">No Analytics Data</h3>
-          <p className="text-sm text-[#6b7280]">
-            No analytics data available for the selected time period.
-          </p>
-        </Card>
-      ) : (
-        <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[#6b7280]">Total Drying Cycles</p>
-                  <p className="text-2xl font-bold text-[#111827]">{totalCycles}</p>
-                </div>
-                <div className="w-12 h-12 bg-[#f0fdf4] rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-[#16a34a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                  </svg>
-                </div>
-              </div>
-            </Card>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <MetricCard title="Avg Temperature" value={`${avgTemperature}°C`} subtitle="Across all devices" icon={<Thermometer className="w-5 h-5" />} />
+        <MetricCard title="Avg Humidity" value={`${avgHumidity}%`} subtitle="Across all devices" icon={<Droplets className="w-5 h-5" />} />
+        <MetricCard title="Total Cycles" value={totalCycles} subtitle="Drying cycles completed" icon={<Activity className="w-5 h-5" />} />
+        <MetricCard title="Active Dryers" value={activeDryers} subtitle="Currently running" icon={<Zap className="w-5 h-5" />} />
+      </div>
 
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[#6b7280]">Active Dryers</p>
-                  <p className="text-2xl font-bold text-[#111827]">{activeDryers}</p>
-                </div>
-                <div className="w-12 h-12 bg-[#f0fdf4] rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-[#16a34a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-              </div>
-            </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ChartCard title="Moisture Levels" description="Average moisture over time">
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={moistureTrend}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="time" stroke="#6b7280" tick={{ fontSize: 11 }} />
+              <YAxis stroke="#6b7280" />
+              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+              <Line type="monotone" dataKey="value" stroke="#166534" strokeWidth={2} dot={false} name="Moisture (%)" />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-[#6b7280]">Avg Temperature</p>
-                  <p className="text-2xl font-bold text-[#111827]">{avgTemperature.toFixed(1)}°C</p>
-                </div>
-                <div className="w-12 h-12 bg-[#f0fdf4] rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-[#16a34a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-              </div>
-            </Card>
-          </div>
+        <ChartCard title="Drying Cycle Duration" description="Duration of recent cycles">
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={dryingCycles}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="cycle" stroke="#6b7280" tick={{ fontSize: 11 }} />
+              <YAxis stroke="#6b7280" />
+              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+              <Bar dataKey="duration" fill="#166534" radius={[4, 4, 0, 0]} name="Duration (min)" />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-          {/* Historical Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Temperature Trends */}
-            <ChartCard
-              title="Moisture Trends"
-              description="Grain moisture content over time"
-            >
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="time" stroke="#6b7280" />
-                  <YAxis stroke="#6b7280" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="moisture"
-                    stroke="#16a34a"
-                    strokeWidth={2}
-                    dot={false}
-                    name="Moisture (%)"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartCard>
+        <ChartCard title="Energy Consumption" description="Energy usage over time">
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={energyConsumption}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="day" stroke="#6b7280" tick={{ fontSize: 11 }} />
+              <YAxis stroke="#6b7280" />
+              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+              <Area type="monotone" dataKey="value" stroke="#166534" fill="#f0fdf4" strokeWidth={2} name="Energy (kWh)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
-            {/* Moisture Reduction */}
-            <ChartCard
-              title="Energy Consumption"
-              description="Daily energy usage over time"
-            >
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={energyData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="time" stroke="#6b7280" />
-                  <YAxis stroke="#6b7280" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '8px',
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="energy"
-                    stroke="#16a34a"
-                    strokeWidth={2}
-                    dot={false}
-                    name="Energy (kWh)"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          </div>
-
-          {/* Drying Duration Chart */}
-          <ChartCard
-            title="Drying Duration"
-            description="Duration of recent drying cycles (minutes)"
-          >
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={dryingCycles.map((c: any) => ({ cycle: `Cycle ${c.cycle}`, duration: c.duration }))}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="cycle" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="duration"
-                  stroke="#16a34a"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Duration (min)"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
-        </>
-      )}
+        <ChartCard title="Device Status Distribution" description="Online vs Offline devices">
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie data={deviceStatusDistribution.length > 0 ? deviceStatusDistribution : [{ status: 'No data', count: 1 }]} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={100} label>
+                {(deviceStatusDistribution.length > 0 ? deviceStatusDistribution : [{ status: 'No data', count: 1 }]).map((_: any, i: number) => (
+                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: '8px' }} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
     </div>
   )
 }

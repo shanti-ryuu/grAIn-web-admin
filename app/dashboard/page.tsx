@@ -2,10 +2,10 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { Cpu, Activity, AlertTriangle, Clock } from 'lucide-react'
+import { Cpu, Activity, AlertTriangle, Users } from 'lucide-react'
 import MetricCard from '@/components/MetricCard'
 import Card from '@/components/Card'
-import { useDevices, useAnalyticsOverview, useAlerts } from '@/hooks/useApi'
+import { useDevices, useAnalyticsOverview, useAlerts, useUsers } from '@/hooks/useApi'
 import ErrorState from '@/components/ErrorState'
 import { getFirebaseApp } from '@/lib/firebase'
 import {
@@ -17,6 +17,16 @@ export default function DashboardPage() {
   const { data: devices, isLoading: devicesLoading, error: devicesError, refetch: refetchDevices } = useDevices()
   const { data: analyticsData, isLoading: analyticsLoading, error: analyticsError, refetch: refetchAnalytics } = useAnalyticsOverview()
   const { data: alerts } = useAlerts()
+  const { data: usersData } = useUsers(1, 1)
+
+  // Auto-refresh dashboard data every 30s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refetchDevices()
+      refetchAnalytics()
+    }, 30_000)
+    return () => clearInterval(interval)
+  }, [refetchDevices, refetchAnalytics])
 
   const [liveData, setLiveData] = useState<Record<string, any>>({})
   const [isLive, setIsLive] = useState(false)
@@ -52,10 +62,7 @@ export default function DashboardPage() {
   const totalDevices = devices?.length || 0
   const onlineDevices = devices?.filter((d: any) => d.status === 'online').length || 0
   const unreadAlerts = (alerts || []).filter((a: any) => !a.isRead).length
-  const dryingCycles = analyticsData?.dryingCycles || []
-  const avgDryingTime = dryingCycles.length > 0
-    ? `${(dryingCycles.reduce((sum: number, c: any) => sum + (c.duration || 0), 0) / dryingCycles.length).toFixed(1)}h`
-    : '0h'
+  const totalUsers = (usersData as any)?.pagination?.total || 0
 
   if (devicesLoading || analyticsLoading) {
     return (
@@ -119,9 +126,9 @@ export default function DashboardPage() {
       {/* Metric Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard title="Total Devices" value={totalDevices.toString()} subtitle="Registered devices" icon={<Cpu className="w-5 h-5" />} />
-        <MetricCard title="Active Dryers" value={onlineDevices.toString()} subtitle={`${totalDevices > 0 ? Math.round((onlineDevices / totalDevices) * 100) : 0}% online`} icon={<Activity className="w-5 h-5" />} />
+        <MetricCard title="Online Devices" value={onlineDevices.toString()} subtitle={`${totalDevices > 0 ? Math.round((onlineDevices / totalDevices) * 100) : 0}% online`} icon={<Activity className="w-5 h-5" />} />
+        <MetricCard title="Active Users" value={totalUsers.toString()} subtitle="Registered users" icon={<Users className="w-5 h-5" />} />
         <MetricCard title="Unread Alerts" value={unreadAlerts.toString()} subtitle="System alerts" icon={<AlertTriangle className="w-5 h-5" />} />
-        <MetricCard title="Avg Drying Time" value={avgDryingTime} subtitle="Last 24h average" icon={<Clock className="w-5 h-5" />} />
       </div>
 
       {/* Live Device Cards */}
@@ -146,7 +153,7 @@ export default function DashboardPage() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-6">
+        <Card className="p-6 glass-card">
           <h3 className="text-lg font-semibold text-gray-900 mb-1">Moisture Trend</h3>
           <p className="text-sm text-gray-500 mb-6">Last 24 hours (hourly avg)</p>
           <ResponsiveContainer width="100%" height={250}>
@@ -160,7 +167,7 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 glass-card">
           <h3 className="text-lg font-semibold text-gray-900 mb-1">Energy Consumption</h3>
           <p className="text-sm text-gray-500 mb-6">Last 7 days (daily total)</p>
           <ResponsiveContainer width="100%" height={250}>

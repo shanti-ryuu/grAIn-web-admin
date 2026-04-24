@@ -1,18 +1,26 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Trash2, CheckCircle } from 'lucide-react'
 import Card from '@/components/Card'
 import ErrorState from '@/components/ErrorState'
 import { useAlerts, useMarkAlertRead, useClearAllAlerts } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
+import { useRouter } from 'next/navigation'
 
 export default function AlertsPage() {
+  const router = useRouter()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('all')
   const { data: alerts, isLoading, error, refetch } = useAlerts()
   const markRead = useMarkAlertRead()
   const clearAll = useClearAllAlerts()
+
+  // Auto-refresh every 30s
+  useEffect(() => {
+    const interval = setInterval(() => refetch(), 30_000)
+    return () => clearInterval(interval)
+  }, [refetch])
 
   const handleMarkRead = async (alertId: string) => {
     try {
@@ -36,6 +44,7 @@ export default function AlertsPage() {
 
   const filteredAlerts = useMemo(() => {
     if (activeTab === 'all') return allAlerts
+    if (activeTab === 'unread') return allAlerts.filter((a: any) => !a.isRead)
     return allAlerts.filter((a: any) => a.type === activeTab)
   }, [allAlerts, activeTab])
 
@@ -76,7 +85,7 @@ export default function AlertsPage() {
       </div>
 
       <Card className="p-4 flex gap-3 no-print">
-        {['all', 'critical', 'warning', 'info'].map((t) => (
+        {['all', 'unread', 'critical', 'warning', 'info'].map((t) => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === t ? 'bg-green-800 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
@@ -106,7 +115,9 @@ export default function AlertsPage() {
                     <p className={`text-sm break-words ${alert.isRead ? 'text-gray-400' : 'font-medium text-gray-900'}`}>{alert.message}</p>
                     <div className="flex items-center gap-3 mt-1">
                       <p className="text-xs text-gray-400">{alert.createdAt ? new Date(alert.createdAt).toLocaleString() : ''}</p>
-                      {alert.deviceId && <span className="text-xs text-gray-400">Device: {alert.deviceId}</span>}
+                      {alert.deviceId && (
+                        <button onClick={() => router.push(`/dashboard/devices`)} className="text-xs text-green-800 hover:underline">Device: {alert.deviceId}</button>
+                      )}
                     </div>
                   </div>
                   <span className={`px-3 py-1 rounded text-xs font-semibold border capitalize whitespace-nowrap ${config.badge}`}>{alert.type}</span>

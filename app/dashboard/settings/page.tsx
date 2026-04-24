@@ -256,6 +256,49 @@ export default function SettingsPage() {
           </div>
         )}
       </Card>
+
+      {/* Danger Zone */}
+      <Card className="p-8 border-red-200">
+        <div className="flex items-center gap-3 mb-6">
+          <Shield className="w-5 h-5 text-red-600" />
+          <h2 className="text-xl font-semibold text-red-600">Danger Zone</h2>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 border border-red-200 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Export My Data</p>
+              <p className="text-xs text-gray-500">Download all your account data as JSON</p>
+            </div>
+            <button
+              onClick={() => {
+                const data = JSON.stringify({ user, settings: { targetMoisture, tempUnit, alertTempMax, alertHumidityMax, emailNotifications, alertFrequency } }, null, 2)
+                const blob = new Blob([data], { type: 'application/json' })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement('a')
+                a.href = url; a.download = 'grain-account-data.json'; a.click()
+                URL.revokeObjectURL(url)
+                toast({ title: 'Data Exported', description: 'Your account data has been downloaded' })
+              }}
+              className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              Export Data
+            </button>
+          </div>
+          <div className="flex items-center justify-between p-4 border border-red-200 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Delete Account</p>
+              <p className="text-xs text-gray-500">Permanently delete your account and all data</p>
+            </div>
+            <button
+              disabled={user?.role === 'admin'}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              title={user?.role === 'admin' ? 'Cannot delete the last admin account' : ''}
+            >
+              Delete Account
+            </button>
+          </div>
+        </div>
+      </Card>
     </div>
   )
 }

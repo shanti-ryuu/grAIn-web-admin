@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
 import { Plus, X, MoreHorizontal, Shield, UserCheck, UserX, Trash2, Eye, Loader2 } from 'lucide-react'
@@ -217,7 +217,7 @@ export default function UsersPage() {
   const columns: ColumnDef<UserRow>[] = [
     {
       id: 'select',
-      header: ({ table }) => (
+      header: () => (
         <input
           type="checkbox"
           checked={selectedRows.length === tableData.length && tableData.length > 0}

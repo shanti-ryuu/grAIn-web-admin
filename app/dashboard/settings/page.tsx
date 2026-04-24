@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react'
 import Card from '@/components/Card'
 import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
-import { useUpdateUser, useDevices } from '@/hooks/useApi'
+import { useUpdateUser, useDevices, useChangePassword } from '@/hooks/useApi'
 import { Settings as SettingsIcon, Bell, Shield, Cpu, Lock } from 'lucide-react'
 
 export default function SettingsPage() {
   const { toast } = useToast()
   const { user } = useAuthStore()
   const updateUser = useUpdateUser()
+  const changePassword = useChangePassword()
   const { data: devices } = useDevices()
 
   // System Settings (persisted to localStorage)
@@ -64,9 +65,7 @@ export default function SettingsPage() {
       return
     }
     try {
-      if (!user?.id) return
-      await updateUser.mutateAsync({ id: user.id, currentPassword: pwForm.currentPassword, password: pwForm.newPassword })
-      toast({ title: 'Password changed', description: 'Your password has been updated.' })
+      await changePassword.mutateAsync(pwForm)
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch {
       toast({ title: 'Failed', description: 'Could not change password. Check your current password.', variant: 'destructive' })

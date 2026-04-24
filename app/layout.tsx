@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { Providers } from '@/components/Providers'
+import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
   title: 'grAIn Admin Dashboard',
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-[#f9fafb] antialiased font-sans">
         <Providers>{children}</Providers>
+        <Toaster />
       </body>
     </html>
   )

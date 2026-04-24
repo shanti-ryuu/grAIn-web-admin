@@ -1,34 +1,40 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Trash2, CheckCircle } from 'lucide-react'
 import Card from '@/components/Card'
 import ErrorState from '@/components/ErrorState'
 import { useAlerts, useMarkAlertRead, useClearAllAlerts } from '@/hooks/useApi'
-import { useToast } from '@/hooks/useToast'
 
 export default function AlertsPage() {
-  const { toast } = useToast()
-  const [typeFilter, setTypeFilter] = useState<string>('')
-  const { data: alerts, isLoading, error, refetch } = useAlerts(typeFilter || undefined)
+  const [activeTab, setActiveTab] = useState('all')
+  const { data: alerts, isLoading, error, refetch } = useAlerts()
   const markRead = useMarkAlertRead()
   const clearAll = useClearAllAlerts()
 
   const handleMarkRead = async (alertId: string) => {
     try {
       await markRead.mutateAsync(alertId)
-    } catch {
-      toast({ title: 'Failed', description: 'Could not mark alert as read.', variant: 'destructive' })
-    }
+    } catch {}
   }
 
   const handleClearAll = async () => {
     try {
       await clearAll.mutateAsync()
-      toast({ title: 'Alerts cleared', description: 'All alerts marked as read.' })
-    } catch {
-      toast({ title: 'Failed', description: 'Could not clear alerts.', variant: 'destructive' })
-    }
+    } catch {}
+  }
+
+  const allAlerts = alerts || []
+
+  const filteredAlerts = useMemo(() => {
+    if (activeTab === 'all') return allAlerts
+    return allAlerts.filter((a: any) => a.type === activeTab)
+  }, [allAlerts, activeTab])
+
+  const severityConfig: Record<string, { badge: string; dot: string }> = {
+    critical: { badge: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' },
+    warning: { badge: 'bg-yellow-50 text-yellow-600 border-yellow-200', dot: 'bg-yellow-500' },
+    info: { badge: 'bg-blue-50 text-blue-600 border-blue-200', dot: 'bg-blue-500' },
   }
 
   if (isLoading) {
@@ -49,17 +55,11 @@ export default function AlertsPage() {
     )
   }
 
-  const severityConfig: Record<string, { badge: string; dot: string }> = {
-    critical: { badge: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' },
-    warning: { badge: 'bg-yellow-50 text-yellow-600 border-yellow-200', dot: 'bg-yellow-500' },
-    info: { badge: 'bg-blue-50 text-blue-600 border-blue-200', dot: 'bg-blue-500' },
-  }
-
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between">
         <div><h1 className="text-3xl font-bold text-gray-900 mb-2">Alert Log</h1><p className="text-base text-gray-500">View all system alerts and notifications.</p></div>
-        {(alerts || []).length > 0 && (
+        {allAlerts.length > 0 && (
           <button onClick={handleClearAll} disabled={clearAll.isPending}
             className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-red-600 rounded-lg font-medium hover:bg-red-50 disabled:opacity-50 transition-colors">
             <Trash2 className="w-4 h-4" /> Clear All
@@ -67,18 +67,18 @@ export default function AlertsPage() {
         )}
       </div>
 
-      <Card className="p-4 flex gap-3">
-        {['', 'critical', 'warning', 'info'].map((t) => (
-          <button key={t} onClick={() => setTypeFilter(t)}
+      <Card className="p-4 flex gap-3 no-print">
+        {['all', 'critical', 'warning', 'info'].map((t) => (
+          <button key={t} onClick={() => setActiveTab(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              typeFilter === t ? 'bg-green-800 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+              activeTab === t ? 'bg-green-800 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
             }`}>
-            {t ? t.charAt(0).toUpperCase() + t.slice(1) : 'All'}
+            {t === 'all' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </Card>
 
-      {(alerts || []).length === 0 ? (
+      {filteredAlerts.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600" />
@@ -89,7 +89,7 @@ export default function AlertsPage() {
       ) : (
         <Card className="p-6">
           <div className="space-y-3">
-            {(alerts || []).map((alert: any) => {
+            {filteredAlerts.map((alert: any) => {
               const config = severityConfig[alert.type] || severityConfig.info
               return (
                 <div key={alert.id} className={`flex items-start gap-4 p-4 border rounded-lg transition-colors ${alert.isRead ? 'border-gray-100 bg-gray-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>

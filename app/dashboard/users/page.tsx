@@ -1,80 +1,199 @@
 'use client'
 
 import { useState } from 'react'
-import { SearchIcon, Plus, X } from 'lucide-react'
-import Table from '@/components/Table'
+import { ColumnDef } from '@tanstack/react-table'
+import { Plus, X, MoreHorizontal, Shield, UserCheck, Trash2, Eye } from 'lucide-react'
 import Card from '@/components/Card'
-import { useUsers, useCreateUser, useUpdateUser } from '@/hooks/useApi'
-import { useToast } from '@/hooks/useToast'
+import DataTable from '@/components/ui/data-table'
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useDevices } from '@/hooks/useApi'
 import ErrorState from '@/components/ErrorState'
+import ConfirmModal from '@/components/ConfirmModal'
+
+interface UserRow {
+  id: string
+  name: string
+  email: string
+  role: string
+  status: string
+  createdAt: string
+  deviceCount: number
+}
 
 export default function UsersPage() {
-  const { toast } = useToast()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: 'farmer' })
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null)
+  const [actionOpen, setActionOpen] = useState<string | null>(null)
 
   const { data: users, isLoading, error, refetch } = useUsers()
+  const { data: devices } = useDevices()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
+  const deleteUser = useDeleteUser()
+
+  const deviceCounts: Record<string, number> = {}
+  ;(devices || []).forEach((d: any) => {
+    const uid = d.assignedUser?.id || d.assignedUser?._id || d.assignedUser
+    if (uid) deviceCounts[uid] = (deviceCounts[uid] || 0) + 1
+  })
+
+  const tableData: UserRow[] = (users || []).map((u: any) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    createdAt: u.createdAt,
+    deviceCount: deviceCounts[u.id] || 0,
+  }))
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
       await createUser.mutateAsync(addForm)
-      toast({ title: 'User created', description: `${addForm.name} has been added.` })
       setShowAddModal(false)
       setAddForm({ name: '', email: '', password: '', role: 'farmer' })
-    } catch {
-      toast({ title: 'Creation failed', description: 'Failed to create user.', variant: 'destructive' })
-    }
+    } catch {}
+  }
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      await updateUser.mutateAsync({ id: userId, role: newRole })
+    } catch {}
+    setActionOpen(null)
   }
 
   const handleToggleStatus = async (userId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active'
     try {
       await updateUser.mutateAsync({ id: userId, status: newStatus })
-      toast({ title: 'Status updated', description: `User is now ${newStatus}.` })
-    } catch {
-      toast({ title: 'Update failed', description: 'Failed to update user status.', variant: 'destructive' })
-    }
+    } catch {}
+    setActionOpen(null)
   }
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
+  const handleDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await updateUser.mutateAsync({ id: userId, role: newRole })
-      toast({ title: 'Role updated', description: `Role changed to ${newRole}.` })
-    } catch {
-      toast({ title: 'Update failed', description: 'Failed to update role.', variant: 'destructive' })
-    }
+      await deleteUser.mutateAsync(deleteTarget.id)
+    } catch {}
+    setDeleteTarget(null)
   }
 
-  const filteredUsers = (users || [])
-    .filter((u: any) => roleFilter === 'all' || u.role === roleFilter)
-    .filter((u: any) =>
-      u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-
-  const statusBadge = (status: string) => (
-    <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${status === 'active' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>{status}</span>
-  )
-
-  const columns = [
-    { key: 'name', label: 'Name' },
-    { key: 'email', label: 'Email' },
-    { key: 'role', label: 'Role', render: (value: string, row: any) => (
-      <select value={value} onChange={(e) => handleRoleChange(row.id, e.target.value)}
-        className="text-xs border border-gray-200 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-green-800">
-        <option value="admin">Admin</option>
-        <option value="farmer">Farmer</option>
-      </select>
-    )},
-    { key: 'status', label: 'Status', render: (value: string, row: any) => (
-      <button onClick={() => handleToggleStatus(row.id, value)} className="cursor-pointer">{statusBadge(value)}</button>
-    )},
-    { key: 'createdAt', label: 'Created', render: (value: any) => value ? new Date(value).toLocaleDateString() : '--' },
+  const columns: ColumnDef<UserRow>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          checked={table.getIsAllPageRowsSelected()}
+          onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)}
+          className="w-4 h-4 rounded border-gray-300 text-green-800 focus:ring-green-800"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={row.getIsSelected()}
+          onChange={(e) => row.toggleSelected(e.target.checked)}
+          className="w-4 h-4 rounded border-gray-300 text-green-800 focus:ring-green-800"
+        />
+      ),
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'name',
+      header: 'Name',
+    },
+    {
+      accessorKey: 'email',
+      header: 'Email',
+    },
+    {
+      accessorKey: 'role',
+      header: 'Role',
+      cell: ({ row }) => {
+        const role = row.original.role
+        return (
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${role === 'admin' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+            {role === 'admin' ? 'Admin' : 'Farmer'}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.original.status
+        return (
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${status === 'active' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
+            {status === 'active' ? 'Active' : 'Inactive'}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Joined',
+      cell: ({ row }) => {
+        const val = row.original.createdAt
+        return val ? new Date(val).toLocaleDateString() : '--'
+      },
+    },
+    {
+      accessorKey: 'deviceCount',
+      header: 'Devices',
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const user = row.original
+        return (
+          <div className="relative">
+            <button
+              onClick={() => setActionOpen(actionOpen === user.id ? null : user.id)}
+              className="p-1 hover:bg-gray-100 rounded"
+            >
+              <MoreHorizontal className="w-4 h-4 text-gray-500" />
+            </button>
+            {actionOpen === user.id && (
+              <div className="absolute right-0 top-8 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]">
+                <button
+                  onClick={() => handleRoleChange(user.id, user.role === 'admin' ? 'farmer' : 'admin')}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  <Shield className="w-4 h-4" />
+                  {user.role === 'admin' ? 'Make Farmer' : 'Make Admin'}
+                </button>
+                <button
+                  onClick={() => handleToggleStatus(user.id, user.status)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                </button>
+                <button
+                  onClick={() => { setActionOpen(null) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  <Eye className="w-4 h-4" />
+                  View Devices
+                </button>
+                <button
+                  onClick={() => { setDeleteTarget(user); setActionOpen(null) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete User
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      },
+      enableSorting: false,
+    },
   ]
 
   if (isLoading) {
@@ -104,21 +223,7 @@ export default function UsersPage() {
         </button>
       </div>
 
-      <Card className="p-4 flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 relative">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input type="text" placeholder="Search by name or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white" />
-        </div>
-        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
-          className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
-          <option value="all">All Roles</option>
-          <option value="admin">Admin</option>
-          <option value="farmer">Farmer</option>
-        </select>
-      </Card>
-
-      {filteredUsers.length === 0 ? (
+      {tableData.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
@@ -127,7 +232,7 @@ export default function UsersPage() {
           <p className="text-sm text-gray-500">Add your first user to get started.</p>
         </Card>
       ) : (
-        <Table columns={columns} data={filteredUsers} title="All Users" />
+        <DataTable columns={columns} data={tableData} searchPlaceholder="Search by name or email..." />
       )}
 
       {/* Add User Modal */}
@@ -171,6 +276,19 @@ export default function UsersPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteTarget && (
+        <ConfirmModal
+          isOpen={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+          title="Delete User"
+          message={`Are you sure you want to delete ${deleteTarget?.name}? This action cannot be undone.`}
+          confirmText="Delete"
+          variant="danger"
+        />
       )}
     </div>
   )

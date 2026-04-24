@@ -2,57 +2,178 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { SearchIcon, Plus, X } from 'lucide-react'
-import Table from '@/components/Table'
+import { ColumnDef } from '@tanstack/react-table'
+import { Plus, X, MoreHorizontal, Eye, MapPin, UserCircle, Trash2 } from 'lucide-react'
 import Card from '@/components/Card'
-import { useDevices, useUsers, useRegisterDevice } from '@/hooks/useApi'
-import { useToast } from '@/hooks/useToast'
+import DataTable from '@/components/ui/data-table'
+import { useDevices, useUsers, useRegisterDevice, useDeleteDevice } from '@/hooks/useApi'
 import ErrorState from '@/components/ErrorState'
+import ConfirmModal from '@/components/ConfirmModal'
+
+interface DeviceRow {
+  id: string
+  deviceId: string
+  location: string
+  assignedUser: string
+  status: string
+  lastActive: string
+  moisture: string
+}
+
+function timeAgo(dateStr: string): string {
+  if (!dateStr) return 'Never'
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins} mins ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
+}
 
 export default function DevicesPage() {
   const router = useRouter()
-  const { toast } = useToast()
-  const [searchTerm, setSearchTerm] = useState('')
   const [showRegisterModal, setShowRegisterModal] = useState(false)
   const [registerForm, setRegisterForm] = useState({ deviceId: '', location: '', assignedUser: '' })
+  const [deleteTarget, setDeleteTarget] = useState<DeviceRow | null>(null)
+  const [actionOpen, setActionOpen] = useState<string | null>(null)
 
   const { data: devices, isLoading, error, refetch } = useDevices()
-  const { data: users } = useUsers()
+  const { data: allUsers } = useUsers()
   const registerDevice = useRegisterDevice()
+  const deleteDevice = useDeleteDevice()
 
-  const farmers = (users || []).filter((u: any) => u.role === 'farmer')
+  const farmers = (allUsers || []).filter((u: any) => u.role === 'farmer')
 
-  const statusBadge = (status: string) => {
-    const isOnline = status === 'online'
-    return (
-      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${isOnline ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    )
-  }
-
-  const filteredDevices = (devices || []).filter(
-    (device: any) =>
-      device.deviceId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.assignedUser?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const tableData: DeviceRow[] = (devices || []).map((d: any) => ({
+    id: d.id,
+    deviceId: d.deviceId,
+    location: d.location || '—',
+    assignedUser: d.assignedUser?.name || 'Unassigned',
+    status: d.status,
+    lastActive: d.lastActive,
+    moisture: '—',
+  }))
 
   const handleRegisterDevice = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
       await registerDevice.mutateAsync(registerForm)
-      toast({ title: 'Device registered', description: `Device ${registerForm.deviceId} registered successfully.` })
       setShowRegisterModal(false)
       setRegisterForm({ deviceId: '', location: '', assignedUser: '' })
-    } catch {
-      toast({ title: 'Registration failed', description: 'Failed to register device.', variant: 'destructive' })
-    }
+    } catch {}
   }
 
-  const handleViewDevice = (deviceId: string) => {
-    router.push(`/dashboard/devices/${deviceId}`)
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      await deleteDevice.mutateAsync(deleteTarget.id)
+    } catch {}
+    setDeleteTarget(null)
   }
+
+  const columns: ColumnDef<DeviceRow>[] = [
+    {
+      id: 'select',
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          checked={table.getIsAllPageRowsSelected()}
+          onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)}
+          className="w-4 h-4 rounded border-gray-300 text-green-800 focus:ring-green-800"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={row.getIsSelected()}
+          onChange={(e) => row.toggleSelected(e.target.checked)}
+          className="w-4 h-4 rounded border-gray-300 text-green-800 focus:ring-green-800"
+        />
+      ),
+      enableSorting: false,
+    },
+    {
+      accessorKey: 'deviceId',
+      header: 'Device ID',
+    },
+    {
+      accessorKey: 'location',
+      header: 'Location',
+    },
+    {
+      accessorKey: 'assignedUser',
+      header: 'Assigned User',
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.original.status
+        return (
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${status === 'online' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
+            {status === 'online' ? 'Online' : 'Offline'}
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'lastActive',
+      header: 'Last Active',
+      cell: ({ row }) => timeAgo(row.original.lastActive),
+    },
+    {
+      accessorKey: 'moisture',
+      header: 'Moisture',
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const device = row.original
+        return (
+          <div className="relative">
+            <button
+              onClick={() => setActionOpen(actionOpen === device.id ? null : device.id)}
+              className="p-1 hover:bg-gray-100 rounded"
+            >
+              <MoreHorizontal className="w-4 h-4 text-gray-500" />
+            </button>
+            {actionOpen === device.id && (
+              <div className="absolute right-0 top-8 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]">
+                <button
+                  onClick={() => { router.push(`/dashboard/devices/${device.id}`); setActionOpen(null) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  <Eye className="w-4 h-4" /> View Details
+                </button>
+                <button
+                  onClick={() => setActionOpen(null)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  <MapPin className="w-4 h-4" /> Edit Location
+                </button>
+                <button
+                  onClick={() => setActionOpen(null)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
+                >
+                  <UserCircle className="w-4 h-4" /> Reassign User
+                </button>
+                <button
+                  onClick={() => { setDeleteTarget(device); setActionOpen(null) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="w-4 h-4" /> Deregister Device
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      },
+      enableSorting: false,
+    },
+  ]
 
   if (isLoading) {
     return (
@@ -73,17 +194,6 @@ export default function DevicesPage() {
     )
   }
 
-  const columns = [
-    { key: 'deviceId', label: 'Device ID' },
-    { key: 'status', label: 'Status', render: (value: string) => statusBadge(value) },
-    { key: 'location', label: 'Location' },
-    { key: 'lastActive', label: 'Last Active', render: (value: any) => value ? new Date(value).toLocaleString() : 'Never' },
-    { key: 'assignedUser', label: 'Assigned User', render: (value: any) => value?.name || 'Unassigned' },
-    { key: 'actions', label: 'Actions', render: (_value: string, row: any) => (
-      <button onClick={() => handleViewDevice(row.id)} className="text-green-800 text-sm font-semibold hover:text-green-700 transition-colors">View</button>
-    )},
-  ]
-
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between">
@@ -93,15 +203,7 @@ export default function DevicesPage() {
         </button>
       </div>
 
-      <Card className="p-4 flex flex-col sm:flex-row gap-4">
-        <div className="flex-1 relative">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input type="text" placeholder="Search devices..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white" />
-        </div>
-      </Card>
-
-      {filteredDevices.length === 0 ? (
+      {tableData.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
@@ -110,7 +212,7 @@ export default function DevicesPage() {
           <p className="text-sm text-gray-500">Register your first device to get started.</p>
         </Card>
       ) : (
-        <Table columns={columns} data={filteredDevices} title="Device List" />
+        <DataTable columns={columns} data={tableData} searchPlaceholder="Search devices..." />
       )}
 
       {/* Register Device Modal */}
@@ -149,6 +251,19 @@ export default function DevicesPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {deleteTarget && (
+        <ConfirmModal
+          isOpen={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+          title="Deregister Device"
+          message={`Are you sure you want to deregister ${deleteTarget.deviceId}? This action cannot be undone.`}
+          confirmText="Deregister"
+          variant="danger"
+        />
       )}
     </div>
   )

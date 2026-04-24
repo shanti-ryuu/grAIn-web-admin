@@ -1,27 +1,17 @@
-# Use official Node.js runtime as a parent image
-FROM node:20-alpine
-
-# Set working directory
+FROM node:20-alpine AS base
 WORKDIR /app
-
-# Copy package.json and package-lock.json
 COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy the rest of the application code
+RUN npm ci
 COPY . .
-
-# Build the Next.js application
 RUN npm run build
 
-# Expose the port the app runs on
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=base /app/.next/standalone ./
+COPY --from=base /app/.next/static ./.next/static
+COPY --from=base /app/public ./public
 EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
-
-# Start the application
-CMD ["npm", "start"]
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+CMD ["node", "server.js"]

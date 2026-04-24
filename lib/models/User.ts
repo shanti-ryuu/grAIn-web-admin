@@ -6,6 +6,10 @@ export interface IUser extends Document {
   password: string
   role: 'admin' | 'farmer'
   status: 'active' | 'inactive'
+  profileImage: string | null
+  bio: string
+  phoneNumber: string
+  location: string
   createdAt: Date
   updatedAt: Date
 }
@@ -36,6 +40,23 @@ const UserSchema: Schema = new Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active',
+  },
+  profileImage: {
+    type: String,
+    default: null,
+  },
+  bio: {
+    type: String,
+    maxlength: 200,
+    default: '',
+  },
+  phoneNumber: {
+    type: String,
+    default: '',
+  },
+  location: {
+    type: String,
+    default: '',
   },
 }, {
   timestamps: true,

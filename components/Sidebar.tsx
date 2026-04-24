@@ -39,7 +39,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-200 h-screen flex flex-col">
+    <aside className="hidden lg:flex lg:flex-col w-64 bg-white border-r border-gray-200 h-full no-print">
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-green-800 rounded-lg flex items-center justify-center">

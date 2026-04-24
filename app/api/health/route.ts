@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
         status: 'ok',
         database: states[state] ?? 'unknown',
         environment: process.env.NODE_ENV,
+        url: 'https://grain-web-admin.onrender.com',
+        cors: 'enabled',
         timestamp: new Date().toISOString(),
         version: '1.0.0'
       }

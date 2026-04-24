@@ -57,3 +57,36 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
+/* Print styles */
+@media print {
+  nav, aside, header, .sidebar, .no-print,
+  button, [data-sidebar], [role="navigation"] {
+    display: none !important;
+  }
+
+  body { margin: 0; padding: 0; }
+  main { width: 100% !important; margin: 0 !important; }
+  
+  .print-break-before { page-break-before: always; }
+  .print-break-after { page-break-after: always; }
+  .print-avoid-break { page-break-inside: avoid; }
+
+  table { width: 100%; border-collapse: collapse; }
+  th, td { 
+    border: 1px solid #ccc; 
+    padding: 8px; 
+    font-size: 11px; 
+  }
+  
+  .print-only { display: block !important; }
+
+  .print-header {
+    display: flex !important;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #22C55E;
+    padding-bottom: 10px;
+  }
+}
+
+.print-only { display: none; }

@@ -59,9 +59,13 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-8">
+      <div className="print-only print-header">
+        <div><h2 className="text-2xl font-bold text-green-800">grAIn Analytics Report</h2><p className="text-sm text-gray-500">Generated: {new Date().toLocaleString()}</p></div>
+        <p className="text-sm text-gray-500">Period: {period} | Device: {deviceId}</p>
+      </div>
       <div className="flex items-start justify-between">
         <div><h1 className="text-3xl font-bold text-gray-900 mb-2">Analytics</h1><p className="text-base text-gray-500">Insights and trends across all dryer operations.</p></div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 no-print">
           <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
             <Download className="w-4 h-4" /> CSV
           </button>
@@ -71,7 +75,7 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
-      <Card className="p-4 flex flex-col sm:flex-row gap-4">
+      <Card className="p-4 flex flex-col sm:flex-row gap-4 no-print">
         <div className="flex items-center gap-3">
           <span className="text-sm font-medium text-gray-700">Period:</span>
           {['daily', 'weekly', 'monthly'].map((p) => (

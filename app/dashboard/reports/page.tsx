@@ -5,12 +5,10 @@ import Card from '@/components/Card'
 import Table from '@/components/Table'
 import MetricCard from '@/components/MetricCard'
 import ErrorState from '@/components/ErrorState'
-import { useToast } from '@/hooks/useToast'
 import { useCommandHistory, useAnalyticsOverview, useDevices } from '@/hooks/useApi'
-import { FileText, Activity, Zap, Cpu, Download } from 'lucide-react'
+import { FileText, Activity, Zap, Cpu, Download, Printer } from 'lucide-react'
 
 export default function ReportsPage() {
-  const { toast } = useToast()
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
@@ -37,10 +35,7 @@ export default function ReportsPage() {
   })
 
   const handleExportCSV = () => {
-    if (filteredCommands.length === 0) {
-      toast({ title: 'No data', description: 'No commands to export.', variant: 'destructive' })
-      return
-    }
+    if (filteredCommands.length === 0) return
     const rows = ['DeviceID,Command,Mode,Status,Temperature,FanSpeed,Timestamp']
     filteredCommands.forEach((cmd: any) => {
       rows.push(`${cmd.deviceId},${cmd.command},${cmd.mode},${cmd.status},${cmd.temperature ?? ''},${cmd.fanSpeed ?? ''},${cmd.createdAt}`)
@@ -50,8 +45,9 @@ export default function ReportsPage() {
     const a = document.createElement('a')
     a.href = url; a.download = `report-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
     URL.revokeObjectURL(url)
-    toast({ title: 'Report exported', description: 'CSV downloaded successfully.' })
   }
+
+  const handlePrint = () => { window.print() }
 
   const commandColumns = [
     { key: 'deviceId', label: 'Device ID' },
@@ -83,11 +79,20 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-8">
+      <div className="print-only print-header">
+        <div><h2 className="text-2xl font-bold text-green-800">grAIn Drying Report</h2><p className="text-sm text-gray-500">Generated: {new Date().toLocaleString()}</p></div>
+        <p className="text-sm text-gray-500">Period: {dateFrom || 'All'} — {dateTo || 'All'}</p>
+      </div>
       <div className="flex items-start justify-between">
         <div><h1 className="text-3xl font-bold text-gray-900 mb-2">Reports</h1><p className="text-base text-gray-500">Generate and download detailed reports on drying operations.</p></div>
-        <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
-          <Download className="w-4 h-4" /> Export CSV
-        </button>
+        <div className="flex gap-2 no-print">
+          <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+            <Printer className="w-4 h-4" /> Print Report
+          </button>
+          <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -97,7 +102,7 @@ export default function ReportsPage() {
         <MetricCard title="Active Devices" value={activeDevices} subtitle="Currently online" icon={<Cpu className="w-5 h-5" />} />
       </div>
 
-      <Card className="p-4 flex flex-col sm:flex-row gap-4 items-end">
+      <Card className="p-4 flex flex-col sm:flex-row gap-4 items-end no-print">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
           <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}

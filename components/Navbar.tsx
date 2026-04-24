@@ -20,7 +20,7 @@ export default function Topbar() {
   const pageTitle = pageNames[pathname] || 'Dashboard'
 
   return (
-    <header className="h-16 bg-white border-b border-[#e5e7eb] flex items-center justify-between px-8">
+    <header className="h-16 bg-white border-b border-[#e5e7eb] flex items-center justify-between px-8 no-print">
       {/* Title */}
       <h1 className="text-xl font-semibold text-[#111827]">{pageTitle}</h1>
 

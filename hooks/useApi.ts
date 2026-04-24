@@ -139,11 +139,11 @@ export const useDeleteDevice = () => {
 }
 
 // Users
-export const useUsers = () => {
+export const useUsers = (page: number = 1, limit: number = 10) => {
   return useQuery({
-    queryKey: ['users'],
+    queryKey: ['users', page, limit],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any[]>>('/users')
+      const { data: responseData } = await api.get<ApiResponse<any>>(`/users?page=${page}&limit=${limit}`)
       return unwrapResponse(responseData)
     },
     staleTime: 5 * 60 * 1000,

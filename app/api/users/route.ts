@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
 import dbConnect from '@/lib/db'
 import User from '@/lib/models/User'
-import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { successResponse, errorResponse, ErrorCodes, paginatedResponse } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
 
@@ -15,12 +15,26 @@ export async function GET(request: NextRequest) {
     await dbConnect()
 
     const user = getUserFromRequest(request)
+    // FIX 3: Explicit logging for auth debugging
+    console.log('[GET /api/users] token:', request.headers.get('authorization') ? 'present' : 'missing', '| user:', user ? `${user.role}` : 'null')
     if (!user || user.role !== 'admin') {
       const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    const users = await User.find({}).select('-password').sort({ createdAt: -1 })
+    // FIX 2.6: Server-side pagination
+    const { searchParams } = request.nextUrl
+    const page = parseInt(searchParams.get('page') ?? '1')
+    const limit = parseInt(searchParams.get('limit') ?? '10')
+
+    const [users, total] = await Promise.all([
+      User.find({})
+        .select('-password')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      User.countDocuments({}),
+    ])
 
     const formattedUsers = users.map((u: any) => ({
       id: u._id,
@@ -32,7 +46,7 @@ export async function GET(request: NextRequest) {
       createdAt: u.createdAt?.toISOString?.() || u.createdAt,
     }))
 
-    const response = successResponse(formattedUsers)
+    const response = paginatedResponse(formattedUsers, total, page, limit)
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {

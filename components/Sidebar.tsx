@@ -5,6 +5,7 @@ import { LayoutDashboard, Cpu, Users, AlertTriangle, BarChart3, FileText, Settin
 import { useAuthStore } from '@/lib/auth-store'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAlerts, useDevices } from '@/hooks/useApi'
+import Image from 'next/image'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -41,10 +42,17 @@ export default function Sidebar() {
   return (
     <aside className="hidden lg:flex lg:flex-col w-64 bg-white border-r border-gray-200 h-full no-print">
       <div className="p-6 border-b border-gray-200">
+        {/* FIX 7: Replace 'G' letter with actual grain-logo.jpg */}
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-green-800 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">G</span>
-          </div>
+          <Image
+            src="/logo/grain-logo.jpg"
+            alt="grAIn Logo"
+            width={36}
+            height={36}
+            className="rounded-lg object-contain"
+            quality={95}
+            priority
+          />
           <span className="text-xl font-bold text-gray-900">grAIn</span>
         </div>
       </div>
@@ -75,9 +83,14 @@ export default function Sidebar() {
 
       <div className="p-4 border-t border-gray-200">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
-            <span className="text-green-800 font-semibold text-sm">{user?.name?.charAt(0) || 'U'}</span>
-          </div>
+          {/* FIX 6: Show profileImage if available */}
+          {user?.profileImage ? (
+            <Image src={user.profileImage} alt="Avatar" width={32} height={32} className="w-8 h-8 rounded-full object-cover" />
+          ) : (
+            <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
+              <span className="text-green-800 font-semibold text-sm">{user?.name?.charAt(0) || 'U'}</span>
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">{user?.name || 'User'}</p>
             <p className="text-xs text-gray-500 truncate">{user?.email || ''}</p>

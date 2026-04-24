@@ -1,12 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
-import { Plus, X, MoreHorizontal, Eye, MapPin, UserCircle, Trash2 } from 'lucide-react'
+import { Plus, X, MoreHorizontal, Eye, MapPin, UserCircle, Trash2, ArrowLeft, Loader2 } from 'lucide-react'
 import Card from '@/components/Card'
 import DataTable from '@/components/ui/data-table'
-import { useDevices, useUsers, useRegisterDevice, useDeleteDevice } from '@/hooks/useApi'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { useDevices, useUsers, useRegisterDevice, useDeleteDevice, useUpdateDevice } from '@/hooks/useApi'
+import { useQueryClient } from '@tanstack/react-query'
+import { useToast } from '@/hooks/useToast'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
 
@@ -15,6 +18,7 @@ interface DeviceRow {
   deviceId: string
   location: string
   assignedUser: string
+  assignedUserId: string
   status: string
   lastActive: string
   moisture: string
@@ -32,29 +36,51 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`
 }
 
+// FIX 2: Single pendingDeviceAction state for all device modals
+type PendingDeviceAction = {
+  type: 'edit_location' | 'reassign_user' | 'delete'
+  device: DeviceRow
+} | null
+
 export default function DevicesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const filterUserId = searchParams.get('userId')
+  const filterUserName = searchParams.get('userName')
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+
   const [showRegisterModal, setShowRegisterModal] = useState(false)
   const [registerForm, setRegisterForm] = useState({ deviceId: '', location: '', assignedUser: '' })
-  const [deleteTarget, setDeleteTarget] = useState<DeviceRow | null>(null)
-  const [actionOpen, setActionOpen] = useState<string | null>(null)
+  const [pendingDeviceAction, setPendingDeviceAction] = useState<PendingDeviceAction>(null)
+
+  // FIX 2: Edit Location state
+  const [editLocationValue, setEditLocationValue] = useState('')
+  // FIX 2: Reassign User state
+  const [reassignUserId, setReassignUserId] = useState('')
 
   const { data: devices, isLoading, error, refetch } = useDevices()
   const { data: allUsers } = useUsers()
   const registerDevice = useRegisterDevice()
   const deleteDevice = useDeleteDevice()
+  const updateDevice = useUpdateDevice()
 
-  const farmers = (allUsers || []).filter((u: any) => u.role === 'farmer')
+  const farmers = ((allUsers as any)?.data || allUsers || []).filter((u: any) => u.role === 'farmer' && u.status === 'active')
 
-  const tableData: DeviceRow[] = (devices || []).map((d: any) => ({
+  const allTableData: DeviceRow[] = (devices || []).map((d: any) => ({
     id: d.id,
     deviceId: d.deviceId,
     location: d.location || '—',
     assignedUser: d.assignedUser?.name || 'Unassigned',
+    assignedUserId: d.assignedUser?.id || d.assignedUser?._id || d.assignedUser || '',
     status: d.status,
     lastActive: d.lastActive,
     moisture: '—',
   }))
+
+  const tableData = filterUserId
+    ? allTableData.filter(d => d.assignedUserId === filterUserId)
+    : allTableData
 
   const handleRegisterDevice = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,12 +91,29 @@ export default function DevicesPage() {
     } catch {}
   }
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return
+  // FIX 2: Handle pending device action (edit location, reassign, delete)
+  const handleConfirmDeviceAction = async () => {
+    if (!pendingDeviceAction) return
+    const { type, device } = pendingDeviceAction
+
     try {
-      await deleteDevice.mutateAsync(deleteTarget.id)
-    } catch {}
-    setDeleteTarget(null)
+      if (type === 'edit_location') {
+        await updateDevice.mutateAsync({ id: device.id, location: editLocationValue })
+        toast({ title: 'Location Updated', description: `Location updated for ${device.deviceId}` })
+      } else if (type === 'reassign_user') {
+        const newFarmer = farmers.find((f: any) => f.id === reassignUserId)
+        await updateDevice.mutateAsync({ id: device.id, assignedUser: reassignUserId })
+        toast({ title: 'Device Reassigned', description: `Device ${device.deviceId} reassigned to ${newFarmer?.name || 'new user'}` })
+      } else if (type === 'delete') {
+        await deleteDevice.mutateAsync(device.id)
+      }
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+    } catch (err: any) {
+      toast({ title: 'Action Failed', description: err?.response?.data?.error || err?.response?.data?.message || 'Failed', variant: 'destructive' })
+    }
+    setPendingDeviceAction(null)
+    setEditLocationValue('')
+    setReassignUserId('')
   }
 
   const columns: ColumnDef<DeviceRow>[] = [
@@ -133,42 +176,33 @@ export default function DevicesPage() {
       cell: ({ row }) => {
         const device = row.original
         return (
-          <div className="relative">
-            <button
-              onClick={() => setActionOpen(actionOpen === device.id ? null : device.id)}
-              className="p-1 hover:bg-gray-100 rounded"
-            >
-              <MoreHorizontal className="w-4 h-4 text-gray-500" />
-            </button>
-            {actionOpen === device.id && (
-              <div className="absolute right-0 top-8 z-10 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]">
-                <button
-                  onClick={() => { router.push(`/dashboard/devices/${device.id}`); setActionOpen(null) }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
-                >
-                  <Eye className="w-4 h-4" /> View Details
-                </button>
-                <button
-                  onClick={() => setActionOpen(null)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
-                >
-                  <MapPin className="w-4 h-4" /> Edit Location
-                </button>
-                <button
-                  onClick={() => setActionOpen(null)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50"
-                >
-                  <UserCircle className="w-4 h-4" /> Reassign User
-                </button>
-                <button
-                  onClick={() => { setDeleteTarget(device); setActionOpen(null) }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 className="w-4 h-4" /> Deregister Device
-                </button>
-              </div>
-            )}
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-1 hover:bg-gray-100 rounded">
+                <MoreHorizontal className="w-4 h-4 text-gray-500" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="bottom" collisionPadding={8}>
+              <DropdownMenuItem onClick={() => router.push(`/dashboard/devices/${device.id}`)}>
+                <Eye className="w-4 h-4" /> View Details
+              </DropdownMenuItem>
+              {/* FIX 2: Edit Location opens modal */}
+              <DropdownMenuItem onClick={() => { setEditLocationValue(device.location === '—' ? '' : device.location); setPendingDeviceAction({ type: 'edit_location', device }) }}>
+                <MapPin className="w-4 h-4" /> Edit Location
+              </DropdownMenuItem>
+              {/* FIX 2: Reassign User opens modal */}
+              <DropdownMenuItem onClick={() => { setReassignUserId(device.assignedUserId); setPendingDeviceAction({ type: 'reassign_user', device }) }}>
+                <UserCircle className="w-4 h-4" /> Reassign User
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                onClick={() => setPendingDeviceAction({ type: 'delete', device })}
+              >
+                <Trash2 className="w-4 h-4" /> Deregister Device
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )
       },
       enableSorting: false,
@@ -197,7 +231,27 @@ export default function DevicesPage() {
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between">
-        <div><h1 className="text-3xl font-bold text-gray-900 mb-2">All Devices</h1><p className="text-base text-gray-500">Monitor and manage all dryer devices.</p></div>
+        <div>
+          {/* FIX 2.4: Breadcrumb and filtered heading when navigating from Users page */}
+          {filterUserId && filterUserName ? (
+            <>
+              <button
+                onClick={() => router.back()}
+                className="flex items-center gap-1 text-sm text-green-800 hover:text-green-700 mb-2 font-medium"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Users
+              </button>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Devices for {filterUserName}</h1>
+              <p className="text-base text-gray-500">Showing devices assigned to this user.</p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">All Devices</h1>
+              <p className="text-base text-gray-500">Monitor and manage all dryer devices.</p>
+            </>
+          )}
+        </div>
         <button onClick={() => setShowRegisterModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
           <Plus className="w-4 h-4" /> Register Device
         </button>
@@ -208,8 +262,12 @@ export default function DevicesPage() {
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Devices Found</h3>
-          <p className="text-sm text-gray-500">Register your first device to get started.</p>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            {filterUserId ? `No devices assigned to ${filterUserName} yet.` : 'No Devices Found'}
+          </h3>
+          <p className="text-sm text-gray-500">
+            {filterUserId ? 'This user does not have any assigned devices.' : 'Register your first device to get started.'}
+          </p>
         </Card>
       ) : (
         <DataTable columns={columns} data={tableData} searchPlaceholder="Search devices..." />
@@ -253,16 +311,71 @@ export default function DevicesPage() {
         </div>
       )}
 
-      {/* Delete Confirmation */}
-      {deleteTarget && (
+      {/* FIX 2: Unified device action modals */}
+      {pendingDeviceAction?.type === 'edit_location' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setPendingDeviceAction(null)}>
+          <div className="bg-white rounded-lg border border-gray-200 p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Edit Device Location</h2>
+              <button onClick={() => setPendingDeviceAction(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                <input type="text" value={editLocationValue} onChange={(e) => setEditLocationValue(e.target.value)} placeholder="e.g., Farm A, Plot 1"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button onClick={() => setPendingDeviceAction(null)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+                <button onClick={handleConfirmDeviceAction} disabled={updateDevice.isPending} className="flex-1 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                  {updateDevice.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeviceAction?.type === 'reassign_user' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setPendingDeviceAction(null)}>
+          <div className="bg-white rounded-lg border border-gray-200 p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">Reassign Device</h2>
+              <button onClick={() => setPendingDeviceAction(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">Currently assigned to: <strong>{pendingDeviceAction.device.assignedUser}</strong></p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Assign to Farmer</label>
+                <select value={reassignUserId} onChange={(e) => setReassignUserId(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
+                  <option value="">Select a farmer...</option>
+                  {farmers.map((f: any) => (<option key={f.id} value={f.id}>{f.name} ({f.email})</option>))}
+                </select>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button onClick={() => setPendingDeviceAction(null)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+                <button onClick={handleConfirmDeviceAction} disabled={updateDevice.isPending || !reassignUserId} className="flex-1 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                  {updateDevice.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Reassign
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeviceAction?.type === 'delete' && (
         <ConfirmModal
-          isOpen={!!deleteTarget}
-          onClose={() => setDeleteTarget(null)}
-          onConfirm={handleDelete}
+          isOpen={pendingDeviceAction.type === 'delete'}
+          onClose={() => setPendingDeviceAction(null)}
+          onConfirm={handleConfirmDeviceAction}
           title="Deregister Device"
-          message={`Are you sure you want to deregister ${deleteTarget.deviceId}? This action cannot be undone.`}
+          message={`Are you sure you want to deregister ${pendingDeviceAction.device.deviceId}? This action cannot be undone.`}
           confirmText="Deregister"
           variant="danger"
+          loading={deleteDevice.isPending}
         />
       )}
     </div>

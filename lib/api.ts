@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useAuthStore } from '@/lib/auth-store'
 
 // Default to '/api' so calls like api.post('/auth/login') resolve to /api/auth/login.
 // This works on any port (no hardcoded localhost:3000) and avoids the mismatch
@@ -13,10 +14,10 @@ export const api = axios.create({
   },
 })
 
-// Add token to requests if available
+// FIX 3: Add token to requests from Zustand auth store (not localStorage)
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('auth_token')
+    const token = useAuthStore.getState().token
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -31,8 +32,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Clear auth state and redirect to login
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('auth_user')
+        useAuthStore.getState().logout()
         window.location.href = '/auth/login'
       }
     }

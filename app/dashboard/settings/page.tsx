@@ -4,13 +4,12 @@ import { useState, useEffect } from 'react'
 import Card from '@/components/Card'
 import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
-import { useUpdateUser, useDevices, useChangePassword } from '@/hooks/useApi'
-import { Settings as SettingsIcon, Bell, Shield, Cpu, Lock } from 'lucide-react'
+import { useDevices, useChangePassword } from '@/hooks/useApi'
+import { Settings as SettingsIcon, Bell, Shield, Cpu, Lock, Loader2 } from 'lucide-react'
 
 export default function SettingsPage() {
   const { toast } = useToast()
   const { user } = useAuthStore()
-  const updateUser = useUpdateUser()
   const changePassword = useChangePassword()
   const { data: devices } = useDevices()
 
@@ -26,6 +25,8 @@ export default function SettingsPage() {
 
   // Password change
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
+  // FIX 4: Inline validation errors for password form
+  const [pwErrors, setPwErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const saved = localStorage.getItem('grain_system_settings')
@@ -54,21 +55,27 @@ export default function SettingsPage() {
     toast({ title: 'Notifications saved', description: 'Notification preferences updated.' })
   }
 
+  // FIX 4: Client-side validation before API call
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (pwForm.newPassword !== pwForm.confirmPassword) {
-      toast({ title: 'Mismatch', description: 'New passwords do not match.', variant: 'destructive' })
-      return
-    }
-    if (pwForm.newPassword.length < 6) {
-      toast({ title: 'Too short', description: 'Password must be at least 6 characters.', variant: 'destructive' })
-      return
-    }
+    const errors: Record<string, string> = {}
+    if (!pwForm.currentPassword) errors.currentPassword = 'Current password is required'
+    if (!pwForm.newPassword || pwForm.newPassword.length < 6) errors.newPassword = 'New password must be at least 6 characters'
+    if (pwForm.newPassword !== pwForm.confirmPassword) errors.confirmPassword = 'Passwords do not match'
+    setPwErrors(errors)
+    if (Object.keys(errors).length > 0) return
+
     try {
       await changePassword.mutateAsync(pwForm)
+      toast({ title: 'Password Changed', description: 'Your password has been updated successfully' })
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
-    } catch {
-      toast({ title: 'Failed', description: 'Could not change password. Check your current password.', variant: 'destructive' })
+      setPwErrors({})
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to change password. Please try again.'
+      toast({ title: 'Change Failed', description: msg, variant: 'destructive' })
+      if (msg.toLowerCase().includes('incorrect') || msg.toLowerCase().includes('wrong') || msg.toLowerCase().includes('current')) {
+        setPwErrors(prev => ({ ...prev, currentPassword: msg }))
+      }
     }
   }
 
@@ -169,22 +176,26 @@ export default function SettingsPage() {
         <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
-            <input type="password" value={pwForm.currentPassword} onChange={(e) => setPwForm({ ...pwForm, currentPassword: e.target.value })} required
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+            <input type="password" value={pwForm.currentPassword} onChange={(e) => { setPwForm({ ...pwForm, currentPassword: e.target.value }); setPwErrors({ ...pwErrors, currentPassword: '' }) }} required autoComplete="current-password"
+              className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 ${pwErrors.currentPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+            {pwErrors.currentPassword && <p className="mt-1 text-xs text-red-600">{pwErrors.currentPassword}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-            <input type="password" value={pwForm.newPassword} onChange={(e) => setPwForm({ ...pwForm, newPassword: e.target.value })} required minLength={6}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+            <input type="password" value={pwForm.newPassword} onChange={(e) => { setPwForm({ ...pwForm, newPassword: e.target.value }); setPwErrors({ ...pwErrors, newPassword: '' }) }} required minLength={6} autoComplete="new-password"
+              className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 ${pwErrors.newPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+            {pwErrors.newPassword && <p className="mt-1 text-xs text-red-600">{pwErrors.newPassword}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
-            <input type="password" value={pwForm.confirmPassword} onChange={(e) => setPwForm({ ...pwForm, confirmPassword: e.target.value })} required minLength={6}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+            <input type="password" value={pwForm.confirmPassword} onChange={(e) => { setPwForm({ ...pwForm, confirmPassword: e.target.value }); setPwErrors({ ...pwErrors, confirmPassword: '' }) }} required minLength={6} autoComplete="new-password"
+              className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 ${pwErrors.confirmPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+            {pwErrors.confirmPassword && <p className="mt-1 text-xs text-red-600">{pwErrors.confirmPassword}</p>}
           </div>
           <div className="pt-4">
-            <button type="submit" disabled={updateUser.isPending} className="px-6 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
-              {updateUser.isPending ? 'Changing...' : 'Change Password'}
+            <button type="submit" disabled={changePassword.isPending} className="px-6 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+              {changePassword.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              {changePassword.isPending ? 'Updating...' : 'Change Password'}
             </button>
           </div>
         </form>

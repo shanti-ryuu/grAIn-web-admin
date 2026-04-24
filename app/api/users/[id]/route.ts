@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
 import dbConnect from '@/lib/db'
 import User from '@/lib/models/User'
+import Device from '@/lib/models/Device'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
@@ -94,6 +95,49 @@ export async function PATCH(
 
   } catch (error) {
     console.error('Update user error:', error)
+    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
+  }
+}
+
+// FIX 2.5: DELETE handler for deleting a user (admin-only)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    await dbConnect()
+
+    const authUser = getUserFromRequest(request)
+    if (!authUser || authUser.role !== 'admin') {
+      const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    }
+
+    const { id } = await params
+
+    // Prevent admin from deleting themselves
+    if (authUser.userId === id) {
+      const response = errorResponse('Cannot delete your own account', ErrorCodes.INVALID_INPUT, 400)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    }
+
+    const user = await User.findById(id)
+    if (!user) {
+      const response = errorResponse('User not found', ErrorCodes.USER_NOT_FOUND, 404)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    }
+
+    // Unassign devices before deleting user
+    await Device.updateMany({ assignedUser: id }, { $unset: { assignedUser: '' } })
+
+    await User.findByIdAndDelete(id)
+
+    const response = successResponse({ id, name: user.name, email: user.email })
+    return addCorsHeaders(response, request.headers.get('origin') || undefined)
+
+  } catch (error) {
+    console.error('Delete user error:', error)
     const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }

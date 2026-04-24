@@ -27,7 +27,6 @@ export default function ProfilePage() {
     location: profile.location || '',
   })
   const [isDirty, setIsDirty] = useState(false)
-  const [avatarUploading, setAvatarUploading] = useState(false)
 
   // Sync form when profile data loads
   useEffect(() => {
@@ -59,37 +58,31 @@ export default function ProfilePage() {
     }
   }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      toast({ title: 'Invalid File', description: 'Only JPEG, PNG, and WebP images are allowed', variant: 'destructive' })
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Invalid File', description: 'Please select an image file', variant: 'destructive' })
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'File Too Large', description: 'Image must be less than 5MB', variant: 'destructive' })
       return
     }
 
-    // Validate file size (2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      toast({ title: 'File Too Large', description: 'Image must be under 2MB', variant: 'destructive' })
-      return
-    }
-
-    setAvatarUploading(true)
     try {
       const reader = new FileReader()
-      reader.onload = async (ev) => {
-        const base64 = ev.target?.result as string
+      reader.onload = async (event) => {
+        const base64 = event.target?.result as string
         await updateAvatar.mutateAsync({ image: base64 })
-        // FIX 6: Update Zustand store with new avatar
+        // Sync profile image to global Zustand store so Header/Sidebar update instantly
         updateStoreUser({ profileImage: base64 })
-        toast({ title: 'Photo Updated', description: 'Profile photo updated successfully' })
-        setAvatarUploading(false)
       }
       reader.readAsDataURL(file)
-    } catch (err: any) {
-      setAvatarUploading(false)
-      toast({ title: 'Upload Failed', description: err?.response?.data?.error || 'Failed to upload photo', variant: 'destructive' })
+    } catch {
+      toast({ title: 'Upload Failed', description: 'Failed to process image', variant: 'destructive' })
     }
   }
 
@@ -136,14 +129,14 @@ export default function ProfilePage() {
               </div>
             )}
           </div>
-          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} className="hidden" />
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleAvatarUpload} className="hidden" />
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={avatarUploading}
+            disabled={updateAvatar.isPending}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-green-800 bg-green-50 rounded-lg hover:bg-green-100 disabled:opacity-50 transition-colors"
           >
-            {avatarUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-            {avatarUploading ? 'Uploading...' : 'Change Photo'}
+            {updateAvatar.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+            {updateAvatar.isPending ? 'Uploading...' : 'Change Photo'}
           </button>
           {currentAvatar && (
             <button onClick={handleRemovePhoto} className="mt-2 text-xs text-red-600 hover:text-red-700 font-medium">

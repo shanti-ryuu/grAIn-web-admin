@@ -17,7 +17,7 @@ export default function MetricCard({
   icon,
 }: MetricCardProps) {
   return (
-    <div className="bg-[#ffffff] rounded-lg border border-[#e5e7eb] p-6 hover:border-[#166534] transition-colors duration-200">
+    <div className="stat-card p-6">
       <div className="flex justify-between items-start mb-4">
         <div>
           <p className="text-sm text-[#6b7280] font-medium">{title}</p>

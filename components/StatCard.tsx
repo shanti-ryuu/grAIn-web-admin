@@ -24,7 +24,7 @@ export default function StatCard({
         : 'text-gray-500'
 
   return (
-    <Card className="p-7 hover:shadow-xl hover:scale-105 transition-all duration-300 group cursor-default">
+    <Card className="p-7 hover:scale-[1.02] transition-all duration-300 group cursor-default">
       <div className="flex items-start justify-between mb-6">
         {/* Left: Labels and Value */}
         <div className="flex-1">

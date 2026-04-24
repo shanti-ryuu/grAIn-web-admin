@@ -11,10 +11,10 @@ export function Toaster() {
       {toasts.map((t) => (
         <div
           key={t.id}
-          className={`flex items-start gap-3 px-4 py-3 rounded-lg border shadow-lg max-w-sm animate-in slide-in-from-right ${
+          className={`flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg max-w-sm animate-in slide-in-from-right backdrop-blur-md ${
             t.variant === 'destructive'
-              ? 'bg-red-50 border-red-200 text-red-900'
-              : 'bg-white border-gray-200 text-gray-900'
+              ? 'bg-red-50/90 border-red-200 text-red-900'
+              : 'bg-white/90 border-gray-200 text-gray-900'
           }`}
         >
           <div className="flex-1">

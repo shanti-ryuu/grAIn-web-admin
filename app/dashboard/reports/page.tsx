@@ -6,9 +6,11 @@ import Table from '@/components/Table'
 import MetricCard from '@/components/MetricCard'
 import ErrorState from '@/components/ErrorState'
 import { useCommandHistory, useAnalyticsOverview, useDevices } from '@/hooks/useApi'
+import { useToast } from '@/hooks/useToast'
 import { FileText, Activity, Zap, Cpu, Download, Printer } from 'lucide-react'
 
 export default function ReportsPage() {
+  const { toast } = useToast()
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
@@ -45,9 +47,13 @@ export default function ReportsPage() {
     const a = document.createElement('a')
     a.href = url; a.download = `report-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
     URL.revokeObjectURL(url)
+    toast({ title: 'CSV Exported', description: 'Report has been downloaded as CSV' })
   }
 
-  const handlePrint = () => { window.print() }
+  const handlePrint = () => {
+    window.print()
+    toast({ title: 'Print Dialog', description: 'Opening print dialog for report' })
+  }
 
   const commandColumns = [
     { key: 'deviceId', label: 'Device ID' },

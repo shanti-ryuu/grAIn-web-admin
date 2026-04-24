@@ -8,7 +8,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/useToast'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import Image from 'next/image'
 
 const pageNames: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -82,7 +81,7 @@ export default function Topbar() {
   const userInitial = user?.name?.charAt(0).toUpperCase() || 'A'
 
   return (
-    <header className="h-16 bg-white border-b border-[#e5e7eb] flex items-center justify-between px-8 no-print">
+    <header className="h-16 glass-header flex items-center justify-between px-8 no-print">
       <h1 className="text-xl font-semibold text-[#111827]">{pageTitle}</h1>
 
       <div className="flex items-center gap-6">
@@ -147,7 +146,8 @@ export default function Topbar() {
                 <p className="text-xs text-[#6b7280]">{user?.role === 'admin' ? 'Administrator' : 'Farmer'}</p>
               </div>
               {user?.profileImage ? (
-                <Image src={user.profileImage} alt="Avatar" width={32} height={32} className="w-8 h-8 rounded-full object-cover" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={user.profileImage} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
               ) : (
                 <div className="w-8 h-8 bg-[#166534] rounded-full flex items-center justify-center text-white text-xs font-bold">
                   {userInitial}

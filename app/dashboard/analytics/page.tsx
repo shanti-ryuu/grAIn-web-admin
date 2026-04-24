@@ -6,6 +6,7 @@ import ChartCard from '@/components/ChartCard'
 import MetricCard from '@/components/MetricCard'
 import ErrorState from '@/components/ErrorState'
 import { useAnalyticsOverview, useDevices } from '@/hooks/useApi'
+import { useToast } from '@/hooks/useToast'
 import { Thermometer, Droplets, Zap, Activity, Download, FileText } from 'lucide-react'
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
@@ -15,6 +16,7 @@ import {
 const PIE_COLORS = ['#166534', '#6b7280', '#22c55e']
 
 export default function AnalyticsPage() {
+  const { toast } = useToast()
   const [period, setPeriod] = useState('weekly')
   const [deviceId, setDeviceId] = useState('all')
   const { data: analytics, isLoading, error, refetch } = useAnalyticsOverview(period, deviceId)
@@ -31,9 +33,13 @@ export default function AnalyticsPage() {
     const a = document.createElement('a')
     a.href = url; a.download = `analytics-${period}-${deviceId}.csv`; a.click()
     URL.revokeObjectURL(url)
+    toast({ title: 'CSV Exported', description: 'Analytics data has been downloaded' })
   }
 
-  const handleExportPDF = () => { window.print() }
+  const handleExportPDF = () => {
+    window.print()
+    toast({ title: 'PDF Export', description: 'Opening print dialog for PDF export' })
+  }
 
   if (isLoading) {
     return (

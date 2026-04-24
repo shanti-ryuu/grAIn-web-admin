@@ -402,6 +402,48 @@ export const useUpdateAvatar = () => {
   })
 }
 
+export const useBulkDeleteUsers = () => {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { data: responseData } = await api.delete<ApiResponse<any>>('/users/bulk', { data: { ids } })
+      return unwrapResponse(responseData)
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] })
+      toast({ title: 'Users Deleted', description: `${data.deletedCount} user(s) have been permanently deleted` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export const useBulkDeleteDevices = () => {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results = await Promise.allSettled(ids.map(id => api.delete<ApiResponse<any>>(`/devices/${id}`)))
+      const succeeded = results.filter(r => r.status === 'fulfilled').length
+      const failed = results.filter(r => r.status === 'rejected').length
+      return { succeeded, failed }
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+      if (data.failed > 0) {
+        toast({ title: 'Partial Delete', description: `${data.succeeded} device(s) deleted, ${data.failed} failed`, variant: 'destructive' })
+      } else {
+        toast({ title: 'Devices Deleted', description: `${data.succeeded} device(s) have been deregistered` })
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
 export const useChangePassword = () => {
   const { toast } = useToast()
   return useMutation({

@@ -5,8 +5,10 @@ import { Trash2, CheckCircle } from 'lucide-react'
 import Card from '@/components/Card'
 import ErrorState from '@/components/ErrorState'
 import { useAlerts, useMarkAlertRead, useClearAllAlerts } from '@/hooks/useApi'
+import { useToast } from '@/hooks/useToast'
 
 export default function AlertsPage() {
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState('all')
   const { data: alerts, isLoading, error, refetch } = useAlerts()
   const markRead = useMarkAlertRead()
@@ -15,13 +17,19 @@ export default function AlertsPage() {
   const handleMarkRead = async (alertId: string) => {
     try {
       await markRead.mutateAsync(alertId)
-    } catch {}
+      toast({ title: 'Alert Read', description: 'Alert marked as read' })
+    } catch {
+      toast({ title: 'Failed', description: 'Could not mark alert as read', variant: 'destructive' })
+    }
   }
 
   const handleClearAll = async () => {
     try {
       await clearAll.mutateAsync()
-    } catch {}
+      toast({ title: 'Alerts Cleared', description: 'All alerts have been dismissed' })
+    } catch {
+      toast({ title: 'Failed', description: 'Could not clear alerts', variant: 'destructive' })
+    }
   }
 
   const allAlerts = alerts || []

@@ -12,7 +12,7 @@ export default function ChartCard({
   description,
 }: ChartCardProps) {
   return (
-    <Card className="p-8 h-full">
+    <Card className="p-8 h-full glass-card">
       <div className="mb-8 pb-6 border-b-2 border-gray-200">
         <h3 className="text-xl font-bold text-gray-900 mb-1">{title}</h3>
         {description && (

@@ -40,9 +40,8 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden lg:flex lg:flex-col w-64 bg-white border-r border-gray-200 h-full no-print">
-      <div className="p-6 border-b border-gray-200">
-        {/* FIX 7: Replace 'G' letter with actual grain-logo.jpg */}
+    <aside className="hidden lg:flex lg:flex-col w-64 glass-sidebar h-full no-print">
+      <div className="p-6 border-b border-gray-100">
         <div className="flex items-center gap-3">
           <Image
             src="/logo/grain-logo.jpg"
@@ -66,7 +65,7 @@ export default function Sidebar() {
               key={item.name}
               onClick={() => router.push(item.href)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive ? 'bg-green-50 text-green-800' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                isActive ? 'nav-item-active' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
               }`}
             >
               <item.icon className="w-5 h-5" />
@@ -81,11 +80,11 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-100">
         <div className="flex items-center gap-3 mb-3">
-          {/* FIX 6: Show profileImage if available */}
           {user?.profileImage ? (
-            <Image src={user.profileImage} alt="Avatar" width={32} height={32} className="w-8 h-8 rounded-full object-cover" />
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.profileImage} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
           ) : (
             <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
               <span className="text-green-800 font-semibold text-sm">{user?.name?.charAt(0) || 'U'}</span>

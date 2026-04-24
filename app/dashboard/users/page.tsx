@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
 import { Plus, X, MoreHorizontal, Shield, UserCheck, UserX, Trash2, Eye, Loader2 } from 'lucide-react'
 import Card from '@/components/Card'
 import DataTable from '@/components/ui/data-table'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useDevices } from '@/hooks/useApi'
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useDevices, useBulkDeleteUsers } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
@@ -24,10 +24,9 @@ interface UserRow {
   deviceCount: number
 }
 
-// FIX 2.2-2.5: Single pendingAction state handles all modal types
 type PendingAction = {
-  type: 'make_farmer' | 'make_admin' | 'deactivate' | 'activate' | 'delete'
-  user: UserRow
+  type: 'make_farmer' | 'make_admin' | 'deactivate' | 'activate' | 'delete' | 'bulk_delete'
+  user?: UserRow
 } | null
 
 export default function UsersPage() {
@@ -38,11 +37,10 @@ export default function UsersPage() {
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: 'farmer' })
-  // FIX 1: Inline validation errors for Add User form
   const [addErrors, setAddErrors] = useState<Record<string, string>>({})
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
+  const [selectedRows, setSelectedRows] = useState<string[]>([])
 
-  // FIX 2.6: Server-side pagination state
   const [page, setPage] = useState(1)
   const limit = 10
 
@@ -51,8 +49,8 @@ export default function UsersPage() {
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const deleteUser = useDeleteUser()
+  const bulkDeleteUsers = useBulkDeleteUsers()
 
-  // FIX 2.6: Unwrap paginated response
   const users = (usersData as any)?.data || []
   const pagination = (usersData as any)?.pagination || { total: 0, page: 1, totalPages: 1 }
   const totalPages = pagination.totalPages || 1
@@ -74,7 +72,6 @@ export default function UsersPage() {
     deviceCount: deviceCounts[u.id] || 0,
   }))
 
-  // FIX 1: Client-side validation before API call
   const validateAddForm = (): boolean => {
     const errors: Record<string, string> = {}
     if (!addForm.name || addForm.name.trim().length < 2) errors.name = 'Name must be at least 2 characters'
@@ -97,50 +94,124 @@ export default function UsersPage() {
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to create user. Please try again.'
       toast({ title: 'Creation Failed', description: msg, variant: 'destructive' })
-      // Highlight email field if error mentions email/duplicate
       if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('already')) {
         setAddErrors(prev => ({ ...prev, email: msg }))
       }
     }
   }
 
-  // FIX 2.2: Confirmation modal for role changes
   const handleConfirmAction = async () => {
     if (!pendingAction) return
     const { type, user } = pendingAction
 
     try {
       if (type === 'make_farmer') {
-        await updateUser.mutateAsync({ id: user.id, role: 'farmer' })
-        toast({ title: 'Role Updated', description: `Role updated to Farmer successfully` })
+        await updateUser.mutateAsync({ id: user!.id, role: 'farmer' })
+        toast({ title: 'Role Updated', description: `${user!.name} is now a Farmer` })
       } else if (type === 'make_admin') {
-        await updateUser.mutateAsync({ id: user.id, role: 'admin' })
-        toast({ title: 'Role Updated', description: `Role updated to Admin successfully` })
+        await updateUser.mutateAsync({ id: user!.id, role: 'admin' })
+        toast({ title: 'Role Updated', description: `${user!.name} is now an Admin` })
       } else if (type === 'deactivate') {
-        await updateUser.mutateAsync({ id: user.id, status: 'inactive' })
-        toast({ title: 'Account Deactivated', description: `${user.name}'s account has been deactivated` })
+        await updateUser.mutateAsync({ id: user!.id, status: 'inactive' })
+        toast({ title: 'Account Deactivated', description: `${user!.name}'s account has been deactivated` })
       } else if (type === 'activate') {
-        await updateUser.mutateAsync({ id: user.id, status: 'active' })
-        toast({ title: 'Account Activated', description: `${user.name}'s account has been activated successfully` })
+        await updateUser.mutateAsync({ id: user!.id, status: 'active' })
+        toast({ title: 'Account Activated', description: `${user!.name}'s account has been activated` })
       } else if (type === 'delete') {
-        await deleteUser.mutateAsync(user.id)
-        toast({ title: 'User Deleted', description: `${user.name} has been permanently deleted` })
+        await deleteUser.mutateAsync(user!.id)
+        toast({ title: 'User Deleted', description: `${user!.name} has been permanently deleted` })
+      } else if (type === 'bulk_delete') {
+        await bulkDeleteUsers.mutateAsync(selectedRows)
+        setSelectedRows([])
       }
       queryClient.invalidateQueries({ queryKey: ['users'] })
     } catch (err: any) {
       toast({
         title: 'Action Failed',
-        description: err?.response?.data?.error || err?.response?.data?.message || 'Failed to update user',
+        description: err?.response?.data?.error || err?.response?.data?.message || 'Failed to perform action',
         variant: 'destructive',
       })
     }
     setPendingAction(null)
   }
 
-  // FIX 2.6: Pagination controls
+  const handleBulkDelete = () => {
+    if (selectedRows.length === 0) return
+    setPendingAction({ type: 'bulk_delete' })
+  }
+
   const handlePageChange = (newPage: number) => {
     setPage(newPage)
+    setSelectedRows([])
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleAddModalClose = (open: boolean) => {
+    if (!open) {
+      setAddForm({ name: '', email: '', password: '', role: 'farmer' })
+      setAddErrors({})
+    }
+    setShowAddModal(open)
+  }
+
+  const getConfirmConfig = () => {
+    if (!pendingAction) return { title: '', message: '', confirmText: 'Confirm', variant: 'danger' as const }
+    const { type, user } = pendingAction
+    switch (type) {
+      case 'make_farmer':
+        return {
+          title: 'Change User Role',
+          message: <span>Are you sure you want to change <strong>{user!.name}</strong>&apos;s role to Farmer? This will affect their access level.</span>,
+          confirmText: 'Yes, Change Role',
+          variant: 'warning' as const,
+        }
+      case 'make_admin':
+        return {
+          title: 'Change User Role',
+          message: <span>Are you sure you want to change <strong>{user!.name}</strong>&apos;s role to Admin? They will gain full system control.</span>,
+          confirmText: 'Yes, Change Role',
+          variant: 'blue' as const,
+        }
+      case 'deactivate':
+        return {
+          title: 'Deactivate Account',
+          message: <span>Are you sure you want to deactivate <strong>{user!.name}</strong>&apos;s account? They will lose access.</span>,
+          confirmText: 'Yes, Deactivate',
+          variant: 'danger' as const,
+        }
+      case 'activate':
+        return {
+          title: 'Activate Account',
+          message: <span>Are you sure you want to activate <strong>{user!.name}</strong>&apos;s account? They will regain access.</span>,
+          confirmText: 'Yes, Activate',
+          variant: 'green' as const,
+        }
+      case 'delete':
+        return {
+          title: 'Delete User',
+          message: (
+            <span>
+              This action cannot be undone. This will permanently delete <strong>{user!.name}</strong>&apos;s account and remove all associated data.
+              {user!.deviceCount > 0 && (
+                <span className="block mt-2 text-amber-600 font-medium">
+                  ⚠️ This user has {user!.deviceCount} assigned device(s) that will be unassigned.
+                </span>
+              )}
+            </span>
+          ),
+          confirmText: 'Delete',
+          variant: 'danger' as const,
+        }
+      case 'bulk_delete':
+        return {
+          title: 'Delete Selected Users',
+          message: <span>Are you sure you want to permanently delete <strong>{selectedRows.length}</strong> user(s)? This action cannot be undone.</span>,
+          confirmText: 'Delete All',
+          variant: 'danger' as const,
+        }
+      default:
+        return { title: '', message: '', confirmText: 'Confirm', variant: 'danger' as const }
+    }
   }
 
   const columns: ColumnDef<UserRow>[] = [
@@ -149,16 +220,28 @@ export default function UsersPage() {
       header: ({ table }) => (
         <input
           type="checkbox"
-          checked={table.getIsAllPageRowsSelected()}
-          onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)}
+          checked={selectedRows.length === tableData.length && tableData.length > 0}
+          onChange={(e) => {
+            if (e.target.checked) {
+              setSelectedRows(tableData.map(d => d.id))
+            } else {
+              setSelectedRows([])
+            }
+          }}
           className="w-4 h-4 rounded border-gray-300 text-green-800 focus:ring-green-800"
         />
       ),
       cell: ({ row }) => (
         <input
           type="checkbox"
-          checked={row.getIsSelected()}
-          onChange={(e) => row.toggleSelected(e.target.checked)}
+          checked={selectedRows.includes(row.original.id)}
+          onChange={(e) => {
+            if (e.target.checked) {
+              setSelectedRows(prev => [...prev, row.original.id])
+            } else {
+              setSelectedRows(prev => prev.filter(id => id !== row.original.id))
+            }
+          }}
           className="w-4 h-4 rounded border-gray-300 text-green-800 focus:ring-green-800"
         />
       ),
@@ -178,7 +261,7 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const role = row.original.role
         return (
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${role === 'admin' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+          <span className={role === 'admin' ? 'badge-admin' : 'badge-farmer'}>
             {role === 'admin' ? 'Admin' : 'Farmer'}
           </span>
         )
@@ -190,7 +273,7 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const status = row.original.status
         return (
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${status === 'active' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
+          <span className={status === 'active' ? 'badge-online' : 'badge-offline'}>
             {status === 'active' ? 'Active' : 'Inactive'}
           </span>
         )
@@ -213,7 +296,6 @@ export default function UsersPage() {
       header: 'Actions',
       cell: ({ row }) => {
         const user = row.original
-        // FIX 2.1: Use shadcn DropdownMenu with collisionPadding for auto-flip
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -221,8 +303,13 @@ export default function UsersPage() {
                 <MoreHorizontal className="w-4 h-4 text-gray-500" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="bottom" collisionPadding={8}>
-              {/* FIX 2.2: Make Farmer/Admin opens confirmation modal */}
+            <DropdownMenuContent
+              align="end"
+              side="bottom"
+              sideOffset={4}
+              avoidCollisions={true}
+              collisionPadding={16}
+            >
               <DropdownMenuItem onClick={() => setPendingAction({
                 type: user.role === 'admin' ? 'make_farmer' : 'make_admin',
                 user,
@@ -230,7 +317,6 @@ export default function UsersPage() {
                 <Shield className="w-4 h-4" />
                 {user.role === 'admin' ? 'Make Farmer' : 'Make Admin'}
               </DropdownMenuItem>
-              {/* FIX 2.3: Deactivate/Activate with dynamic label and icon */}
               <DropdownMenuItem onClick={() => setPendingAction({
                 type: user.status === 'active' ? 'deactivate' : 'activate',
                 user,
@@ -238,13 +324,11 @@ export default function UsersPage() {
                 {user.status === 'active' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                 {user.status === 'active' ? 'Deactivate' : 'Activate'}
               </DropdownMenuItem>
-              {/* FIX 2.4: View Devices navigates to filtered devices page */}
               <DropdownMenuItem onClick={() => router.push(`/dashboard/devices?userId=${user.id}&userName=${encodeURIComponent(user.name)}`)}>
                 <Eye className="w-4 h-4" />
                 View Devices
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              {/* FIX 2.5: Delete User opens confirmation modal */}
               <DropdownMenuItem
                 className="text-red-600 focus:text-red-600 focus:bg-red-50"
                 onClick={() => setPendingAction({ type: 'delete', user })}
@@ -278,18 +362,40 @@ export default function UsersPage() {
     )
   }
 
-  // FIX 2.6: Compute showing range
   const start = (page - 1) * limit + 1
   const end = Math.min(page * limit, total)
+  const confirmConfig = getConfirmConfig()
 
   return (
     <div className="space-y-8">
       <div className="flex items-start justify-between">
         <div><h1 className="text-3xl font-bold text-gray-900 mb-2">User Management</h1><p className="text-base text-gray-500">Manage administrator and farmer accounts.</p></div>
-        <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
+        <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2 px-4 py-2.5 text-white font-medium">
           <Plus className="w-4 h-4" /> Add User
         </button>
       </div>
+
+      {/* Bulk Actions Toolbar */}
+      {selectedRows.length > 0 && (
+        <div className="flex items-center gap-2 p-3 bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-lg">
+          <span className="text-sm font-medium text-red-700">
+            {selectedRows.length} selected
+          </span>
+          <button
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Selected
+          </button>
+          <button
+            onClick={() => setSelectedRows([])}
+            className="px-3 py-1.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Clear Selection
+          </button>
+        </div>
+      )}
 
       {tableData.length === 0 && page === 1 ? (
         <Card className="p-12 text-center">
@@ -303,7 +409,6 @@ export default function UsersPage() {
         <>
           <DataTable columns={columns} data={tableData} searchPlaceholder="Search by name or email..." />
 
-          {/* FIX 2.6: Server-side pagination controls */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-sm text-gray-500">
               Showing {start}-{end} of {total} results
@@ -312,19 +417,19 @@ export default function UsersPage() {
               <button
                 onClick={() => handlePageChange(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="px-3 py-1.5 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm"
               >
-                &lt;
+                Previous
               </button>
               <span className="text-sm text-gray-700">
                 Page {page} of {totalPages}
               </span>
               <button
-                onClick={() => handlePageChange(page + 1)}
+                onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
                 disabled={page >= totalPages}
-                className="px-3 py-1.5 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm"
+                className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm"
               >
-                &gt;
+                Next
               </button>
             </div>
           </div>
@@ -333,11 +438,11 @@ export default function UsersPage() {
 
       {/* Add User Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => handleAddModalClose(false)}>
+          <div className="dialog-content p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Add User</h2>
-              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <button onClick={() => handleAddModalClose(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleAddUser} className="space-y-4">
               <div>
@@ -367,8 +472,8 @@ export default function UsersPage() {
                 </select>
               </div>
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">Cancel</button>
-                <button type="submit" disabled={createUser.isPending} className="flex-1 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                <button type="button" onClick={() => handleAddModalClose(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+                <button type="submit" disabled={createUser.isPending} className="btn-primary flex-1 px-4 py-2.5 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                   {createUser.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   {createUser.isPending ? 'Creating...' : 'Create'}
                 </button>
@@ -378,53 +483,16 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* FIX 2.2-2.5: Unified confirmation modal for all actions */}
+      {/* Confirmation Modal for all actions */}
       <ConfirmModal
         isOpen={!!pendingAction}
         onClose={() => setPendingAction(null)}
         onConfirm={handleConfirmAction}
-        title={
-          pendingAction?.type === 'make_farmer' ? 'Change Role' :
-          pendingAction?.type === 'make_admin' ? 'Change Role' :
-          pendingAction?.type === 'deactivate' ? 'Deactivate Account' :
-          pendingAction?.type === 'activate' ? 'Activate Account' :
-          'Delete User'
-        }
-        message={
-          pendingAction?.type === 'make_farmer' ? (
-            <span>Are you sure you want to change <strong>{pendingAction.user.name}</strong>&apos;s role to Farmer? They will lose admin privileges.</span>
-          ) : pendingAction?.type === 'make_admin' ? (
-            <span>Are you sure you want to grant <strong>{pendingAction.user.name}</strong> admin access? They will have full system control.</span>
-          ) : pendingAction?.type === 'deactivate' ? (
-            <span>Are you sure you want to deactivate <strong>{pendingAction.user.name}</strong>&apos;s account? They will no longer be able to log in.</span>
-          ) : pendingAction?.type === 'activate' ? (
-            <span>Are you sure you want to reactivate <strong>{pendingAction.user.name}</strong>&apos;s account? They will regain access to the system.</span>
-          ) : pendingAction?.type === 'delete' ? (
-            <span>
-              Are you sure you want to permanently delete <strong>{pendingAction.user.name}</strong> ({pendingAction.user.email})? This action cannot be undone.
-              {pendingAction.user.deviceCount > 0 && (
-                <span className="block mt-2 text-amber-600 font-medium">
-                  ⚠️ This user has {pendingAction.user.deviceCount} assigned device(s). Deleting this account will unassign those devices.
-                </span>
-              )}
-            </span>
-          ) : ''
-        }
-        confirmText={
-          pendingAction?.type === 'make_farmer' ? 'Yes, Change Role' :
-          pendingAction?.type === 'make_admin' ? 'Yes, Grant Admin' :
-          pendingAction?.type === 'deactivate' ? 'Deactivate' :
-          pendingAction?.type === 'activate' ? 'Activate' :
-          'Delete Permanently'
-        }
-        variant={
-          pendingAction?.type === 'make_farmer' ? 'warning' :
-          pendingAction?.type === 'make_admin' ? 'blue' :
-          pendingAction?.type === 'deactivate' ? 'danger' :
-          pendingAction?.type === 'activate' ? 'green' :
-          'danger'
-        }
-        loading={updateUser.isPending || deleteUser.isPending}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        confirmText={confirmConfig.confirmText}
+        variant={confirmConfig.variant}
+        loading={updateUser.isPending || deleteUser.isPending || bulkDeleteUsers.isPending}
       />
     </div>
   )

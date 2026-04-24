@@ -7,7 +7,7 @@ import { Plus, X, MoreHorizontal, Eye, MapPin, UserCircle, Trash2, ArrowLeft, Lo
 import Card from '@/components/Card'
 import DataTable from '@/components/ui/data-table'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import { useDevices, useUsers, useRegisterDevice, useDeleteDevice, useUpdateDevice } from '@/hooks/useApi'
+import { useDevices, useUsers, useRegisterDevice, useDeleteDevice, useUpdateDevice, useBulkDeleteDevices } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/useToast'
 import ErrorState from '@/components/ErrorState'
@@ -38,7 +38,7 @@ function timeAgo(dateStr: string): string {
 
 // FIX 2: Single pendingDeviceAction state for all device modals
 type PendingDeviceAction = {
-  type: 'edit_location' | 'reassign_user' | 'delete'
+  type: 'edit_location' | 'reassign_user' | 'delete' | 'bulk_delete'
   device: DeviceRow
 } | null
 
@@ -53,6 +53,7 @@ export default function DevicesPage() {
   const [showRegisterModal, setShowRegisterModal] = useState(false)
   const [registerForm, setRegisterForm] = useState({ deviceId: '', location: '', assignedUser: '' })
   const [pendingDeviceAction, setPendingDeviceAction] = useState<PendingDeviceAction>(null)
+  const [selectedDeviceRows, setSelectedDeviceRows] = useState<string[]>([])
 
   // FIX 2: Edit Location state
   const [editLocationValue, setEditLocationValue] = useState('')
@@ -64,6 +65,7 @@ export default function DevicesPage() {
   const registerDevice = useRegisterDevice()
   const deleteDevice = useDeleteDevice()
   const updateDevice = useUpdateDevice()
+  const bulkDeleteDevices = useBulkDeleteDevices()
 
   const farmers = ((allUsers as any)?.data || allUsers || []).filter((u: any) => u.role === 'farmer' && u.status === 'active')
 
@@ -119,19 +121,31 @@ export default function DevicesPage() {
   const columns: ColumnDef<DeviceRow>[] = [
     {
       id: 'select',
-      header: ({ table }) => (
+      header: () => (
         <input
           type="checkbox"
-          checked={table.getIsAllPageRowsSelected()}
-          onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)}
+          checked={selectedDeviceRows.length === tableData.length && tableData.length > 0}
+          onChange={(e) => {
+            if (e.target.checked) {
+              setSelectedDeviceRows(tableData.map(d => d.id))
+            } else {
+              setSelectedDeviceRows([])
+            }
+          }}
           className="w-4 h-4 rounded border-gray-300 text-green-800 focus:ring-green-800"
         />
       ),
       cell: ({ row }) => (
         <input
           type="checkbox"
-          checked={row.getIsSelected()}
-          onChange={(e) => row.toggleSelected(e.target.checked)}
+          checked={selectedDeviceRows.includes(row.original.id)}
+          onChange={(e) => {
+            if (e.target.checked) {
+              setSelectedDeviceRows(prev => [...prev, row.original.id])
+            } else {
+              setSelectedDeviceRows(prev => prev.filter(id => id !== row.original.id))
+            }
+          }}
           className="w-4 h-4 rounded border-gray-300 text-green-800 focus:ring-green-800"
         />
       ),
@@ -182,7 +196,7 @@ export default function DevicesPage() {
                 <MoreHorizontal className="w-4 h-4 text-gray-500" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="bottom" collisionPadding={8}>
+            <DropdownMenuContent align="end" side="bottom" sideOffset={4} avoidCollisions={true} collisionPadding={16}>
               <DropdownMenuItem onClick={() => router.push(`/dashboard/devices/${device.id}`)}>
                 <Eye className="w-4 h-4" /> View Details
               </DropdownMenuItem>
@@ -256,6 +270,30 @@ export default function DevicesPage() {
           <Plus className="w-4 h-4" /> Register Device
         </button>
       </div>
+
+      {/* Bulk Actions Toolbar */}
+      {selectedDeviceRows.length > 0 && (
+        <div className="flex items-center gap-2 p-3 bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-lg">
+          <span className="text-sm font-medium text-red-700">
+            {selectedDeviceRows.length} selected
+          </span>
+          <button
+            onClick={() => {
+              if (selectedDeviceRows.length > 0) setPendingDeviceAction({ type: 'bulk_delete', device: {} as DeviceRow })
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Selected
+          </button>
+          <button
+            onClick={() => setSelectedDeviceRows([])}
+            className="px-3 py-1.5 border border-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Clear Selection
+          </button>
+        </div>
+      )}
 
       {tableData.length === 0 ? (
         <Card className="p-12 text-center">
@@ -376,6 +414,28 @@ export default function DevicesPage() {
           confirmText="Deregister"
           variant="danger"
           loading={deleteDevice.isPending}
+        />
+      )}
+
+      {pendingDeviceAction?.type === 'bulk_delete' && (
+        <ConfirmModal
+          isOpen={pendingDeviceAction.type === 'bulk_delete'}
+          onClose={() => setPendingDeviceAction(null)}
+          onConfirm={async () => {
+            try {
+              await bulkDeleteDevices.mutateAsync(selectedDeviceRows)
+              setSelectedDeviceRows([])
+              queryClient.invalidateQueries({ queryKey: ['devices'] })
+            } catch (err: any) {
+              toast({ title: 'Bulk Delete Failed', description: err?.response?.data?.error || err?.message || 'Failed', variant: 'destructive' })
+            }
+            setPendingDeviceAction(null)
+          }}
+          title="Delete Selected Devices"
+          message={`Are you sure you want to deregister ${selectedDeviceRows.length} device(s)? This action cannot be undone.`}
+          confirmText="Delete All"
+          variant="danger"
+          loading={bulkDeleteDevices.isPending}
         />
       )}
     </div>

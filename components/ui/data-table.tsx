@@ -12,7 +12,6 @@ import {
   SortingState,
 } from '@tanstack/react-table'
 import { Search, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
-import Card from '@/components/Card'
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
@@ -62,7 +61,7 @@ export default function DataTable<TData, TValue>({
   const selectedCount = Object.keys(rowSelection).length
 
   return (
-    <Card>
+    <div className="data-table">
       {/* Search + Bulk Actions */}
       <div className="px-6 pt-6 pb-4 space-y-3">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
@@ -73,7 +72,7 @@ export default function DataTable<TData, TValue>({
               placeholder={searchPlaceholder}
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white"
+              className="w-full pl-9 pr-4 py-2 border border-gray-200/60 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white/60 backdrop-blur-sm"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -105,7 +104,7 @@ export default function DataTable<TData, TValue>({
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-6 py-3 text-left text-xs font-semibold text-gray-700 bg-gray-50 border-b border-gray-200 cursor-pointer select-none"
+                    className="table-header px-6 py-3 text-left border-b border-gray-200 cursor-pointer select-none"
                     onClick={header.column.getToggleSortingHandler()}
                   >
                     <div className="flex items-center gap-1">
@@ -126,7 +125,7 @@ export default function DataTable<TData, TValue>({
           <tbody>
             {table.getRowModel().rows.length > 0 ? (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                <tr key={row.id} className="table-row border-b border-gray-200 transition-colors">
                   {row.getVisibleCells().map((cell) => (
                     <td key={cell.id} className="px-6 py-4 text-sm text-gray-900">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -170,6 +169,6 @@ export default function DataTable<TData, TValue>({
           </button>
         </div>
       </div>
-    </Card>
+    </div>
   )
 }

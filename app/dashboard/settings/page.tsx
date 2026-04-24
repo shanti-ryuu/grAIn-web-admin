@@ -5,7 +5,7 @@ import Card from '@/components/Card'
 import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
 import { useDevices, useChangePassword } from '@/hooks/useApi'
-import { Settings as SettingsIcon, Bell, Shield, Cpu, Lock, Loader2 } from 'lucide-react'
+import { Settings as SettingsIcon, Bell, Shield, Cpu, Lock, Loader2, Eye, EyeOff } from 'lucide-react'
 
 export default function SettingsPage() {
   const { toast } = useToast()
@@ -27,6 +27,9 @@ export default function SettingsPage() {
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   // FIX 4: Inline validation errors for password form
   const [pwErrors, setPwErrors] = useState<Record<string, string>>({})
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   useEffect(() => {
     const saved = localStorage.getItem('grain_system_settings')
@@ -176,20 +179,47 @@ export default function SettingsPage() {
         <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
-            <input type="password" value={pwForm.currentPassword} onChange={(e) => { setPwForm({ ...pwForm, currentPassword: e.target.value }); setPwErrors({ ...pwErrors, currentPassword: '' }) }} required autoComplete="current-password"
-              className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 ${pwErrors.currentPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+            <div className="relative">
+              <input type={showCurrent ? 'text' : 'password'} value={pwForm.currentPassword} onChange={(e) => { setPwForm({ ...pwForm, currentPassword: e.target.value }); setPwErrors({ ...pwErrors, currentPassword: '' }) }} required autoComplete="current-password"
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 pr-10 ${pwErrors.currentPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowCurrent(p => !p)}
+              >
+                {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {pwErrors.currentPassword && <p className="mt-1 text-xs text-red-600">{pwErrors.currentPassword}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
-            <input type="password" value={pwForm.newPassword} onChange={(e) => { setPwForm({ ...pwForm, newPassword: e.target.value }); setPwErrors({ ...pwErrors, newPassword: '' }) }} required minLength={6} autoComplete="new-password"
-              className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 ${pwErrors.newPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+            <div className="relative">
+              <input type={showNew ? 'text' : 'password'} value={pwForm.newPassword} onChange={(e) => { setPwForm({ ...pwForm, newPassword: e.target.value }); setPwErrors({ ...pwErrors, newPassword: '' }) }} required minLength={6} autoComplete="new-password"
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 pr-10 ${pwErrors.newPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowNew(p => !p)}
+              >
+                {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {pwErrors.newPassword && <p className="mt-1 text-xs text-red-600">{pwErrors.newPassword}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
-            <input type="password" value={pwForm.confirmPassword} onChange={(e) => { setPwForm({ ...pwForm, confirmPassword: e.target.value }); setPwErrors({ ...pwErrors, confirmPassword: '' }) }} required minLength={6} autoComplete="new-password"
-              className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 ${pwErrors.confirmPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+            <div className="relative">
+              <input type={showConfirm ? 'text' : 'password'} value={pwForm.confirmPassword} onChange={(e) => { setPwForm({ ...pwForm, confirmPassword: e.target.value }); setPwErrors({ ...pwErrors, confirmPassword: '' }) }} required minLength={6} autoComplete="new-password"
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 pr-10 ${pwErrors.confirmPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowConfirm(p => !p)}
+              >
+                {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
             {pwErrors.confirmPassword && <p className="mt-1 text-xs text-red-600">{pwErrors.confirmPassword}</p>}
           </div>
           <div className="pt-4">

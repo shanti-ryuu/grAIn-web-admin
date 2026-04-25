@@ -1,0 +1,27 @@
+meta {
+  name: Auth - Login
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+}
+
+body:json {
+  {
+    "email": "admin@grain.com",
+    "password": "admin123"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.token: isString
+}
+
+script:post-response {
+  // Save token to Bruno env variable for use in other requests
+  bru.setEnvVar("token", res.body.token);
+  console.log("Token saved:", res.body.token.substring(0, 20) + "...");
+}

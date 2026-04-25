@@ -1,0 +1,24 @@
+meta {
+  name: Stop Dryer
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/dryer/GR-001/stop
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.command: eq STOP
+  res.body.status: eq pending
+}
+
+docs {
+  Sends a STOP command to an IoT device.
+  The command is stored in MongoDB and pushed to Firebase for ESP32 polling.
+}

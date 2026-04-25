@@ -6,6 +6,7 @@ export interface IDevice extends Document {
   status: 'online' | 'offline'
   location?: string
   lastActive: Date
+  lastMoisture?: number
   createdAt: Date
   updatedAt: Date
 }
@@ -34,6 +35,10 @@ const DeviceSchema: Schema = new Schema({
   lastActive: {
     type: Date,
     default: Date.now,
+  },
+  lastMoisture: {
+    type: Number,
+    default: null,
   },
 }, {
   timestamps: true,

@@ -1,0 +1,38 @@
+{
+  "version": "1",
+  "name": "grAIn API Tests",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"],
+  "environments": [
+    {
+      "name": "Local",
+      "variables": [
+        {
+          "name": "baseUrl",
+          "value": "http://localhost:3000/api",
+          "enabled": true
+        },
+        {
+          "name": "token",
+          "value": "",
+          "enabled": true
+        }
+      ]
+    },
+    {
+      "name": "Production",
+      "variables": [
+        {
+          "name": "baseUrl",
+          "value": "https://grain-web-admin.onrender.com/api",
+          "enabled": true
+        },
+        {
+          "name": "token",
+          "value": "",
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

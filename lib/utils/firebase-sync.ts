@@ -15,6 +15,8 @@ export async function syncSensorToFirebase(
     fanSpeed?: number
     energy?: number
     status?: string
+    solarVoltage?: number
+    weight?: number
   }
 ): Promise<void> {
   const db = getRealtimeDb()
@@ -27,6 +29,8 @@ export async function syncSensorToFirebase(
     fanSpeed: sensorData.fanSpeed ?? 0,
     energy: sensorData.energy ?? 0,
     status: sensorData.status ?? 'idle',
+    solarVoltage: sensorData.solarVoltage ?? 0,
+    weight: sensorData.weight ?? 0,
     updatedAt: Date.now(),
   })
 

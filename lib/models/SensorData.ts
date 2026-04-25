@@ -8,6 +8,8 @@ export interface ISensorData extends Document {
   fanSpeed: number
   energy: number
   status: 'running' | 'idle' | 'paused' | 'error'
+  solarVoltage: number
+  weight: number
   timestamp: Date
   createdAt: Date
   updatedAt: Date
@@ -46,6 +48,16 @@ const SensorDataSchema: Schema = new Schema({
     type: String,
     enum: ['running', 'idle', 'paused', 'error'],
     default: 'idle',
+  },
+  solarVoltage: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
+  weight: {
+    type: Number,
+    default: 0,
+    min: 0,
   },
   timestamp: {
     type: Date,

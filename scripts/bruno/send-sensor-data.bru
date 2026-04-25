@@ -1,0 +1,39 @@
+meta {
+  name: Send Sensor Data (Public)
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/sensors/data
+}
+
+body:json {
+  {
+    "deviceId": "GR-001",
+    "temperature": 58.5,
+    "humidity": 42.3,
+    "moisture": 22.7,
+    "fanSpeed": 75,
+    "energy": 2.4,
+    "status": "running",
+    "solarVoltage": 12.6,
+    "weight": 4.8
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.deviceId: eq GR-001
+  res.body.temperature: eq 58.5
+  res.body.solarVoltage: eq 12.6
+  res.body.weight: eq 4.8
+}
+
+docs {
+  This endpoint is PUBLIC and requires no authentication.
+  It receives sensor data from ESP32 devices and:
+  1. Saves to MongoDB SensorData collection
+  2. Syncs to Firebase Realtime DB
+  3. Updates Device.lastActive and Device.status
+}

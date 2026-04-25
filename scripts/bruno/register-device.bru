@@ -1,0 +1,31 @@
+meta {
+  name: Register Device
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/devices
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+body:json {
+  {
+    "deviceId": "BRUNO-TEST-001",
+    "location": "Bruno Test Farm, Plot 1"
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.deviceId: eq BRUNO-TEST-001
+  res.body.location: eq Bruno Test Farm, Plot 1
+}
+
+docs {
+  Registers a new IoT device.
+  Requires JWT authentication.
+}

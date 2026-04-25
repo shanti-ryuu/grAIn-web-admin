@@ -1,0 +1,29 @@
+meta {
+  name: Get Sensor Data (Paginated)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/sensors/GR-001?page=1&limit=5&hours=24
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: isArray
+  res.body.pagination: isObject
+  res.body.pagination.page: eq 1
+  res.body.pagination.limit: eq 5
+}
+
+docs {
+  Retrieves sensor data for a specific device with pagination.
+  Query params:
+  - page: Page number (default: 1)
+  - limit: Records per page (default: 50, max: 100)
+  - hours: Look back period in hours (default: 24, max: 720)
+}

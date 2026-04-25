@@ -69,22 +69,29 @@ const seedDevices = [
   },
 ]
 
-async function generateSensorData(deviceId: string, count: number = 24) {
+async function generateSensorData(deviceId: string, count: number = 120) {
   const data = []
   const now = Date.now()
   
   for (let i = count - 1; i >= 0; i--) {
-    const timestamp = new Date(now - i * 60 * 60 * 1000) // 1 hour intervals
-    const isRunning = Math.random() > 0.3 // 70% chance of running
+    const timestamp = new Date(now - i * 60 * 1000) // 1 minute intervals for realistic drying curve
+    const isRunning = Math.random() > 0.2 // 80% chance of running
+    
+    // Realistic drying curve: moisture decreases gradually
+    const baselineMoisture = 35
+    const dryingProgress = (count - i) / count
+    const moisture = Math.max(14, baselineMoisture - (dryingProgress * 15) + (Math.random() * 2))
     
     data.push({
       deviceId,
-      temperature: 28 + Math.random() * 20, // 28-48°C
-      humidity: 50 + Math.random() * 40, // 50-90%
-      moisture: 20 + Math.random() * 30, // 20-50%
-      fanSpeed: isRunning ? 60 + Math.floor(Math.random() * 30) : 0, // 60-90% when running, 0 when idle
+      temperature: 45 + Math.random() * 20, // 45-65°C (optimal for grain drying)
+      humidity: 35 + Math.random() * 30, // 35-65%
+      moisture: Math.round(moisture * 100) / 100,
+      fanSpeed: isRunning ? 65 + Math.floor(Math.random() * 20) : 0, // 65-85% when running, 0 when idle
       energy: isRunning ? 1.5 + Math.random() * 3 : 0, // 1.5-4.5 kWh when running, 0 when idle
       status: isRunning ? 'running' : 'idle',
+      solarVoltage: 11 + Math.random() * 3, // 11-14V (realistic solar panel output)
+      weight: 4 + Math.random() * 3, // 4-7kg (grain load)
       timestamp,
     })
   }

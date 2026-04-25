@@ -1,0 +1,40 @@
+meta {
+  name: Start Dryer
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/dryer/GR-001/start
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+body:json {
+  {
+    "mode": "MANUAL",
+    "temperature": 58,
+    "fanSpeed": 75
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.command: eq START
+  res.body.status: eq pending
+}
+
+docs {
+  Sends a START command to an IoT device.
+  The command is stored in MongoDB and pushed to Firebase for ESP32 polling.
+  
+  Expected Firebase structure after:
+  grain/commands/GR-001/pending/{commandId}/
+    - command: "START"
+    - mode: "MANUAL"
+    - temperature: 58
+    - fanSpeed: 75
+    - createdAt: timestamp
+}

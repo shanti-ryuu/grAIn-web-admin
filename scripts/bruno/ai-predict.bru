@@ -1,0 +1,49 @@
+meta {
+  name: AI - Predict Drying Outcome
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/ai/predict
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+body:json {
+  {
+    "deviceId": "GR-001",
+    "temperature": 58.5,
+    "humidity": 42.3,
+    "moisture": 22.7,
+    "fanSpeed": 75,
+    "timeElapsed": 90,
+    "solarVoltage": 12.6
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.predictedMoisture30min: isNumber
+  res.body.estimatedMinutesToTarget: isNumber
+  res.body.recommendation: isString
+  res.body.efficiencyScore: isNumber
+  res.body.confidence: isNumber
+  res.body.isDryingComplete: isBoolean
+  res.body.projectedCurve: isArray
+}
+
+docs {
+  AI prediction endpoint using rule-based model (Phase 1).
+  
+  Returns:
+  - predictedMoisture30min: Predicted moisture level in 30 minutes
+  - estimatedMinutesToTarget: Minutes to reach 14% moisture target
+  - recommendation: Text recommendation for operator
+  - efficiencyScore: 0-100 efficiency metric
+  - confidence: 0-100 confidence in prediction
+  - isDryingComplete: Boolean flag
+  - projectedCurve: Array of {time, moisture} points
+}

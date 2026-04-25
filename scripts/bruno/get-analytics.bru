@@ -1,0 +1,43 @@
+meta {
+  name: Get Analytics Overview
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/analytics/overview?period=weekly&deviceId=all
+}
+
+headers {
+  Authorization: Bearer {{token}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.moistureTrend: isArray
+  res.body.dryingCycles: isArray
+  res.body.energyConsumption: isArray
+  res.body.avgTemperature: isNumber
+  res.body.avgHumidity: isNumber
+  res.body.totalCycles: isNumber
+  res.body.activeDryers: isNumber
+  res.body.period: eq weekly
+}
+
+docs {
+  Retrieves analytics data for dashboards and reporting.
+  
+  Query params:
+  - period: daily, weekly, or monthly (default: weekly)
+  - deviceId: specific device ID or "all" for all accessible devices
+  
+  Returns:
+  - moistureTrend: Array of {time, value} points
+  - dryingCycles: Array of cycle metadata
+  - energyConsumption: Array of {day, value} energy used
+  - avgTemperature: Average temperature over period
+  - avgHumidity: Average humidity over period
+  - totalCycles: Total drying cycles started
+  - activeDryers: Devices actively drying in last 24h
+  - period: The selected time period
+}

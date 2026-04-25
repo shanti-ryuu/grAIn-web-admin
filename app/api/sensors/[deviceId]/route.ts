@@ -100,7 +100,7 @@ export async function GET(
       .limit(limit)
       .lean()
 
-    // Format response
+    // Format response with ALL fields
     const formattedData = sensorData.map((data: any) => ({
       id: data._id,
       deviceId: data.deviceId,
@@ -110,6 +110,8 @@ export async function GET(
       fanSpeed: data.fanSpeed,
       energy: data.energy,
       status: data.status,
+      solarVoltage: data.solarVoltage,
+      weight: data.weight,
       timestamp: data.timestamp.toISOString(),
       createdAt: data.createdAt.toISOString(),
     }))

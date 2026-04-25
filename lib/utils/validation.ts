@@ -116,6 +116,37 @@ export function validateSensorDataRequest(body: any): ValidationResult {
     errors.moisture = 'Moisture out of valid range'
   }
 
+  // fanSpeed, energy, status, solarVoltage, weight are optional with validation
+  if (body.fanSpeed !== undefined && body.fanSpeed !== null) {
+    if (typeof body.fanSpeed !== 'number' || body.fanSpeed < 0 || body.fanSpeed > 100) {
+      errors.fanSpeed = 'Fan speed must be between 0 and 100'
+    }
+  }
+
+  if (body.energy !== undefined && body.energy !== null) {
+    if (typeof body.energy !== 'number' || body.energy < 0) {
+      errors.energy = 'Energy must be a positive number'
+    }
+  }
+
+  if (body.status !== undefined && body.status !== null) {
+    if (typeof body.status !== 'string' || !['running', 'idle', 'paused', 'error'].includes(body.status)) {
+      errors.status = 'Status must be one of: running, idle, paused, error'
+    }
+  }
+
+  if (body.solarVoltage !== undefined && body.solarVoltage !== null) {
+    if (typeof body.solarVoltage !== 'number' || body.solarVoltage < 0) {
+      errors.solarVoltage = 'Solar voltage must be a positive number'
+    }
+  }
+
+  if (body.weight !== undefined && body.weight !== null) {
+    if (typeof body.weight !== 'number' || body.weight < 0) {
+      errors.weight = 'Weight must be a positive number'
+    }
+  }
+
   return {
     valid: Object.keys(errors).length === 0,
     errors,

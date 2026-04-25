@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
 import { Plus, X, MoreHorizontal, Shield, UserCheck, UserX, Trash2, Eye, Loader2 } from 'lucide-react'
@@ -33,7 +33,16 @@ export default function UsersPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const { isHydrated } = useAuthStore()
+  const { isHydrated, user } = useAuthStore()
+
+  // Role-based guard: only admins can access user management
+  useEffect(() => {
+    if (isHydrated && user?.role !== 'admin') {
+      router.replace('/dashboard')
+    }
+  }, [isHydrated, user, router])
+
+  if (isHydrated && user?.role !== 'admin') return null
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: 'farmer' })

@@ -51,10 +51,9 @@ export default function UsersPage() {
   const deleteUser = useDeleteUser()
   const bulkDeleteUsers = useBulkDeleteUsers()
 
-  const users = (usersData as any)?.data || []
-  const pagination = (usersData as any)?.pagination || { total: 0, page: 1, totalPages: 1 }
-  const totalPages = pagination.totalPages || 1
-  const total = pagination.total || 0
+  const users = (usersData as any)?.users || []
+  const total = (usersData as any)?.total || 0
+  const totalPages = (usersData as any)?.totalPages || 1
 
   const deviceCounts: Record<string, number> = {}
   ;(devices || []).forEach((d: any) => {
@@ -63,13 +62,13 @@ export default function UsersPage() {
   })
 
   const tableData: UserRow[] = (users || []).map((u: any) => ({
-    id: u.id,
+    id: u._id?.toString?.() || u.id,
     name: u.name,
     email: u.email,
     role: u.role,
     status: u.status,
     createdAt: u.createdAt,
-    deviceCount: deviceCounts[u.id] || 0,
+    deviceCount: deviceCounts[u._id?.toString?.() || u.id] || 0,
   }))
 
   const validateAddForm = (): boolean => {

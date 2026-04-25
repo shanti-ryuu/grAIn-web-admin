@@ -62,7 +62,7 @@ export default function DashboardPage() {
   const totalDevices = devices?.length || 0
   const onlineDevices = devices?.filter((d: any) => d.status === 'online').length || 0
   const unreadAlerts = (alerts || []).filter((a: any) => !a.isRead).length
-  const totalUsers = (usersData as any)?.pagination?.total || 0
+  const totalUsers = (usersData as any)?.total || 0
 
   if (devicesLoading || analyticsLoading) {
     return (

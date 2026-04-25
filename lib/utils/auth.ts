@@ -30,21 +30,37 @@ export function verifyToken(token: string): TokenPayload | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload
     return decoded
-  } catch {
+  } catch (error) {
+    console.warn('[verifyToken] Token verification failed:', error instanceof Error ? error.message : error)
     return null
   }
 }
 
 /**
- * Get user from request
+ * Get user from request — with diagnostic logging
  */
 export function getUserFromRequest(request: NextRequest): TokenPayload | null {
-  const token = getTokenFromRequest(request)
-  if (!token) {
+  const authHeader = request.headers.get('Authorization')
+
+  if (!authHeader) {
+    console.warn('[getUserFromRequest] No Authorization header')
     return null
   }
 
-  return verifyToken(token)
+  if (!authHeader.startsWith('Bearer ')) {
+    console.warn('[getUserFromRequest] Invalid header format:', authHeader.slice(0, 20))
+    return null
+  }
+
+  const token = authHeader.slice(7)
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload
+    return decoded
+  } catch (error) {
+    console.warn('[getUserFromRequest] Token verification failed:', error instanceof Error ? error.message : error)
+    return null
+  }
 }
 
 /**

@@ -146,7 +146,8 @@ export const useUsers = (page: number = 1, limit: number = 10) => {
       const { data: responseData } = await api.get<ApiResponse<any>>(`/users?page=${page}&limit=${limit}`)
       return unwrapResponse(responseData)
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30_000,
+    retry: 2,
   })
 }
 

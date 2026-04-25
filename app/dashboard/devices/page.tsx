@@ -67,7 +67,7 @@ export default function DevicesPage() {
   const updateDevice = useUpdateDevice()
   const bulkDeleteDevices = useBulkDeleteDevices()
 
-  const farmers = ((allUsers as any)?.data || allUsers || []).filter((u: any) => u.role === 'farmer' && u.status === 'active')
+  const farmers = ((allUsers as any)?.users || []).filter((u: any) => u.role === 'farmer' && u.status === 'active')
 
   const allTableData: DeviceRow[] = (devices || []).map((d: any) => ({
     id: d.id,

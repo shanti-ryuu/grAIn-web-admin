@@ -6,12 +6,13 @@ import { Loader2, Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth-store'
 import { useLogin } from '@/hooks/useAuth'
 import { useToast } from '@/hooks/useToast'
+import { FullScreenLoader } from '@/components/FullScreenLoader'
 import Image from 'next/image'
 
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore()
+  const { token, user, isHydrated } = useAuthStore()
   const login = useLogin()
 
   const [email, setEmail] = useState('')
@@ -32,10 +33,10 @@ export default function LoginPage() {
   [])
 
   useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      router.push('/dashboard')
+    if (isHydrated && token && user) {
+      router.replace('/dashboard')
     }
-  }, [isAuthenticated, authLoading, router])
+  }, [isHydrated, token, user, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,6 +57,12 @@ export default function LoginPage() {
       toast({ title: 'Login Failed', description: msg, variant: 'destructive' })
     }
   }
+
+  // Show loader while hydrating
+  if (!isHydrated) return <FullScreenLoader />
+
+  // If already authenticated, render nothing (redirect is in progress)
+  if (token && user) return null
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-100 flex items-center justify-center p-4 relative overflow-hidden">

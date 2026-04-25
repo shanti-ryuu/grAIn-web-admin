@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/auth-store'
 import Sidebar from '@/components/Sidebar'
 import Topbar from '@/components/Navbar'
+import { FullScreenLoader } from '@/components/FullScreenLoader'
 
 export default function DashboardLayout({
   children,
@@ -12,28 +13,20 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { isAuthenticated, isLoading } = useAuthStore()
+  const { token, user, isHydrated } = useAuthStore()
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/auth/login')
+    if (!isHydrated) return // Wait for localStorage rehydration
+    if (!token || !user) {
+      router.replace('/auth/login')
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [isHydrated, token, user, router])
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#f9fafb]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-[#166534] border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-[#6b7280]">Loading...</p>
-        </div>
-      </div>
-    )
-  }
+  // Show nothing while hydrating to prevent flash of protected content
+  if (!isHydrated) return <FullScreenLoader />
 
-  if (!isAuthenticated) {
-    return null
-  }
+  // If not authenticated, render nothing (redirect is in progress)
+  if (!token || !user) return null
 
   return (
     <div className="flex h-screen dashboard-bg">

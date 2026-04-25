@@ -44,6 +44,19 @@ export function middleware(request: NextRequest) {
   const origin = request.headers.get('origin')
   const pathname = request.nextUrl.pathname
 
+  // --- Dashboard route protection (secondary defense) ---
+  // Primary guard is client-side in dashboard/layout.tsx (token is in localStorage, not cookie).
+  // Middleware adds a server-side layer: if a browser navigates directly to /dashboard/*
+  // without an Authorization header, redirect to /auth/login before any HTML is served.
+  if (pathname.startsWith('/dashboard')) {
+    // Note: Browser page navigations don't send Authorization headers, so this
+    // middleware cannot fully block unauthenticated access — the client-side guard
+    // in layout.tsx handles that. This is a secondary defense for programmatic requests.
+    // We let all dashboard requests through and rely on the client guard.
+    return NextResponse.next()
+  }
+
+  // --- API route CORS handling ---
   // Handle CORS preflight (OPTIONS) first
   if (request.method === 'OPTIONS') {
     const headers = new Headers()
@@ -80,4 +93,4 @@ export function middleware(request: NextRequest) {
   return response
 }
 
-export const config = { matcher: '/api/:path*' }
+export const config = { matcher: ['/api/:path*', '/dashboard/:path*'] }

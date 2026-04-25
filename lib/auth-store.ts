@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export interface AuthUser {
   id: string
@@ -11,74 +12,70 @@ export interface AuthUser {
 export interface AuthStore {
   user: AuthUser | null
   token: string | null
-  isLoading: boolean
-  isAuthenticated: boolean
   isHydrated: boolean
-  login: (token: string, user: AuthUser) => void
+  isAuthenticated: boolean
+  isLoading: boolean
+  setAuth: (token: string, user: AuthUser) => void
+  clearAuth: () => void
   logout: () => void
-  setLoading: (loading: boolean) => void
+  setHydrated: () => void
   hydrate: () => void
+  setLoading: (loading: boolean) => void
   updateUser: (updates: Partial<AuthUser>) => void
+  login: (token: string, user: AuthUser) => void
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  user: null,
-  token: null,
-  isLoading: true,
-  isAuthenticated: false,
-  isHydrated: false,
+export const useAuthStore = create<AuthStore>()(
+  persist(
+    (set) => ({
+      user: null,
+      token: null,
+      isHydrated: false,
+      isAuthenticated: false,
+      isLoading: true,
 
-  login: (token: string, user: AuthUser) => {
-    localStorage.setItem('auth_token', token)
-    localStorage.setItem('auth_user', JSON.stringify(user))
-    set({ token, user, isAuthenticated: true, isLoading: false, isHydrated: true })
-  },
+      setAuth: (token: string, user: AuthUser) => set({
+        token, user, isAuthenticated: true, isLoading: false
+      }),
 
-  logout: () => {
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('auth_user')
-    set({ token: null, user: null, isAuthenticated: false, isLoading: false, isHydrated: true })
-  },
+      login: (token: string, user: AuthUser) => set({
+        token, user, isAuthenticated: true, isLoading: false
+      }),
 
-  setLoading: (loading: boolean) => {
-    set({ isLoading: loading })
-  },
+      clearAuth: () => set({
+        token: null, user: null, isAuthenticated: false, isLoading: false
+      }),
 
-  hydrate: () => {
-    if (typeof window === 'undefined') return
+      logout: () => set({
+        token: null, user: null, isAuthenticated: false, isLoading: false
+      }),
 
-    const token = localStorage.getItem('auth_token')
-    const userStr = localStorage.getItem('auth_user')
+      setHydrated: () => set((state) => ({
+        isHydrated: true,
+        isAuthenticated: !!(state.token && state.user),
+        isLoading: false,
+      })),
 
-    if (token && userStr) {
-      try {
-        // Check if JWT is expired before restoring session
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-          localStorage.removeItem('auth_token')
-          localStorage.removeItem('auth_user')
-          set({ isLoading: false, isHydrated: true })
-          return
-        }
-        const user = JSON.parse(userStr)
-        set({ token, user, isAuthenticated: true, isLoading: false, isHydrated: true })
-      } catch {
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('auth_user')
-        set({ isLoading: false, isHydrated: true })
-      }
-    } else {
-      set({ isLoading: false, isHydrated: true })
+      hydrate: () => {
+        // No-op: persist middleware handles rehydration automatically
+        // Just mark as hydrated if persist already rehydrated
+        set({ isHydrated: true, isLoading: false })
+      },
+
+      setLoading: (loading: boolean) => set({ isLoading: loading }),
+
+      updateUser: (updates: Partial<AuthUser>) => set((state) => {
+        if (!state.user) return state
+        return { user: { ...state.user, ...updates } }
+      }),
+    }),
+    {
+      name: 'grain-auth',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ token: state.token, user: state.user }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHydrated()
+      },
     }
-  },
-
-  // FIX 3 + FIX 6: Update user data in store (for profile changes)
-  updateUser: (updates: Partial<AuthUser>) => {
-    set((state) => {
-      if (!state.user) return state
-      const updatedUser = { ...state.user, ...updates }
-      localStorage.setItem('auth_user', JSON.stringify(updatedUser))
-      return { user: updatedUser }
-    })
-  },
-}))
+  )
+)

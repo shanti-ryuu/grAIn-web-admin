@@ -27,11 +27,22 @@ jobs:
         run: npm ci
       
       - name: Run linting
-        run: npm run lint
+        run: npx next lint --no-cache
+        env:
+          CI: true
+          MONGO_URI: "mongodb://placeholder:27017/grain"
+          JWT_SECRET: "ci-placeholder-secret-32chars-min"
+          NEXT_PUBLIC_API_URL: "https://grain-web-admin.onrender.com/api"
+      
+      - name: Type check
+        run: npx tsc --noEmit
+        env:
+          CI: true
       
       - name: Build project
         run: npm run build
         env:
+          CI: true
           MONGO_URI: ${{ secrets.MONGO_URI || 'mongodb://placeholder:27017/grain' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET || 'ci-placeholder-secret-min-32-chars-long' }}
           NEXT_PUBLIC_API_URL: http://localhost:3000/api

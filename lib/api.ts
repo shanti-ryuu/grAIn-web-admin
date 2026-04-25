@@ -14,25 +14,30 @@ export const api = axios.create({
   },
 })
 
-// FIX 3: Add token to requests from Zustand auth store (not localStorage)
+// Attach token from Zustand auth store on every request
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = useAuthStore.getState().token
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+    // Debug log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`,
+        token ? '✅ token attached' : '❌ NO TOKEN')
+    }
   }
   return config
 })
 
-// Handle errors
+// Handle errors — clear auth on 401
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear auth state and redirect to login
+      // Token expired or invalid — clear auth and redirect
       if (typeof window !== 'undefined') {
-        useAuthStore.getState().logout()
+        useAuthStore.getState().clearAuth()
         window.location.href = '/auth/login'
       }
     }

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
 import dbConnect from '@/lib/db'
 import User from '@/lib/models/User'
-import { successResponse, errorResponse, ErrorCodes, paginatedResponse } from '@/lib/utils/response'
+import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
 
@@ -12,41 +12,51 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    await dbConnect()
-
+    // 1. Verify JWT
     const user = getUserFromRequest(request)
-    // FIX 3: Explicit logging for auth debugging
-    console.log('[GET /api/users] token:', request.headers.get('authorization') ? 'present' : 'missing', '| user:', user ? `${user.role}` : 'null')
-    if (!user || user.role !== 'admin') {
+    if (!user) {
+      console.error('[GET /api/users] Unauthorized — no valid token')
+      const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    }
+
+    // 2. Role check — only admin can list all users
+    if (user.role !== 'admin') {
+      console.error('[GET /api/users] Forbidden — role:', user.role)
       const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    // FIX 2.6: Server-side pagination
-    const { searchParams } = request.nextUrl
-    const page = parseInt(searchParams.get('page') ?? '1')
-    const limit = parseInt(searchParams.get('limit') ?? '10')
+    // 3. Connect DB
+    await dbConnect()
 
+    // 4. Parse pagination
+    const { searchParams } = request.nextUrl
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
+    const limit = Math.min(100, parseInt(searchParams.get('limit') ?? '10'))
+    const skip = (page - 1) * limit
+
+    // 5. Query ALL users — NO filter by assignedUser or current user
     const [users, total] = await Promise.all([
       User.find({})
         .select('-password')
         .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit),
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       User.countDocuments({}),
     ])
 
-    const formattedUsers = users.map((u: any) => ({
-      id: u._id,
-      name: u.name,
-      email: u.email,
-      role: u.role,
-      status: u.status,
-      lastActive: u.updatedAt?.toISOString?.() || u.updatedAt,
-      createdAt: u.createdAt?.toISOString?.() || u.createdAt,
-    }))
+    console.log(`[GET /api/users] Found ${users.length} users (total: ${total})`)
 
-    const response = paginatedResponse(formattedUsers, total, page, limit)
+    // 6. Return with pagination metadata inside successResponse data
+    const response = successResponse({
+      users,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      limit,
+    })
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {
@@ -58,13 +68,23 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await dbConnect()
-
+    // 1. Verify JWT
     const user = getUserFromRequest(request)
-    if (!user || user.role !== 'admin') {
+    if (!user) {
+      console.error('[POST /api/users] Unauthorized — no valid token')
+      const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    }
+
+    // 2. Role check
+    if (user.role !== 'admin') {
+      console.error('[POST /api/users] Forbidden — role:', user.role)
       const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
+
+    // 3. Connect DB
+    await dbConnect()
 
     const { name, email, password, role } = await request.json()
 
@@ -80,27 +100,22 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12)
-
     // Create user
     const newUser = await User.create({
       name,
       email,
-      password: hashedPassword,
-      role: role || 'farmer',
+      password: await bcrypt.hash(password, 10),
+      role: role ?? 'farmer',
+      status: 'active',
     })
 
-    const userData = {
-      id: newUser._id,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      status: newUser.status,
-      createdAt: newUser.createdAt?.toISOString?.() || newUser.createdAt,
-    }
+    // Return created user without password
+    const userWithoutPassword = newUser.toObject()
+    delete userWithoutPassword.password
 
-    const response = successResponse(userData, 201)
+    console.log(`[POST /api/users] Created user: ${newUser.name} (${newUser.email})`)
+
+    const response = successResponse(userWithoutPassword, 201)
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {

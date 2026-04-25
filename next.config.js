@@ -4,7 +4,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
   allowedDevOrigins: [
     'http://192.168.1.2',

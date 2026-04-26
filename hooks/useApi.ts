@@ -139,11 +139,14 @@ export const useDeleteDevice = () => {
 }
 
 // Users
-export const useUsers = (page: number = 1, limit: number = 10) => {
+export const useUsers = (page?: number, limit?: number) => {
+  const params = page !== undefined && limit !== undefined
+    ? `?page=${page}&limit=${limit}`
+    : '?limit=9999'
   return useQuery({
-    queryKey: ['users', page, limit],
+    queryKey: ['users', page ?? 'all', limit ?? 'all'],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any>>(`/users?page=${page}&limit=${limit}`)
+      const { data: responseData } = await api.get<ApiResponse<any>>(`/users${params}`)
       return unwrapResponse(responseData)
     },
     staleTime: 30_000,

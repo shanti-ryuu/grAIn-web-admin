@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
+import { UserRole, UserStatus } from '@/lib/enums'
 
 interface UserRow {
   id: string
@@ -36,7 +37,7 @@ export default function UsersPage() {
   const { isHydrated } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
-  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: 'farmer' })
+  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: UserRole.Farmer })
   const [addErrors, setAddErrors] = useState<Record<string, string>>({})
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
@@ -87,7 +88,7 @@ export default function UsersPage() {
       await createUser.mutateAsync(addForm)
       toast({ title: 'User Created', description: `User ${addForm.name} created successfully` })
       setShowAddModal(false)
-      setAddForm({ name: '', email: '', password: '', role: 'farmer' })
+      setAddForm({ name: '', email: '', password: '', role: UserRole.Farmer })
       setAddErrors({})
       queryClient.invalidateQueries({ queryKey: ['users'] })
     } catch (err: any) {
@@ -105,16 +106,16 @@ export default function UsersPage() {
 
     try {
       if (type === 'make_farmer') {
-        await updateUser.mutateAsync({ id: user!.id, role: 'farmer' })
+        await updateUser.mutateAsync({ id: user!.id, role: UserRole.Farmer })
         toast({ title: 'Role Updated', description: `${user!.name} is now a Farmer` })
       } else if (type === 'make_admin') {
-        await updateUser.mutateAsync({ id: user!.id, role: 'admin' })
+        await updateUser.mutateAsync({ id: user!.id, role: UserRole.Admin })
         toast({ title: 'Role Updated', description: `${user!.name} is now an Admin` })
       } else if (type === 'deactivate') {
-        await updateUser.mutateAsync({ id: user!.id, status: 'inactive' })
+        await updateUser.mutateAsync({ id: user!.id, status: UserStatus.Inactive })
         toast({ title: 'Account Deactivated', description: `${user!.name}'s account has been deactivated` })
       } else if (type === 'activate') {
-        await updateUser.mutateAsync({ id: user!.id, status: 'active' })
+        await updateUser.mutateAsync({ id: user!.id, status: UserStatus.Active })
         toast({ title: 'Account Activated', description: `${user!.name}'s account has been activated` })
       } else if (type === 'delete') {
         await deleteUser.mutateAsync(user!.id)
@@ -147,7 +148,7 @@ export default function UsersPage() {
 
   const handleAddModalClose = (open: boolean) => {
     if (!open) {
-      setAddForm({ name: '', email: '', password: '', role: 'farmer' })
+      setAddForm({ name: '', email: '', password: '', role: UserRole.Farmer })
       setAddErrors({})
     }
     setShowAddModal(open)
@@ -260,8 +261,8 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const role = row.original.role
         return (
-          <span className={role === 'admin' ? 'badge-admin' : 'badge-farmer'}>
-            {role === 'admin' ? 'Admin' : 'Farmer'}
+          <span className={role === UserRole.Admin ? 'badge-admin' : 'badge-farmer'}>
+            {role === UserRole.Admin ? 'Admin' : 'Farmer'}
           </span>
         )
       },
@@ -272,8 +273,8 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const status = row.original.status
         return (
-          <span className={status === 'active' ? 'badge-online' : 'badge-offline'}>
-            {status === 'active' ? 'Active' : 'Inactive'}
+          <span className={status === UserStatus.Active ? 'badge-online' : 'badge-offline'}>
+            {status === UserStatus.Active ? 'Active' : 'Inactive'}
           </span>
         )
       },

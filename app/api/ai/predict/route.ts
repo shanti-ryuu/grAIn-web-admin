@@ -5,6 +5,7 @@ import Prediction from '@/lib/models/Prediction'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
+import { AlertType } from '@/lib/enums'
 
 function calculateDryingRate(temp: number, fanSpeed: number): number {
   const baseRate = 0.008
@@ -14,10 +15,10 @@ function calculateDryingRate(temp: number, fanSpeed: number): number {
 }
 
 function getRecommendation(temp: number, fanSpeed: number, humidity: number, moisture: number): { recommendation: string; type: string } {
-  if (temp > 65) return { recommendation: 'Temperature too high — grain cracking risk', type: 'critical' }
-  if (temp < 35) return { recommendation: 'Temperature too low — increase heating', type: 'warning' }
-  if (fanSpeed < 50) return { recommendation: 'Increase fan speed for better airflow', type: 'warning' }
-  if (humidity > 70) return { recommendation: 'High humidity — increase exhaust fan', type: 'warning' }
+  if (temp > 65) return { recommendation: 'Temperature too high — grain cracking risk', type: AlertType.Critical }
+  if (temp < 35) return { recommendation: 'Temperature too low — increase heating', type: AlertType.Warning }
+  if (fanSpeed < 50) return { recommendation: 'Increase fan speed for better airflow', type: AlertType.Warning }
+  if (humidity > 70) return { recommendation: 'High humidity — increase exhaust fan', type: AlertType.Warning }
   if (moisture <= 14) return { recommendation: 'Drying complete — stop dryer now', type: 'optimal' }
   return { recommendation: 'Optimal conditions — maintain settings', type: 'optimal' }
 }

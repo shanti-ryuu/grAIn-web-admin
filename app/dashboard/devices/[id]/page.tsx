@@ -11,6 +11,7 @@ import { getFirebaseApp } from '@/lib/firebase'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
+import { DeviceStatus, CommandStatus } from '@/lib/enums'
 
 export default function DeviceDetailPage() {
   const params = useParams()
@@ -127,9 +128,9 @@ export default function DeviceDetailPage() {
     { key: 'mode', label: 'Mode' },
     { key: 'status', label: 'Status', render: (v: string) => (
       <span className={`px-2 py-1 rounded text-xs font-semibold ${
-        v === 'executed' ? 'bg-green-50 text-green-600' :
-        v === 'pending' ? 'bg-yellow-50 text-yellow-600' :
-        v === 'failed' || v === 'error' ? 'bg-red-50 text-red-600' :
+        v === CommandStatus.Executed ? 'bg-green-50 text-green-600' :
+        v === CommandStatus.Pending ? 'bg-yellow-50 text-yellow-600' :
+        v === CommandStatus.Failed || v === CommandStatus.Error ? 'bg-red-50 text-red-600' :
         'bg-gray-50 text-gray-600'
       }`}>{v}</span>
     )},
@@ -164,10 +165,10 @@ export default function DeviceDetailPage() {
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className={`w-3 h-3 rounded-full ${device?.status === 'online' ? 'bg-green-500' : 'bg-gray-400'}`} />
+            <div className={`w-3 h-3 rounded-full ${device?.status === DeviceStatus.Online ? 'bg-green-500' : 'bg-gray-400'}`} />
             <div>
               <p className="text-sm font-medium text-gray-900">Device Status</p>
-              <p className="text-xs text-gray-500">{device?.status === 'online' ? 'Online and Operational' : 'Offline'}</p>
+              <p className="text-xs text-gray-500">{device?.status === DeviceStatus.Online ? 'Online and Operational' : 'Offline'}</p>
             </div>
           </div>
           <div className="text-right">

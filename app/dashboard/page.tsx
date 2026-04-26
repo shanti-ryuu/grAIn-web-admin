@@ -11,6 +11,7 @@ import { getFirebaseApp } from '@/lib/firebase'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
+import { DeviceStatus } from '@/lib/enums'
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -60,7 +61,7 @@ export default function DashboardPage() {
   }, [devices])
 
   const totalDevices = devices?.length || 0
-  const onlineDevices = devices?.filter((d: any) => d.status === 'online').length || 0
+  const onlineDevices = devices?.filter((d: any) => d.status === DeviceStatus.Online).length || 0
   const unreadAlerts = (alerts || []).filter((a: any) => !a.isRead).length
   const totalUsers = (usersData as any)?.total || 0
 

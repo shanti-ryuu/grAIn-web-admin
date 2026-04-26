@@ -8,6 +8,7 @@ import ErrorState from '@/components/ErrorState'
 import { useCommandHistory, useAnalyticsOverview, useDevices } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { FileText, Activity, Zap, Cpu, Download, Printer } from 'lucide-react'
+import { DeviceStatus, CommandStatus } from '@/lib/enums'
 
 export default function ReportsPage() {
   const { toast } = useToast()
@@ -26,7 +27,7 @@ export default function ReportsPage() {
     ? (analytics.moistureTrend.reduce((s: number, r: any) => s + r.value, 0) / analytics.moistureTrend.length).toFixed(1)
     : '--'
   const totalEnergy = analytics?.energyConsumption?.reduce((s: number, r: any) => s + r.value, 0).toFixed(1) || '--'
-  const activeDevices = (devices || []).filter((d: any) => d.status === 'online').length
+  const activeDevices = (devices || []).filter((d: any) => d.status === DeviceStatus.Online).length
 
   const filteredCommands = (commands || []).filter((cmd: any) => {
     if (!dateFrom && !dateTo) return true
@@ -60,7 +61,7 @@ export default function ReportsPage() {
     { key: 'command', label: 'Command' },
     { key: 'mode', label: 'Mode' },
     { key: 'status', label: 'Status', render: (v: string) => (
-      <span className={`px-2 py-1 rounded text-xs font-semibold ${v === 'executed' ? 'bg-green-50 text-green-600' : v === 'pending' ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600'}`}>{v}</span>
+      <span className={`px-2 py-1 rounded text-xs font-semibold ${v === CommandStatus.Executed ? 'bg-green-50 text-green-600' : v === CommandStatus.Pending ? 'bg-yellow-50 text-yellow-600' : 'bg-red-50 text-red-600'}`}>{v}</span>
     )},
     { key: 'createdAt', label: 'Timestamp', render: (v: string) => new Date(v).toLocaleString() },
   ]

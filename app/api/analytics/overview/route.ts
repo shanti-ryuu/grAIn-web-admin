@@ -6,6 +6,7 @@ import Device from '@/lib/models/Device'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
+import { UserRole, CommandType, SensorDataStatus } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const user = getUserFromRequest(request)
     if (!user) {
-      const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
+      const response = errorResponse('Unauthorized', ErrorCodes.Unauthorized, 401)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
     let deviceFilter: any = {}
     if (deviceId !== 'all') {
       deviceFilter = { deviceId }
-    } else if (user.role !== 'admin') {
+    } else if (user.role !== UserRole.Admin) {
       const userDevices = await Device.find({ assignedUser: user.userId }).select('deviceId')
       deviceFilter = { deviceId: { $in: userDevices.map(d => d.deviceId) } }
     }
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
     ])
 
     // 2. Drying cycles (last 10 START commands)
-    const startCommands = await Command.find({ ...deviceFilter, command: 'START' })
+    const startCommands = await Command.find({ ...deviceFilter, command: CommandType.Start })
       .sort({ createdAt: -1 }).limit(10).lean()
 
     const dryingCycles = startCommands.map((cmd, i) => {
@@ -92,12 +93,12 @@ export async function GET(request: NextRequest) {
     const avgHumidity = averages.length > 0 ? Math.round(averages[0].avgHumidity * 100) / 100 : 0
 
     // 5. Total cycles
-    const totalCycles = await Command.countDocuments({ ...deviceFilter, command: 'START' })
+    const totalCycles = await Command.countDocuments({ ...deviceFilter, command: CommandType.Start })
 
     // 6. Active dryers
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000)
     const activeDryers = await SensorData.distinct('deviceId', {
-      ...deviceFilter, status: 'running', timestamp: { $gte: last24h },
+      ...deviceFilter, status: SensorDataStatus.Running, timestamp: { $gte: last24h },
     }).then((ids) => ids.length)
 
     // 7. Device status distribution
@@ -118,7 +119,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Analytics error:', error)
-    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
+    const response = errorResponse('Internal server error', ErrorCodes.InternalError, 500)
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }
 }

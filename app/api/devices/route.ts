@@ -6,6 +6,7 @@ import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
 import { validateDeviceRequest } from '@/lib/utils/validation'
+import { UserRole, DeviceStatus } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     }
 
     let devices
-    if (user.role === 'admin') {
+    if (user.role === UserRole.Admin) {
       devices = await Device.find({})
         .populate('assignedUser', 'name email')
         .sort({ createdAt: -1 })
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
     await dbConnect()
 
     const user = getUserFromRequest(request)
-    if (!user || user.role !== 'admin') {
+    if (!user || user.role !== UserRole.Admin) {
       const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest) {
       deviceId,
       assignedUser,
       location,
-      status: 'offline',
+      status: DeviceStatus.Offline,
     })
 
     await newDevice.populate('assignedUser', 'name email')

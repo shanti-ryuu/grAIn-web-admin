@@ -8,6 +8,7 @@ import { getUserFromRequest } from '@/lib/utils/auth'
 import { isValidDeviceId } from '@/lib/utils/validation'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { pushCommandToFirebase } from '@/lib/utils/firebase-sync'
+import { UserRole, CommandType, DryerMode, CommandStatus } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -66,7 +67,7 @@ export async function POST(
     }
 
     // Check access control
-    if (user.role !== 'admin' && device.assignedUser?.toString() !== user.userId) {
+    if (user.role !== UserRole.Admin && device.assignedUser?.toString() !== user.userId) {
       const response = errorResponse(
         'Forbidden: You do not have access to this device',
         ErrorCodes.FORBIDDEN,
@@ -78,16 +79,16 @@ export async function POST(
     // Create STOP command
     const command = await Command.create({
       deviceId,
-      command: 'STOP',
-      mode: 'MANUAL',
-      status: 'pending',
+      command: CommandType.Stop,
+      mode: DryerMode.Manual,
+      status: CommandStatus.Pending,
     })
 
     // Push STOP command to Firebase for ESP32 to poll
     try {
       await pushCommandToFirebase(deviceId, command._id.toString(), {
-        command: 'STOP',
-        mode: 'MANUAL',
+        command: CommandType.Stop,
+        mode: DryerMode.Manual,
       })
     } catch (firebaseError) {
       console.warn('Firebase command push failed:', firebaseError)

@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose'
+import { SensorDataStatus } from '@/lib/enums'
 
 export interface ISensorData extends Document {
   deviceId: string
@@ -7,7 +8,7 @@ export interface ISensorData extends Document {
   moisture: number
   fanSpeed: number
   energy: number
-  status: 'running' | 'idle' | 'paused' | 'error'
+  status: SensorDataStatus
   solarVoltage: number
   weight: number
   timestamp: Date
@@ -46,8 +47,8 @@ const SensorDataSchema: Schema = new Schema({
   },
   status: {
     type: String,
-    enum: ['running', 'idle', 'paused', 'error'],
-    default: 'idle',
+    enum: Object.values(SensorDataStatus),
+    default: SensorDataStatus.Idle,
   },
   solarVoltage: {
     type: Number,

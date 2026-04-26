@@ -6,6 +6,7 @@ import Device from '@/lib/models/Device'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
+import { UserRole } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -29,7 +30,7 @@ export async function PATCH(
     const { name, email, role, status, password, currentPassword } = body
 
     // Allow users to update their own profile (password change) or admins to update any user
-    const isAdmin = authUser.role === 'admin'
+    const isAdmin = authUser.role === UserRole.Admin
     const isSelf = authUser.userId === id
 
     if (!isAdmin && !isSelf) {

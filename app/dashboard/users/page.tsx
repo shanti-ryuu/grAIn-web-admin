@@ -42,10 +42,7 @@ export default function UsersPage() {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
 
-  const [page, setPage] = useState(1)
-  const limit = 10
-
-  const { data: usersData, isLoading, error, refetch } = useUsers(page, limit)
+  const { data: usersData, isLoading, error, refetch } = useUsers()
   const { data: devices } = useDevices()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
@@ -53,8 +50,6 @@ export default function UsersPage() {
   const bulkDeleteUsers = useBulkDeleteUsers()
 
   const users = (usersData as any)?.users || []
-  const total = (usersData as any)?.total || 0
-  const totalPages = (usersData as any)?.totalPages || 1
 
   const deviceCounts: Record<string, number> = {}
   ;(devices || []).forEach((d: any) => {
@@ -138,12 +133,6 @@ export default function UsersPage() {
   const handleBulkDelete = () => {
     if (selectedRows.length === 0) return
     setPendingAction({ type: 'bulk_delete' })
-  }
-
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage)
-    setSelectedRows([])
-    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleAddModalClose = (open: boolean) => {
@@ -362,8 +351,6 @@ export default function UsersPage() {
     )
   }
 
-  const start = (page - 1) * limit + 1
-  const end = Math.min(page * limit, total)
   const confirmConfig = getConfirmConfig()
 
   return (
@@ -397,7 +384,7 @@ export default function UsersPage() {
         </div>
       )}
 
-      {tableData.length === 0 && page === 1 ? (
+      {tableData.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
@@ -408,31 +395,6 @@ export default function UsersPage() {
       ) : (
         <>
           <DataTable columns={columns} data={tableData} searchPlaceholder="Search by name or email..." />
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-sm text-gray-500">
-              Showing {start}-{end} of {total} results
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handlePageChange(Math.max(1, page - 1))}
-                disabled={page === 1}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-gray-700">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
-                disabled={page >= totalPages}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm"
-              >
-                Next
-              </button>
-            </div>
-          </div>
         </>
       )}
 

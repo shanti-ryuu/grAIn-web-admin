@@ -1,10 +1,4 @@
 /**
- * Central repository for all TypeScript enums used throughout the application.
- * This ensures type safety, autocomplete support, and a single source of truth
- * for magic strings across models, API routes, and UI components.
- */
-
-/**
  * User roles in the system
  */
 export enum UserRole {

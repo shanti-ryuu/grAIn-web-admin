@@ -39,7 +39,7 @@ export default function DashboardPage() {
     try { app = getFirebaseApp() } catch { return }
     if (!app) return
 
-    let unsubscribes: (() => void)[] = []
+    const unsubscribes: (() => void)[] = []
 
     import('firebase/database').then(({ getDatabase, ref, onValue }) => {
       const db = getDatabase(app)

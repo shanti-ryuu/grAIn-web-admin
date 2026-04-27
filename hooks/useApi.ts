@@ -268,6 +268,28 @@ export const useStopDryer = () => {
   })
 }
 
+export function useControlFan() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, fan, action }: {
+      deviceId: string;
+      fan: 'FAN1' | 'FAN2' | 'ALL';
+      action: 'ON' | 'OFF';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/fan`, { fan, action })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Fan Control', description: `${variables.fan} turned ${variables.action.toLowerCase()}` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Fan Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
 export const useCommandHistory = (deviceId?: string, limit: number = 20) => {
   return useQuery({
     queryKey: ['commands', deviceId, limit],

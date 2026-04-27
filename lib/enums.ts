@@ -45,6 +45,18 @@ export enum AlertStatus {
 export enum CommandType {
   Start = 'START',
   Stop = 'STOP',
+  FanControl = 'FAN_CONTROL',
+}
+
+export enum FanTarget {
+  Fan1 = 'FAN1',
+  Fan2 = 'FAN2',
+  All = 'ALL',
+}
+
+export enum FanAction {
+  On = 'ON',
+  Off = 'OFF',
 }
 
 /**

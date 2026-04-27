@@ -53,6 +53,8 @@ export async function pushCommandToFirebase(
     mode: string
     temperature?: number
     fanSpeed?: number
+    fanTarget?: string
+    fanAction?: string
   }
 ): Promise<void> {
   const db = getRealtimeDb()
@@ -63,6 +65,8 @@ export async function pushCommandToFirebase(
     mode: command.mode,
     temperature: command.temperature ?? null,
     fanSpeed: command.fanSpeed ?? null,
+    fanTarget: command.fanTarget ?? null,
+    fanAction: command.fanAction ?? null,
     createdAt: Date.now(),
   })
 }

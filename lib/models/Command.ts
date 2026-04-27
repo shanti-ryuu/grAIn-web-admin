@@ -2,10 +2,12 @@ import mongoose, { Document, Schema } from 'mongoose'
 
 export interface ICommand extends Document {
   deviceId: string
-  command: 'START' | 'STOP'
+  command: 'START' | 'STOP' | 'FAN_CONTROL'
   mode: 'AUTO' | 'MANUAL'
   temperature?: number
   fanSpeed?: number
+  fanTarget?: 'FAN1' | 'FAN2' | 'ALL'
+  fanAction?: 'ON' | 'OFF'
   status: 'pending' | 'executed' | 'failed' | 'error'
   executedAt?: Date
   createdAt: Date
@@ -20,7 +22,7 @@ const CommandSchema: Schema = new Schema({
   },
   command: {
     type: String,
-    enum: ['START', 'STOP'],
+    enum: ['START', 'STOP', 'FAN_CONTROL'],
     required: true,
   },
   mode: {
@@ -35,6 +37,14 @@ const CommandSchema: Schema = new Schema({
     type: Number,
     min: 0,
     max: 100,
+  },
+  fanTarget: {
+    type: String,
+    enum: ['FAN1', 'FAN2', 'ALL'],
+  },
+  fanAction: {
+    type: String,
+    enum: ['ON', 'OFF'],
   },
   status: {
     type: String,

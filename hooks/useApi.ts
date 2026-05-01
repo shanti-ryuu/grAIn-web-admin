@@ -68,7 +68,9 @@ export const useDevices = () => {
       const { data: responseData } = await api.get<ApiResponse<any[]>>('/devices')
       return unwrapResponse(responseData)
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -224,7 +226,9 @@ export const useSensorData = (deviceId: string, hours: number = 24) => {
       const { data: responseData } = await api.get<ApiResponse<any[]>>(`/sensors/${deviceId}?hours=${hours}`)
       return unwrapResponse(responseData)
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
     enabled: !!deviceId,
   })
 }
@@ -325,7 +329,9 @@ export const useAlerts = (type?: string) => {
       const { data: responseData } = await api.get<ApiResponse<any[]>>(`/alerts${params}`)
       return unwrapResponse(responseData)
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 20_000,
+    refetchInterval: 20_000,
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -375,6 +381,40 @@ export const usePredictDrying = () => {
     },
     onError: (error: any) => {
       toast({ title: 'Prediction Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
+// Predictions
+export const usePredictions = (deviceId?: string) => {
+  return useQuery({
+    queryKey: ['predictions', deviceId],
+    queryFn: async () => {
+      const params = deviceId ? `?deviceId=${deviceId}` : ''
+      const { data: responseData } = await api.get<ApiResponse<any[]>>(`/predictions${params}`)
+      return unwrapResponse(responseData)
+    },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    enabled: !!deviceId || deviceId === undefined,
+  })
+}
+
+// Logout
+export const useLogout = () => {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: async () => {
+      const { data: responseData } = await api.post<ApiResponse<any>>('/auth/logout')
+      return unwrapResponse(responseData)
+    },
+    onSuccess: () => {
+      queryClient.clear()
+      toast({ title: 'Logged Out', description: 'You have been logged out successfully' })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Logout Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
     },
   })
 }
@@ -451,18 +491,12 @@ export const useBulkDeleteDevices = () => {
   const { toast } = useToast()
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      const results = await Promise.allSettled(ids.map(id => api.delete<ApiResponse<any>>(`/devices/${id}`)))
-      const succeeded = results.filter(r => r.status === 'fulfilled').length
-      const failed = results.filter(r => r.status === 'rejected').length
-      return { succeeded, failed }
+      const { data: responseData } = await api.delete<ApiResponse<any>>('/devices/bulk', { data: { ids } })
+      return unwrapResponse(responseData)
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
-      if (data.failed > 0) {
-        toast({ title: 'Partial Delete', description: `${data.succeeded} device(s) deleted, ${data.failed} failed`, variant: 'destructive' })
-      } else {
-        toast({ title: 'Devices Deleted', description: `${data.succeeded} device(s) have been deregistered` })
-      }
+      toast({ title: 'Devices Deleted', description: `${data.deletedCount} device(s) have been deregistered` })
     },
     onError: (error: any) => {
       toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })

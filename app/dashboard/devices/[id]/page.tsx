@@ -2,10 +2,10 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Play, Square, Thermometer, Droplets, Wind, Zap, Activity, Clock } from 'lucide-react'
+import { ArrowLeft, Play, Square, Thermometer, Droplets, Wind, Zap, Activity, Clock, Brain } from 'lucide-react'
 import Card from '@/components/Card'
 import Table from '@/components/Table'
-import { useDevice, useSensorData, useStartDryer, useStopDryer, useCommandHistory } from '@/hooks/useApi'
+import { useDevice, useSensorData, useStartDryer, useStopDryer, useCommandHistory, usePredictions } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { getFirebaseApp } from '@/lib/firebase'
 import {
@@ -21,6 +21,7 @@ export default function DeviceDetailPage() {
   const { data: device, isLoading: deviceLoading, error: deviceError, refetch: refetchDevice } = useDevice(id)
   const { data: sensorData, isLoading: sensorLoading } = useSensorData(device?.deviceId || '', 24)
   const { data: commandHistory } = useCommandHistory(device?.deviceId, 20)
+  const { data: predictions } = usePredictions(device?.deviceId)
   const startDryer = useStartDryer()
   const stopDryer = useStopDryer()
 
@@ -261,6 +262,34 @@ export default function DeviceDetailPage() {
           </ResponsiveContainer>
         </Card>
       </div>
+
+      {/* AI Prediction History */}
+      {(predictions && predictions.length > 0) && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Brain className="w-5 h-5 text-purple-600" /> AI Prediction History
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {predictions.slice(0, 10).map((p: any) => (
+              <Card key={p.id} className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500">{new Date(p.createdAt).toLocaleString()}</p>
+                  {p.isDryingComplete && (
+                    <span className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs font-semibold">Complete</span>
+                  )}
+                </div>
+                <p className="text-sm font-medium text-gray-900 mb-1">{p.output?.recommendation}</p>
+                <div className="grid grid-cols-2 gap-2 text-xs mt-2">
+                  <div><span className="text-gray-500">Confidence:</span> <span className="font-medium">{((p.output?.confidence ?? 0) * 100).toFixed(0)}%</span></div>
+                  <div><span className="text-gray-500">ETA:</span> <span className="font-medium">{p.output?.estimatedMinutesToTarget ?? '--'} min</span></div>
+                  <div><span className="text-gray-500">Moisture 30m:</span> <span className="font-medium">{p.output?.predictedMoisture30min?.toFixed(1) ?? '--'}%</span></div>
+                  <div><span className="text-gray-500">Efficiency:</span> <span className="font-medium">{((p.output?.efficiencyScore ?? 0) * 100).toFixed(0)}%</span></div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Command History */}
       <div>

@@ -13,7 +13,7 @@ export async function OPTIONS(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     // 1. Verify JWT
-    const user = getUserFromRequest(request)
+    const user = await getUserFromRequest(request)
     if (!user) {
       console.error('[GET /api/users] Unauthorized — no valid token')
       const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // 1. Verify JWT
-    const user = getUserFromRequest(request)
+    const user = await getUserFromRequest(request)
     if (!user) {
       console.error('[POST /api/users] Unauthorized — no valid token')
       const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)

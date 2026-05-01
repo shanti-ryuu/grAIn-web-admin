@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   try {
     await dbConnect()
 
-    const user = getUserFromRequest(request)
+    const user = await getUserFromRequest(request)
     if (!user) {
       const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   try {
     await dbConnect()
 
-    const user = getUserFromRequest(request)
+    const user = await getUserFromRequest(request)
     if (!user || user.role !== 'admin') {
       const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)

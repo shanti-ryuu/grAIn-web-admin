@@ -19,15 +19,6 @@ export default function DashboardPage() {
   const { data: alerts } = useAlerts()
   const { data: usersData } = useUsers(1, 1)
 
-  // Auto-refresh dashboard data every 30s
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetchDevices()
-      refetchAnalytics()
-    }, 30_000)
-    return () => clearInterval(interval)
-  }, [refetchDevices, refetchAnalytics])
-
   const [liveData, setLiveData] = useState<Record<string, any>>({})
   const [isLive, setIsLive] = useState(false)
 

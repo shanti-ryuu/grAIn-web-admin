@@ -18,7 +18,7 @@ export async function PATCH(
   try {
     await dbConnect()
 
-    const authUser = getUserFromRequest(request)
+    const authUser = await getUserFromRequest(request)
     if (!authUser) {
       const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -108,7 +108,7 @@ export async function DELETE(
   try {
     await dbConnect()
 
-    const authUser = getUserFromRequest(request)
+    const authUser = await getUserFromRequest(request)
     if (!authUser || authUser.role !== 'admin') {
       const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)

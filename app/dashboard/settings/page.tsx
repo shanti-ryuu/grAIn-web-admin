@@ -75,7 +75,7 @@ export default function SettingsPage() {
       setPwErrors({})
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to change password. Please try again.'
-      toast({ title: 'Change Failed', description: msg, variant: 'destructive' })
+      toast({ title: 'Change Failed', description: msg, variant: 'error' })
       if (msg.toLowerCase().includes('incorrect') || msg.toLowerCase().includes('wrong') || msg.toLowerCase().includes('current')) {
         setPwErrors(prev => ({ ...prev, currentPassword: msg }))
       }

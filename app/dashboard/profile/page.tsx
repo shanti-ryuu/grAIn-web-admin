@@ -54,7 +54,7 @@ export default function ProfilePage() {
       toast({ title: 'Profile Updated', description: 'Your profile has been updated successfully' })
       setIsDirty(false)
     } catch (err: any) {
-      toast({ title: 'Update Failed', description: err?.response?.data?.error || err?.response?.data?.message || 'Failed to update profile', variant: 'destructive' })
+      toast({ title: 'Update Failed', description: err?.response?.data?.error || err?.response?.data?.message || 'Failed to update profile', variant: 'error' })
     }
   }
 
@@ -64,11 +64,11 @@ export default function ProfilePage() {
 
     // Validate file
     if (!file.type.startsWith('image/')) {
-      toast({ title: 'Invalid File', description: 'Please select an image file', variant: 'destructive' })
+      toast({ title: 'Invalid File', description: 'Please select an image file', variant: 'error' })
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'File Too Large', description: 'Image must be less than 5MB', variant: 'destructive' })
+      toast({ title: 'File Too Large', description: 'Image must be less than 5MB', variant: 'error' })
       return
     }
 
@@ -82,7 +82,7 @@ export default function ProfilePage() {
       }
       reader.readAsDataURL(file)
     } catch {
-      toast({ title: 'Upload Failed', description: 'Failed to process image', variant: 'destructive' })
+      toast({ title: 'Upload Failed', description: 'Failed to process image', variant: 'error' })
     }
   }
 
@@ -92,7 +92,7 @@ export default function ProfilePage() {
       updateStoreUser({ profileImage: null })
       toast({ title: 'Photo Removed', description: 'Profile photo has been removed' })
     } catch (err: any) {
-      toast({ title: 'Failed', description: 'Could not remove photo', variant: 'destructive' })
+      toast({ title: 'Failed', description: 'Could not remove photo', variant: 'error' })
     }
   }
 

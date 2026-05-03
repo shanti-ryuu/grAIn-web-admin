@@ -66,7 +66,7 @@ export default function DeviceDetailPage() {
       toast({ title: 'Device started', description: `${device.deviceId} started in ${mode} mode.` })
       refetchDevice()
     } catch {
-      toast({ title: 'Start failed', description: 'Failed to start device.', variant: 'destructive' })
+      toast({ title: 'Start failed', description: 'Failed to start device.', variant: 'error' })
     }
   }
 
@@ -76,7 +76,7 @@ export default function DeviceDetailPage() {
       toast({ title: 'Device stopped', description: `${device.deviceId} has been stopped.` })
       refetchDevice()
     } catch {
-      toast({ title: 'Stop failed', description: 'Failed to stop device.', variant: 'destructive' })
+      toast({ title: 'Stop failed', description: 'Failed to stop device.', variant: 'error' })
     }
   }
 

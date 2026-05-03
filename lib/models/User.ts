@@ -1,6 +1,11 @@
 import mongoose, { Document, Schema } from 'mongoose'
 import { UserRole, UserStatus } from '@/lib/enums'
 
+export interface IRevokedToken {
+  token: string
+  revokedAt: Date
+}
+
 export interface IUser extends Document {
   name: string
   email: string
@@ -11,6 +16,7 @@ export interface IUser extends Document {
   bio: string
   phoneNumber: string
   location: string
+  revokedTokens: IRevokedToken[]
   createdAt: Date
   updatedAt: Date
 }
@@ -59,8 +65,17 @@ const UserSchema: Schema = new Schema({
     type: String,
     default: '',
   },
+  revokedTokens: {
+    type: [{
+      token: { type: String, required: true },
+      revokedAt: { type: Date, default: Date.now },
+    }],
+    default: [],
+  },
 }, {
   timestamps: true,
 })
+
+UserSchema.index({ 'revokedTokens.revokedAt': 1 })
 
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema)

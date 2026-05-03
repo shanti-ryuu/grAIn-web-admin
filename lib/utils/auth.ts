@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
+import dbConnect from '@/lib/db'
+import User, { IRevokedToken } from '@/lib/models/User'
 
 export interface TokenPayload {
   userId: string
@@ -37,9 +39,9 @@ export function verifyToken(token: string): TokenPayload | null {
 }
 
 /**
- * Get user from request — with diagnostic logging
+ * Get user from request — with diagnostic logging + revoked token check
  */
-export function getUserFromRequest(request: NextRequest): TokenPayload | null {
+export async function getUserFromRequest(request: NextRequest): Promise<TokenPayload | null> {
   const authHeader = request.headers.get('Authorization')
 
   if (!authHeader) {
@@ -56,6 +58,20 @@ export function getUserFromRequest(request: NextRequest): TokenPayload | null {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload
+
+    // Check if token has been revoked
+    try {
+      await dbConnect()
+      const user = await User.findById(decoded.userId)
+      if (user && user.revokedTokens?.some((rt: IRevokedToken) => rt.token === token)) {
+        console.warn('[getUserFromRequest] Token has been revoked')
+        return null
+      }
+    } catch (dbError) {
+      // If DB check fails, still allow the request (fail open for availability)
+      console.warn('[getUserFromRequest] Revoked token check failed, allowing request:', dbError)
+    }
+
     return decoded
   } catch (error) {
     console.warn('[getUserFromRequest] Token verification failed:', error instanceof Error ? error.message : error)

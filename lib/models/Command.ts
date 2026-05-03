@@ -8,6 +8,13 @@ export interface ICommand extends Document {
   temperature?: number
   fanSpeed?: number
   status: CommandStatus
+  command: 'START' | 'STOP' | 'FAN_CONTROL'
+  mode: 'AUTO' | 'MANUAL'
+  temperature?: number
+  fanSpeed?: number
+  fanTarget?: 'FAN1' | 'FAN2' | 'ALL'
+  fanAction?: 'ON' | 'OFF'
+  status: 'pending' | 'executed' | 'failed' | 'error'
   executedAt?: Date
   createdAt: Date
   updatedAt: Date
@@ -22,6 +29,7 @@ const CommandSchema: Schema = new Schema({
   command: {
     type: String,
     enum: Object.values(CommandType),
+    enum: ['START', 'STOP', 'FAN_CONTROL'],
     required: true,
   },
   mode: {
@@ -36,6 +44,14 @@ const CommandSchema: Schema = new Schema({
     type: Number,
     min: 0,
     max: 100,
+  },
+  fanTarget: {
+    type: String,
+    enum: ['FAN1', 'FAN2', 'ALL'],
+  },
+  fanAction: {
+    type: String,
+    enum: ['ON', 'OFF'],
   },
   status: {
     type: String,

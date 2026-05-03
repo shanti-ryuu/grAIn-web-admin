@@ -8,7 +8,9 @@ import { getUserFromRequest } from '@/lib/utils/auth'
 import { isValidDeviceId } from '@/lib/utils/validation'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { pushCommandToFirebase } from '@/lib/utils/firebase-sync'
-import { UserRole, CommandType, DryerMode, CommandStatus } from '@/lib/enums'
+
+const VALID_FANS = ['FAN1', 'FAN2', 'ALL'] as const
+const VALID_ACTIONS = ['ON', 'OFF'] as const
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -67,7 +69,7 @@ export async function POST(
     }
 
     // Check access control
-    if (user.role !== UserRole.Admin && device.assignedUser?.toString() !== user.userId) {
+    if (user.role !== 'admin' && device.assignedUser?.toString() !== user.userId) {
       const response = errorResponse(
         'Forbidden: You do not have access to this device',
         ErrorCodes.FORBIDDEN,
@@ -76,33 +78,60 @@ export async function POST(
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    // Parse request body for optional parameters
-    let body: any = {}
+    // Parse and validate request body
+    let body: { fan?: string; action?: string }
     try {
       body = await request.json()
     } catch {
-      // Body is optional for start command
+      const response = errorResponse(
+        'Invalid request body',
+        ErrorCodes.INVALID_INPUT,
+        400
+      )
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    const { mode, temperature, fanSpeed } = body
+    const { fan: rawFan, action: rawAction } = body
 
-    // Create START command with optional temperature/fanSpeed
+    // Validate fan field
+    if (!rawFan || !(VALID_FANS as readonly string[]).includes(rawFan)) {
+      const response = errorResponse(
+        'Invalid or missing "fan" field. Must be one of: FAN1, FAN2, ALL',
+        ErrorCodes.INVALID_INPUT,
+        400
+      )
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    }
+    const fan = rawFan as typeof VALID_FANS[number]
+
+    // Validate action field
+    if (!rawAction || !(VALID_ACTIONS as readonly string[]).includes(rawAction)) {
+      const response = errorResponse(
+        'Invalid or missing "action" field. Must be one of: ON, OFF',
+        ErrorCodes.INVALID_INPUT,
+        400
+      )
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    }
+    const action = rawAction as typeof VALID_ACTIONS[number]
+
+    // Create FAN_CONTROL command
     const command = await Command.create({
       deviceId,
-      command: CommandType.Start,
-      mode: mode && [DryerMode.Auto, DryerMode.Manual].includes(mode) ? mode : DryerMode.Manual,
-      temperature: temperature !== undefined ? Number(temperature) : undefined,
-      fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : undefined,
-      status: CommandStatus.Pending,
+      command: 'FAN_CONTROL',
+      mode: 'MANUAL',
+      fanTarget: fan,
+      fanAction: action,
+      status: 'pending',
     })
 
     // Push command to Firebase for ESP32 to poll
     try {
       await pushCommandToFirebase(deviceId, command._id.toString(), {
-        command: CommandType.Start,
-        mode: mode && [DryerMode.Auto, DryerMode.Manual].includes(mode) ? mode : DryerMode.Manual,
-        temperature: temperature !== undefined ? Number(temperature) : undefined,
-        fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : undefined,
+        command: 'FAN_CONTROL',
+        mode: 'MANUAL',
+        fanTarget: fan,
+        fanAction: action,
       })
     } catch (firebaseError) {
       console.warn('Firebase command push failed:', firebaseError)
@@ -113,8 +142,8 @@ export async function POST(
       deviceId: command.deviceId,
       command: command.command,
       mode: command.mode,
-      temperature: command.temperature,
-      fanSpeed: command.fanSpeed,
+      fanTarget: command.fanTarget,
+      fanAction: command.fanAction,
       status: command.status,
       createdAt: command.createdAt.toISOString(),
     }, 201)
@@ -122,9 +151,9 @@ export async function POST(
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {
-    console.error('Start dryer error:', error)
+    console.error('Fan control error:', error)
     const response = errorResponse(
-      'Failed to create start command',
+      'Failed to create fan control command',
       ErrorCodes.INTERNAL_ERROR,
       500
     )

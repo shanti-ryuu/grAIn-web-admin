@@ -44,6 +44,8 @@ export async function GET(
       deviceId: cmd.deviceId,
       command: cmd.command,
       mode: cmd.mode,
+      ...(cmd.fanTarget && { fanTarget: cmd.fanTarget }),
+      ...(cmd.fanAction && { fanAction: cmd.fanAction }),
       status: cmd.status,
       createdAt: cmd.createdAt.toISOString(),
     }))

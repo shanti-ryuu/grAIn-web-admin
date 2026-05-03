@@ -7,6 +7,7 @@ import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { validateLoginRequest } from '@/lib/utils/validation'
 import { generateToken } from '@/lib/utils/auth'
+import { UserStatus } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     if (!rateLimit.allowed) {
       const response = errorResponse(
         'Too many login attempts. Please try again later.',
-        ErrorCodes.RATE_LIMIT,
+        ErrorCodes.RateLimit,
         429
       )
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
     if (!validation.valid) {
       const response = errorResponse(
         Object.values(validation.errors).join(', '),
-        ErrorCodes.INVALID_INPUT,
+        ErrorCodes.InvalidInput,
         400
       )
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     if (!user) {
       const response = errorResponse(
         'Invalid credentials',
-        ErrorCodes.INVALID_CREDENTIALS,
+        ErrorCodes.InvalidCredentials,
         401
       )
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -58,17 +59,17 @@ export async function POST(request: NextRequest) {
     if (!isPasswordValid) {
       const response = errorResponse(
         'Invalid credentials',
-        ErrorCodes.INVALID_CREDENTIALS,
+        ErrorCodes.InvalidCredentials,
         401
       )
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     // Check if user is active
-    if (user.status !== 'active') {
+    if (user.status !== UserStatus.Active) {
       const response = errorResponse(
         'Account is inactive',
-        ErrorCodes.ACCOUNT_INACTIVE,
+        ErrorCodes.AccountInactive,
         403
       )
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
     console.error('Login error:', error)
     const response = errorResponse(
       'Internal server error',
-      ErrorCodes.INTERNAL_ERROR,
+      ErrorCodes.InternalError,
       500
     )
     return addCorsHeaders(response, request.headers.get('origin') || undefined)

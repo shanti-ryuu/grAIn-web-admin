@@ -6,6 +6,7 @@ import { successResponse, paginatedResponse, errorResponse, ErrorCodes } from '@
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
 import { getQueryParams } from '@/lib/utils/validation'
+import { AlertType, CommandStatus, SensorDataStatus } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
     // Build filter
     const filter: any = {}
     if (deviceId) filter.deviceId = deviceId
-    if (type && ['critical', 'warning', 'info'].includes(type)) filter.type = type
+    if (type && [AlertType.Critical, AlertType.Warning, AlertType.Info].includes(type)) filter.type = type
     if (isRead !== null && isRead !== undefined) filter.isRead = isRead === 'true'
 
     // Get alerts from Alert collection
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
     ])
 
     // Also get failed/error commands as alerts
-    const commandFilter: any = { status: { $in: ['failed', 'error'] } }
+    const commandFilter: any = { status: { $in: [CommandStatus.Failed, SensorDataStatus.Error] } }
     if (deviceId) commandFilter.deviceId = deviceId
     const failedCommands = await Command.find(commandFilter)
       .sort({ createdAt: -1 })
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
     const commandAlerts = failedCommands.map((cmd) => ({
       id: cmd._id,
       deviceId: cmd.deviceId,
-      type: 'critical' as const,
+      type: AlertType.Critical as const,
       message: `Command ${cmd.command} failed for device ${cmd.deviceId}`,
       severity: 8,
       isRead: false,
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
       errors.deviceId = 'Device ID is required'
     }
 
-    if (!type || !['critical', 'warning', 'info'].includes(type)) {
+    if (!type || ![AlertType.Critical, AlertType.Warning, AlertType.Info].includes(type)) {
       errors.type = 'Type must be critical, warning, or info'
     }
 
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
       deviceId: deviceId.trim(),
       type,
       message: message.trim(),
-      severity: severity ?? (type === 'critical' ? 8 : type === 'warning' ? 5 : 2),
+      severity: severity ?? (type === AlertType.Critical ? 8 : type === AlertType.Warning ? 5 : 2),
       isRead: false,
     })
 

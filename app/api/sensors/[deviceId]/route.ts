@@ -7,6 +7,7 @@ import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
 import { getQueryParams, isValidDeviceId } from '@/lib/utils/validation'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
+import { UserRole } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -65,7 +66,7 @@ export async function GET(
     }
 
     // Check access control
-    if (user.role !== 'admin' && device.assignedUser?.toString() !== user.userId) {
+    if (user.role !== UserRole.Admin && device.assignedUser?.toString() !== user.userId) {
       const response = errorResponse(
         'Forbidden: You do not have access to this device',
         ErrorCodes.FORBIDDEN,

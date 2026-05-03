@@ -5,6 +5,7 @@ import User from '@/lib/models/User'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
+import { UserRole, UserStatus } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Role check — only admin can list all users
-    if (user.role !== 'admin') {
+    if (user.role !== UserRole.Admin) {
       console.error('[GET /api/users] Forbidden — role:', user.role)
       const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Role check
-    if (user.role !== 'admin') {
+    if (user.role !== UserRole.Admin) {
       console.error('[POST /api/users] Forbidden — role:', user.role)
       const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -105,8 +106,8 @@ export async function POST(request: NextRequest) {
       name,
       email,
       password: await bcrypt.hash(password, 10),
-      role: role ?? 'farmer',
-      status: 'active',
+      role: role ?? UserRole.Farmer,
+      status: UserStatus.Active,
     })
 
     // Return created user without password

@@ -1,4 +1,8 @@
 import { NextResponse } from 'next/server'
+import { ErrorCodes } from '@/lib/enums'
+
+// Re-export ErrorCodes for backward compatibility
+export { ErrorCodes }
 
 /**
  * Standardized API response format
@@ -85,19 +89,7 @@ export function paginatedResponse<T>(
   )
 }
 
+
 /**
- * Error codes for common scenarios
+ * Error codes imported from enums — see lib/enums.ts for the complete list
  */
-export const ErrorCodes = {
-  INVALID_INPUT: 'INVALID_INPUT',
-  UNAUTHORIZED: 'UNAUTHORIZED',
-  FORBIDDEN: 'FORBIDDEN',
-  NOT_FOUND: 'NOT_FOUND',
-  CONFLICT: 'CONFLICT',
-  RATE_LIMIT: 'RATE_LIMIT',
-  INTERNAL_ERROR: 'INTERNAL_ERROR',
-  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
-  ACCOUNT_INACTIVE: 'ACCOUNT_INACTIVE',
-  DEVICE_NOT_FOUND: 'DEVICE_NOT_FOUND',
-  USER_NOT_FOUND: 'USER_NOT_FOUND',
-} as const

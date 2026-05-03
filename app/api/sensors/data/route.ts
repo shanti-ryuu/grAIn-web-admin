@@ -7,7 +7,7 @@ import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { validateSensorDataRequest } from '@/lib/utils/validation'
 import { syncSensorToFirebase } from '@/lib/utils/firebase-sync'
-import Alert from '@/lib/models/Alert'
+import { DeviceStatus, SensorDataStatus } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       moisture: Number(moisture),
       fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
       energy: energy !== undefined ? Number(energy) : 0,
-      status: status && ['running', 'idle', 'paused', 'error'].includes(status) ? status : 'idle',
+      status: status && [SensorDataStatus.Running, SensorDataStatus.Idle, SensorDataStatus.Paused, SensorDataStatus.Error].includes(status) ? status : SensorDataStatus.Idle,
       solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
       weight: weight !== undefined ? Number(weight) : 0,
       timestamp: new Date(), // Ensure consistent timestamp
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     // Update device status to online, last active, and last moisture
     await Device.findByIdAndUpdate(device._id, {
-      status: 'online',
+      status: DeviceStatus.Online,
       lastActive: new Date(),
       lastMoisture: Number(moisture),
     })
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         moisture: Number(moisture),
         fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
         energy: energy !== undefined ? Number(energy) : 0,
-        status: status && ['running', 'idle', 'paused', 'error'].includes(status) ? status : 'idle',
+        status: status && [SensorDataStatus.Running, SensorDataStatus.Idle, SensorDataStatus.Paused, SensorDataStatus.Error].includes(status) ? status : SensorDataStatus.Idle,
         solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
         weight: weight !== undefined ? Number(weight) : 0,
       })

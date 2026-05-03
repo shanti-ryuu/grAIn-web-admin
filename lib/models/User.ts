@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose'
+import { UserRole, UserStatus } from '@/lib/enums'
 
 export interface IRevokedToken {
   token: string
@@ -9,8 +10,8 @@ export interface IUser extends Document {
   name: string
   email: string
   password: string
-  role: 'admin' | 'farmer'
-  status: 'active' | 'inactive'
+  role: UserRole
+  status: UserStatus
   profileImage: string | null
   bio: string
   phoneNumber: string
@@ -39,13 +40,13 @@ const UserSchema: Schema = new Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'farmer'],
-    default: 'farmer',
+    enum: Object.values(UserRole),
+    default: UserRole.Farmer,
   },
   status: {
     type: String,
-    enum: ['active', 'inactive'],
-    default: 'active',
+    enum: Object.values(UserStatus),
+    default: UserStatus.Active,
   },
   profileImage: {
     type: String,

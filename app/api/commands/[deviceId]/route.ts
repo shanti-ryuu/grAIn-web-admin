@@ -4,6 +4,7 @@ import Command from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { isValidDeviceId } from '@/lib/utils/validation'
+import { CommandStatus } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -22,7 +23,7 @@ export async function GET(
     if (!isValidDeviceId(deviceId)) {
       const response = errorResponse(
         'Invalid device ID format',
-        ErrorCodes.INVALID_INPUT,
+        ErrorCodes.InvalidInput,
         400
       )
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -31,7 +32,7 @@ export async function GET(
     // Get pending commands for this device
     const commands = await Command.find({
       deviceId,
-      status: 'pending',
+      status: CommandStatus.Pending,
     })
       .sort({ createdAt: 1 })
       .limit(10)
@@ -55,7 +56,7 @@ export async function GET(
       await Command.updateMany(
         { _id: { $in: commandIds } },
         {
-          status: 'executed',
+          status: CommandStatus.Executed,
           executedAt: new Date(),
         }
       )
@@ -72,7 +73,7 @@ export async function GET(
     console.error('Get commands error:', error)
     const response = errorResponse(
       'Failed to retrieve commands',
-      ErrorCodes.INTERNAL_ERROR,
+      ErrorCodes.InternalError,
       500
     )
     return addCorsHeaders(response, request.headers.get('origin') || undefined)

@@ -1,9 +1,10 @@
 import mongoose, { Document, Schema } from 'mongoose'
+import { DeviceStatus } from '@/lib/enums'
 
 export interface IDevice extends Document {
   deviceId: string
   assignedUser: mongoose.Types.ObjectId
-  status: 'online' | 'offline'
+  status: DeviceStatus
   location?: string
   lastActive: Date
   lastMoisture?: number
@@ -25,8 +26,8 @@ const DeviceSchema: Schema = new Schema({
   },
   status: {
     type: String,
-    enum: ['online', 'offline'],
-    default: 'offline',
+    enum: Object.values(DeviceStatus),
+    default: DeviceStatus.Offline,
   },
   location: {
     type: String,

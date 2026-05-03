@@ -7,6 +7,7 @@ import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { isValidEmail } from '@/lib/utils/validation'
 import { generateToken } from '@/lib/utils/auth'
+import { UserRole, UserStatus } from '@/lib/enums'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     if (!rateLimit.allowed) {
       const response = errorResponse(
         'Too many registration attempts. Please try again later.',
-        ErrorCodes.RATE_LIMIT,
+        ErrorCodes.RateLimit,
         429
       )
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -49,14 +50,14 @@ export async function POST(request: NextRequest) {
       errors.password = 'Password must be at least 6 characters'
     }
 
-    if (role && !['admin', 'farmer'].includes(role)) {
+    if (role && ![UserRole.Admin, UserRole.Farmer].includes(role)) {
       errors.role = 'Role must be admin or farmer'
     }
 
     if (Object.keys(errors).length > 0) {
       const response = errorResponse(
         Object.values(errors).join(', '),
-        ErrorCodes.INVALID_INPUT,
+        ErrorCodes.InvalidInput,
         400
       )
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     if (existingUser) {
       const response = errorResponse(
         'Email already registered',
-        ErrorCodes.CONFLICT,
+        ErrorCodes.Conflict,
         409
       )
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
@@ -81,8 +82,8 @@ export async function POST(request: NextRequest) {
       name: name.trim(),
       email: email.toLowerCase().trim(),
       password: hashedPassword,
-      role: role || 'farmer',
-      status: 'active',
+      role: role || UserRole.Farmer,
+      status: UserStatus.Active,
     })
 
     // Generate JWT token
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
     console.error('Registration error:', error)
     const response = errorResponse(
       'Internal server error',
-      ErrorCodes.INTERNAL_ERROR,
+      ErrorCodes.InternalError,
       500
     )
     return addCorsHeaders(response, request.headers.get('origin') || undefined)

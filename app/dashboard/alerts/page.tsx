@@ -7,6 +7,7 @@ import ErrorState from '@/components/ErrorState'
 import { useAlerts, useMarkAlertRead, useClearAllAlerts } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { useRouter } from 'next/navigation'
+import { AlertType } from '@/lib/enums'
 
 export default function AlertsPage() {
   const router = useRouter()
@@ -49,9 +50,9 @@ export default function AlertsPage() {
   }, [allAlerts, activeTab])
 
   const severityConfig: Record<string, { badge: string; dot: string }> = {
-    critical: { badge: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' },
-    warning: { badge: 'bg-yellow-50 text-yellow-600 border-yellow-200', dot: 'bg-yellow-500' },
-    info: { badge: 'bg-blue-50 text-blue-600 border-blue-200', dot: 'bg-blue-500' },
+    [AlertType.Critical]: { badge: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' },
+    [AlertType.Warning]: { badge: 'bg-yellow-50 text-yellow-600 border-yellow-200', dot: 'bg-yellow-500' },
+    [AlertType.Info]: { badge: 'bg-blue-50 text-blue-600 border-blue-200', dot: 'bg-blue-500' },
   }
 
   if (isLoading) {
@@ -85,12 +86,12 @@ export default function AlertsPage() {
       </div>
 
       <Card className="p-4 flex gap-3 no-print">
-        {['all', 'unread', 'critical', 'warning', 'info'].map((t) => (
+        {['all', 'unread', AlertType.Critical, AlertType.Warning, AlertType.Info].map((t) => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === t ? 'bg-green-800 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
             }`}>
-            {t === 'all' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
+            {t === 'all' ? 'All' : t === 'unread' ? 'Unread' : t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </Card>

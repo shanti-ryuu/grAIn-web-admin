@@ -7,6 +7,7 @@ import Card from '@/components/Card'
 import { useAuthStore } from '@/lib/auth-store'
 import { useUserProfile, useUpdateProfile, useUpdateAvatar } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
+import { UserRole } from '@/lib/enums'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -146,8 +147,8 @@ export default function ProfilePage() {
           <div className="mt-6 text-center">
             <p className="text-lg font-semibold text-gray-900">{user?.name}</p>
             <p className="text-sm text-gray-500">{user?.email}</p>
-            <span className={`mt-2 inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${user?.role === 'admin' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
-              {user?.role === 'admin' ? 'Administrator' : 'Farmer'}
+            <span className={`mt-2 inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${user?.role === UserRole.Admin ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+              {user?.role === UserRole.Admin ? 'Administrator' : 'Farmer'}
             </span>
           </div>
         </Card>

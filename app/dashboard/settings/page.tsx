@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
 import { useDevices, useChangePassword } from '@/hooks/useApi'
 import { Settings as SettingsIcon, Bell, Shield, Cpu, Lock, Loader2, Eye, EyeOff } from 'lucide-react'
+import { UserRole, DeviceStatus } from '@/lib/enums'
 
 export default function SettingsPage() {
   const { toast } = useToast()
@@ -82,7 +83,7 @@ export default function SettingsPage() {
     }
   }
 
-  const onlineDevices = (devices || []).filter((d: any) => d.status === 'online')
+  const onlineDevices = (devices || []).filter((d: any) => d.status === DeviceStatus.Online)
 
   return (
     <div className="space-y-8">
@@ -290,9 +291,9 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-500">Permanently delete your account and all data</p>
             </div>
             <button
-              disabled={user?.role === 'admin'}
+              disabled={user?.role === UserRole.Admin}
               className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              title={user?.role === 'admin' ? 'Cannot delete the last admin account' : ''}
+              title={user?.role === UserRole.Admin ? 'Cannot delete the last admin account' : ''}
             >
               Delete Account
             </button>

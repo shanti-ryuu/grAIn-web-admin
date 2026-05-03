@@ -1,7 +1,13 @@
 import mongoose, { Document, Schema } from 'mongoose'
+import { CommandType, CommandStatus, DryerMode } from '@/lib/enums'
 
 export interface ICommand extends Document {
   deviceId: string
+  command: CommandType
+  mode: DryerMode
+  temperature?: number
+  fanSpeed?: number
+  status: CommandStatus
   command: 'START' | 'STOP' | 'FAN_CONTROL'
   mode: 'AUTO' | 'MANUAL'
   temperature?: number
@@ -22,13 +28,14 @@ const CommandSchema: Schema = new Schema({
   },
   command: {
     type: String,
+    enum: Object.values(CommandType),
     enum: ['START', 'STOP', 'FAN_CONTROL'],
     required: true,
   },
   mode: {
     type: String,
-    enum: ['AUTO', 'MANUAL'],
-    default: 'MANUAL',
+    enum: Object.values(DryerMode),
+    default: DryerMode.Manual,
   },
   temperature: {
     type: Number,
@@ -48,8 +55,8 @@ const CommandSchema: Schema = new Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'executed', 'failed', 'error'],
-    default: 'pending',
+    enum: Object.values(CommandStatus),
+    default: CommandStatus.Pending,
   },
   executedAt: {
     type: Date,

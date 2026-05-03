@@ -111,7 +111,7 @@ export default function DevicesPage() {
       }
       queryClient.invalidateQueries({ queryKey: ['devices'] })
     } catch (err: any) {
-      toast({ title: 'Action Failed', description: err?.response?.data?.error || err?.response?.data?.message || 'Failed', variant: 'destructive' })
+      toast({ title: 'Action Failed', description: err?.response?.data?.error || err?.response?.data?.message || 'Failed', variant: 'error' })
     }
     setPendingDeviceAction(null)
     setEditLocationValue('')
@@ -427,7 +427,7 @@ export default function DevicesPage() {
               setSelectedDeviceRows([])
               queryClient.invalidateQueries({ queryKey: ['devices'] })
             } catch (err: any) {
-              toast({ title: 'Bulk Delete Failed', description: err?.response?.data?.error || err?.message || 'Failed', variant: 'destructive' })
+              toast({ title: 'Bulk Delete Failed', description: err?.response?.data?.error || err?.message || 'Failed', variant: 'error' })
             }
             setPendingDeviceAction(null)
           }}

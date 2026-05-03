@@ -9,7 +9,6 @@ import DataTable from '@/components/ui/data-table'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useDevices, useBulkDeleteUsers } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
-import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
@@ -32,7 +31,6 @@ type PendingAction = {
 export default function UsersPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { toast } = useToast()
   const { isHydrated } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
@@ -80,14 +78,13 @@ export default function UsersPage() {
     if (!validateAddForm()) return
     try {
       await createUser.mutateAsync(addForm)
-      toast({ title: 'User Created', description: `User ${addForm.name} created successfully` })
       setShowAddModal(false)
       setAddForm({ name: '', email: '', password: '', role: 'farmer' })
       setAddErrors({})
       queryClient.invalidateQueries({ queryKey: ['users'] })
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to create user. Please try again.'
-      toast({ title: 'Creation Failed', description: msg, variant: 'destructive' })
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string; message?: string } }; message?: string }
+      const msg = error?.response?.data?.error || error?.response?.data?.message || 'Failed to create user. Please try again.'
       if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('already')) {
         setAddErrors(prev => ({ ...prev, email: msg }))
       }
@@ -101,30 +98,21 @@ export default function UsersPage() {
     try {
       if (type === 'make_farmer') {
         await updateUser.mutateAsync({ id: user!.id, role: 'farmer' })
-        toast({ title: 'Role Updated', description: `${user!.name} is now a Farmer` })
       } else if (type === 'make_admin') {
         await updateUser.mutateAsync({ id: user!.id, role: 'admin' })
-        toast({ title: 'Role Updated', description: `${user!.name} is now an Admin` })
       } else if (type === 'deactivate') {
         await updateUser.mutateAsync({ id: user!.id, status: 'inactive' })
-        toast({ title: 'Account Deactivated', description: `${user!.name}'s account has been deactivated` })
       } else if (type === 'activate') {
         await updateUser.mutateAsync({ id: user!.id, status: 'active' })
-        toast({ title: 'Account Activated', description: `${user!.name}'s account has been activated` })
       } else if (type === 'delete') {
         await deleteUser.mutateAsync(user!.id)
-        toast({ title: 'User Deleted', description: `${user!.name} has been permanently deleted` })
       } else if (type === 'bulk_delete') {
         await bulkDeleteUsers.mutateAsync(selectedRows)
         setSelectedRows([])
       }
       queryClient.invalidateQueries({ queryKey: ['users'] })
-    } catch (err: any) {
-      toast({
-        title: 'Action Failed',
-        description: err?.response?.data?.error || err?.response?.data?.message || 'Failed to perform action',
-        variant: 'destructive',
-      })
+    } catch {
+      // Error toasts are handled by mutation hooks in useApi.ts
     }
     setPendingAction(null)
   }

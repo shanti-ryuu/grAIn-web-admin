@@ -53,7 +53,7 @@ export default function LoginPage() {
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Invalid email or password. Please try again.'
       setFormError(msg)
-      toast({ title: 'Login Failed', description: msg, variant: 'destructive' })
+      toast({ title: 'Login Failed', description: msg, variant: 'error' })
     }
   }
 

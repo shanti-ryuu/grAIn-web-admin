@@ -60,7 +60,7 @@ export default function Topbar() {
       await clearAllAlerts.mutateAsync()
       queryClient.invalidateQueries({ queryKey: ['alerts'] })
     } catch {
-      toast({ title: 'Failed', description: 'Failed to mark notifications as read', variant: 'destructive' })
+      toast({ title: 'Failed', description: 'Failed to mark notifications as read', variant: 'error' })
     }
   }
 

@@ -32,7 +32,7 @@ export async function GET(
     await dbConnect()
 
     // Verify authentication
-    const user = getUserFromRequest(request)
+    const user = await getUserFromRequest(request)
     if (!user) {
       const response = errorResponse(
         'Unauthorized: Missing or invalid token',

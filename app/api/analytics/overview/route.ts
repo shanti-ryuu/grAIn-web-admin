@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     await dbConnect()
 
-    const user = getUserFromRequest(request)
+    const user = await getUserFromRequest(request)
     if (!user) {
       const response = errorResponse('Unauthorized', ErrorCodes.Unauthorized, 401)
       return addCorsHeaders(response, request.headers.get('origin') || undefined)

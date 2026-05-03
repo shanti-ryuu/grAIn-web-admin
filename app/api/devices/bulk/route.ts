@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server'
 import dbConnect from '@/lib/db'
-import User from '@/lib/models/User'
 import Device from '@/lib/models/Device'
+import SensorData from '@/lib/models/SensorData'
+import Command from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
-import { UserRole } from '@/lib/enums'
+import { IDevice } from '@/lib/models/Device'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -28,22 +29,25 @@ export async function DELETE(request: NextRequest) {
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    // Prevent admin from deleting themselves
-    const filteredIds = ids.filter((id: string) => id !== authUser.userId)
+    // Find deviceIds for associated data cleanup
+    const devices = await Device.find({ _id: { $in: ids } }).select('deviceId').lean()
+    const deviceIds = devices.map((d: IDevice) => d.deviceId)
 
-    // Unassign devices for all users being deleted
-    await Device.updateMany(
-      { assignedUser: { $in: filteredIds } },
-      { $unset: { assignedUser: '' } }
-    )
+    // Delete associated SensorData and Commands for cleanliness
+    if (deviceIds.length > 0) {
+      await Promise.all([
+        SensorData.deleteMany({ deviceId: { $in: deviceIds } }),
+        Command.deleteMany({ deviceId: { $in: deviceIds } }),
+      ])
+    }
 
-    const result = await User.deleteMany({ _id: { $in: filteredIds } })
+    const result = await Device.deleteMany({ _id: { $in: ids } })
 
     const response = successResponse({ deletedCount: result.deletedCount })
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {
-    console.error('Bulk delete users error:', error)
+    console.error('Bulk delete devices error:', error)
     const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
   }

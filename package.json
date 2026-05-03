@@ -13,7 +13,8 @@
     "lint:fix": "next lint --fix",
     "type-check": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
-    "seed:dev": "tsx scripts/seed.ts"
+    "seed:dev": "tsx scripts/seed.ts",
+    "seed:reset": "tsx scripts/seed.ts --reset"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

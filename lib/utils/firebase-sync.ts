@@ -53,6 +53,8 @@ export async function pushCommandToFirebase(
     mode: string
     temperature?: number
     fanSpeed?: number
+    fanTarget?: string
+    fanAction?: string
   }
 ): Promise<void> {
   const db = getRealtimeDb()
@@ -63,7 +65,21 @@ export async function pushCommandToFirebase(
     mode: command.mode,
     temperature: command.temperature ?? null,
     fanSpeed: command.fanSpeed ?? null,
+    fanTarget: command.fanTarget ?? null,
+    fanAction: command.fanAction ?? null,
     createdAt: Date.now(),
+  })
+
+  // Write to /latest path for ESP32 real-time listener (<500ms delivery)
+  await db.ref(`grain/commands/${deviceId}/latest`).set({
+    commandId,
+    command: command.command,
+    mode: command.mode,
+    temperature: command.temperature ?? null,
+    fanSpeed: command.fanSpeed ?? null,
+    fanTarget: command.fanTarget ?? null,
+    fanAction: command.fanAction ?? null,
+    issuedAt: Date.now(),
   })
 }
 

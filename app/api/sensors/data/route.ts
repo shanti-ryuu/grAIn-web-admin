@@ -13,6 +13,36 @@ export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
 }
 
+async function checkAndCreateAlerts(deviceId: string, data: { temperature: number; humidity: number; moisture: number }): Promise<void> {
+  const alerts: { deviceId: string; type: 'critical' | 'warning' | 'info'; message: string; severity: number }[] = []
+  const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000)
+
+  const recentAlerts = await Alert.find({
+    deviceId,
+    createdAt: { $gte: thirtyMinAgo },
+  }).select('message').lean()
+
+  const hasRecent = (keyword: string) =>
+    recentAlerts.some(a => a.message.toLowerCase().includes(keyword))
+
+  if (data.temperature > 55 && !hasRecent('temperature')) {
+    alerts.push({ deviceId, type: 'critical', message: `Temperature critical: ${data.temperature}°C (threshold: 55°C)`, severity: 9 })
+  }
+  if (data.humidity > 85 && !hasRecent('humidity')) {
+    alerts.push({ deviceId, type: 'warning', message: `High humidity: ${data.humidity}% may slow drying`, severity: 6 })
+  }
+  if (data.moisture < 10 && !hasRecent('over-dried')) {
+    alerts.push({ deviceId, type: 'warning', message: `Moisture ${data.moisture}% — grain may be over-dried (min: 10%)`, severity: 7 })
+  }
+  if (data.temperature < 0 && !hasRecent('sensor')) {
+    alerts.push({ deviceId, type: 'critical', message: `Temperature sensor error: ${data.temperature}°C — check hardware`, severity: 10 })
+  }
+
+  if (alerts.length > 0) {
+    await Alert.insertMany(alerts)
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Check rate limit for ESP32 public endpoint
@@ -30,11 +60,17 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
+    // Log raw incoming data for IoT debugging
+    if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_SENSORS === 'true') {
+      console.log('[ESP32 RAW]', JSON.stringify(body, null, 2))
+    }
+
     // Validate sensor data
     const validation = validateSensorDataRequest(body)
     if (!validation.valid) {
+      const failedFields = Object.keys(validation.errors)
       const response = errorResponse(
-        Object.values(validation.errors).join('; '),
+        `Validation failed: ${failedFields.join(', ')}. Received: temp=${body.temperature}, hum=${body.humidity}, moisture=${body.moisture}`,
         ErrorCodes.INVALID_INPUT,
         400
       )
@@ -91,6 +127,13 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if Firebase sync fails
       console.warn('Firebase sync failed:', firebaseError)
     }
+
+    // Auto-generate alerts based on sensor thresholds (non-blocking)
+    checkAndCreateAlerts(deviceId, {
+      temperature: Number(temperature),
+      humidity: Number(humidity),
+      moisture: Number(moisture),
+    }).catch((err: unknown) => console.error('[Alert generation failed]', err))
 
     const response = successResponse({
       id: sensorData._id,

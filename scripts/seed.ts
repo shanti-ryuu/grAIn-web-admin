@@ -9,6 +9,9 @@ import dbConnect from '../lib/db'
 import User from '../lib/models/User'
 import Device from '../lib/models/Device'
 import SensorData from '../lib/models/SensorData'
+import Command from '../lib/models/Command'
+import Alert from '../lib/models/Alert'
+import Prediction from '../lib/models/Prediction'
 
 const seedUsers = [
   {
@@ -103,13 +106,28 @@ async function seedDatabase() {
   try {
     await dbConnect()
     
-    console.log('Starting database seeding...')
+    const shouldReset = process.argv.includes('--reset')
     
-    // Clear existing data
-    await User.deleteMany({})
-    await Device.deleteMany({})
-    await SensorData.deleteMany({})
-    console.log('Cleared existing data')
+    if (shouldReset) {
+      console.log('Resetting database...')
+      await Promise.all([
+        User.deleteMany({}),
+        Device.deleteMany({}),
+        SensorData.deleteMany({}),
+        Command.deleteMany({}),
+        Alert.deleteMany({}),
+        Prediction.deleteMany({}),
+      ])
+      console.log('Cleared all collections')
+    } else {
+      // Only clear the core collections for a normal seed
+      await User.deleteMany({})
+      await Device.deleteMany({})
+      await SensorData.deleteMany({})
+      console.log('Cleared existing data')
+    }
+    
+    console.log('Starting database seeding...')
     
     // Create users
     const hashedUsers = await Promise.all(

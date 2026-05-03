@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import dbConnect from '@/lib/db'
-import Command from '@/lib/models/Command'
+import Command, { ICommand } from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { isValidDeviceId } from '@/lib/utils/validation'
@@ -38,7 +38,7 @@ export async function GET(
       .lean()
 
     // Format commands
-    const formattedCommands = commands.map((cmd: any) => ({
+    const formattedCommands = commands.map((cmd: ICommand) => ({
       id: cmd._id,
       deviceId: cmd.deviceId,
       command: cmd.command,

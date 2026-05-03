@@ -3,12 +3,13 @@ import { NextResponse } from 'next/server'
 /**
  * Standardized API response format
  */
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   error?: string
   errorCode?: string
   message?: string
+  warning?: string
   timestamp: string
 }
 
@@ -82,6 +83,25 @@ export function paginatedResponse<T>(
       timestamp: new Date().toISOString(),
     },
     { status }
+  )
+}
+
+/**
+ * Multi-Status response (207) — partial success.
+ * Used when MongoDB write succeeded but Firebase realtime push failed.
+ */
+export function multiStatusResponse<T>(
+  data: T,
+  warning: string
+): NextResponse<ApiResponse<T>> {
+  return NextResponse.json(
+    {
+      success: true,
+      data,
+      warning,
+      timestamp: new Date().toISOString(),
+    },
+    { status: 207 }
   )
 }
 

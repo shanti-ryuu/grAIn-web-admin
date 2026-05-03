@@ -90,30 +90,10 @@ export async function POST(request: NextRequest) {
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    // Create sensor data with ALL fields
-    const sensorData = await SensorData.create({
-      deviceId,
-      temperature: Number(temperature),
-      humidity: Number(humidity),
-      moisture: Number(moisture),
-      fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
-      energy: energy !== undefined ? Number(energy) : 0,
-      status: status && ['running', 'idle', 'paused', 'error'].includes(status) ? status : 'idle',
-      solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
-      weight: weight !== undefined ? Number(weight) : 0,
-      timestamp: new Date(), // Ensure consistent timestamp
-    })
-
-    // Update device status to online, last active, and last moisture
-    await Device.findByIdAndUpdate(device._id, {
-      status: 'online',
-      lastActive: new Date(),
-      lastMoisture: Number(moisture),
-    })
-
-    // Sync sensor data to Firebase Realtime Database (non-blocking)
-    try {
-      await syncSensorToFirebase(deviceId, {
+    // Run MongoDB save, device update, and Firebase sync in parallel to cut latency
+    const [mongoResult, deviceUpdateResult, firebaseResult] = await Promise.allSettled([
+      SensorData.create({
+        deviceId,
         temperature: Number(temperature),
         humidity: Number(humidity),
         moisture: Number(moisture),
@@ -122,18 +102,54 @@ export async function POST(request: NextRequest) {
         status: status && ['running', 'idle', 'paused', 'error'].includes(status) ? status : 'idle',
         solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
         weight: weight !== undefined ? Number(weight) : 0,
-      })
-    } catch (firebaseError) {
-      // Don't fail the request if Firebase sync fails
-      console.warn('Firebase sync failed:', firebaseError)
+        timestamp: new Date(),
+      }),
+      Device.findByIdAndUpdate(device._id, {
+        status: 'online',
+        lastActive: new Date(),
+        lastMoisture: Number(moisture),
+      }),
+      syncSensorToFirebase(deviceId, {
+        temperature: Number(temperature),
+        humidity: Number(humidity),
+        moisture: Number(moisture),
+        fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
+        energy: energy !== undefined ? Number(energy) : 0,
+        status: status && ['running', 'idle', 'paused', 'error'].includes(status) ? status : 'idle',
+        solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
+        weight: weight !== undefined ? Number(weight) : 0,
+      }),
+    ])
+
+    // MongoDB save is critical — return error if it failed
+    if (mongoResult.status === 'rejected') {
+      console.error('Sensor data MongoDB save failed:', mongoResult.reason)
+      const response = errorResponse(
+        'Failed to store sensor data',
+        ErrorCodes.INTERNAL_ERROR,
+        500
+      )
+      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    // Auto-generate alerts based on sensor thresholds (non-blocking)
-    checkAndCreateAlerts(deviceId, {
-      temperature: Number(temperature),
-      humidity: Number(humidity),
-      moisture: Number(moisture),
-    }).catch((err: unknown) => console.error('[Alert generation failed]', err))
+    const sensorData = mongoResult.value
+
+    // Log non-critical failures (device update + Firebase sync)
+    if (deviceUpdateResult.status === 'rejected') {
+      console.warn('[Device Update Error] Failed to update device status:', deviceUpdateResult.reason)
+    }
+    if (firebaseResult.status === 'rejected') {
+      console.warn('[Firebase Sync Error] Sensor data Firebase sync failed:', firebaseResult.reason)
+    }
+
+    // Auto-generate alerts based on sensor thresholds (fully fire-and-forget)
+    setImmediate(() => {
+      void checkAndCreateAlerts(deviceId, {
+        temperature: Number(temperature),
+        humidity: Number(humidity),
+        moisture: Number(moisture),
+      }).catch((err: unknown) => console.error('[Alert Gen Error]', err))
+    })
 
     const response = successResponse({
       id: sensorData._id,

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import dbConnect from '@/lib/db'
 import Command from '@/lib/models/Command'
 import Device from '@/lib/models/Device'
-import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { successResponse, multiStatusResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
 import { isValidDeviceId } from '@/lib/utils/validation'
@@ -76,7 +76,7 @@ export async function POST(
     }
 
     // Parse request body for optional parameters
-    let body: any = {}
+    let body: { mode?: string; temperature?: number; fanSpeed?: number } = {}
     try {
       body = await request.json()
     } catch {
@@ -95,7 +95,8 @@ export async function POST(
       status: 'pending',
     })
 
-    // Push command to Firebase for ESP32 to poll
+    // Push command to Firebase for ESP32 to poll (with retry)
+    let firebaseDelivered = true
     try {
       await pushCommandToFirebase(deviceId, command._id.toString(), {
         command: 'START',
@@ -104,10 +105,23 @@ export async function POST(
         fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : undefined,
       })
     } catch (firebaseError) {
-      console.warn('Firebase command push failed:', firebaseError)
+      console.error('[Firebase Push Error] Initial attempt failed for START command:', firebaseError)
+      // Retry once after 1s
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      try {
+        await pushCommandToFirebase(deviceId, command._id.toString(), {
+          command: 'START',
+          mode: mode && ['AUTO', 'MANUAL'].includes(mode) ? mode : 'MANUAL',
+          temperature: temperature !== undefined ? Number(temperature) : undefined,
+          fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : undefined,
+        })
+      } catch (retryError) {
+        console.error('[Firebase Push Error] Retry failed for START command:', retryError)
+        firebaseDelivered = false
+      }
     }
 
-    const response = successResponse({
+    const commandData = {
       id: command._id,
       deviceId: command.deviceId,
       command: command.command,
@@ -116,7 +130,14 @@ export async function POST(
       fanSpeed: command.fanSpeed,
       status: command.status,
       createdAt: command.createdAt.toISOString(),
-    }, 201)
+    }
+
+    const response = firebaseDelivered
+      ? successResponse(commandData, 201)
+      : multiStatusResponse(
+          commandData,
+          'Command saved but realtime delivery failed. ESP32 will receive on next poll.'
+        )
 
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
 

@@ -6,6 +6,7 @@ import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
 import { validateDeviceRequest } from '@/lib/utils/validation'
+import type { IDevice } from '@/lib/models/Device'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
         .sort({ createdAt: -1 })
     }
 
-    const formattedDevices = devices.map((d: any) => ({
+    const formattedDevices = devices.map((d: IDevice) => ({
       id: d._id,
       deviceId: d.deviceId,
       status: d.status,
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
     }))
 
     const response = successResponse(formattedDevices)
+    response.headers.set('Cache-Control', 'private, max-age=30')
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {

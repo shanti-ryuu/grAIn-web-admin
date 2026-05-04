@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     const isRead = url.searchParams.get('isRead')
 
     // Build filter
-    const filter: any = {}
+    const filter: Record<string, unknown> = {}
     if (deviceId) filter.deviceId = deviceId
     if (type && ['critical', 'warning', 'info'].includes(type)) filter.type = type
     if (isRead !== null && isRead !== undefined) filter.isRead = isRead === 'true'
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     ])
 
     // Also get failed/error commands as alerts
-    const commandFilter: any = { status: { $in: ['failed', 'error'] } }
+    const commandFilter: Record<string, unknown> = { status: { $in: ['failed', 'error'] } }
     if (deviceId) commandFilter.deviceId = deviceId
     const failedCommands = await Command.find(commandFilter)
       .sort({ createdAt: -1 })
@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
     const response = paginatedResponse(allAlerts, total + commandAlerts.length, page, limit)
+    response.headers.set('Cache-Control', 'no-store')
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {

@@ -8,6 +8,13 @@ import { getUserFromRequest } from '@/lib/utils/auth'
 import { getQueryParams, isValidDeviceId } from '@/lib/utils/validation'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 
+// Lean sensor document with dynamic keys for field projection
+type LeanSensorDoc = {
+  _id: string
+  deviceId: string
+  [key: string]: unknown
+}
+
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
 }
@@ -82,6 +89,13 @@ export async function GET(
     const hoursParam = parseInt(searchParams.get('hours') || '24', 10)
     const hours = Math.min(Math.max(1, hoursParam), 720) // 1-720 hours (30 days)
 
+    // Parse optional field projection (?fields=temperature,humidity,moisture,timestamp)
+    const fieldsParam = searchParams.get('fields')
+    const allowedFields = ['temperature', 'humidity', 'moisture', 'fanSpeed', 'energy', 'status', 'solarVoltage', 'weight', 'timestamp']
+    const selectFields = fieldsParam
+      ? fieldsParam.split(',').filter(f => allowedFields.includes(f)).join(' ')
+      : 'temperature humidity moisture timestamp -_id'
+
     const hoursAgo = new Date(Date.now() - hours * 60 * 60 * 1000)
 
     // Get total count
@@ -90,33 +104,34 @@ export async function GET(
       timestamp: { $gte: hoursAgo },
     })
 
-    // Get paginated sensor data
+    // Get paginated sensor data with field projection
     const sensorData = await SensorData.find({
       deviceId,
       timestamp: { $gte: hoursAgo },
     })
+      .select(selectFields)
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limit)
       .lean()
 
-    // Format response with ALL fields
-    const formattedData = sensorData.map((data: any) => ({
-      id: data._id,
-      deviceId: data.deviceId,
-      temperature: data.temperature,
-      humidity: data.humidity,
-      moisture: data.moisture,
-      fanSpeed: data.fanSpeed,
-      energy: data.energy,
-      status: data.status,
-      solarVoltage: data.solarVoltage,
-      weight: data.weight,
-      timestamp: data.timestamp.toISOString(),
-      createdAt: data.createdAt.toISOString(),
-    }))
+    // Format response — only include projected fields
+    const formattedData = sensorData.map((data: LeanSensorDoc) => {
+      const entry: Record<string, unknown> = { id: data._id, deviceId: data.deviceId }
+      for (const key of Object.keys(data)) {
+        if (key === '_id' || key === 'deviceId' || key === '__v') continue
+        if (key === 'timestamp' || key === 'createdAt') {
+          const val = data[key] as Date | null | undefined
+          entry[key] = val?.toISOString?.() ?? data[key]
+        } else {
+          entry[key] = data[key]
+        }
+      }
+      return entry
+    })
 
     const response = paginatedResponse(formattedData, total, page, limit)
+    response.headers.set('Cache-Control', 'private, max-age=60')
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {

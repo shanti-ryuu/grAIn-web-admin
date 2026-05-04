@@ -138,20 +138,19 @@ export async function POST(request: NextRequest) {
     if (deviceUpdateResult.status === 'rejected') {
       console.warn('[Device Update Error] Failed to update device status:', deviceUpdateResult.reason)
     }
-    if (firebaseResult.status === 'rejected') {
-      console.warn('[Firebase Sync Error] Sensor data Firebase sync failed:', firebaseResult.reason)
+    const firebaseFailed = firebaseResult.status === 'rejected'
+    if (firebaseFailed) {
+      console.error('[Firebase Sync Failed] Sensor data Firebase sync failed:', firebaseResult.reason)
     }
 
-    // Auto-generate alerts based on sensor thresholds (fully fire-and-forget)
-    setImmediate(() => {
-      void checkAndCreateAlerts(deviceId, {
-        temperature: Number(temperature),
-        humidity: Number(humidity),
-        moisture: Number(moisture),
-      }).catch((err: unknown) => console.error('[Alert Gen Error]', err))
-    })
+    // Auto-generate alerts based on sensor thresholds (fully non-blocking)
+    void checkAndCreateAlerts(deviceId, {
+      temperature: Number(temperature),
+      humidity: Number(humidity),
+      moisture: Number(moisture),
+    }).catch((err: unknown) => console.error('[Alert Gen]', err))
 
-    const response = successResponse({
+    const sensorPayload = {
       id: sensorData._id,
       deviceId: sensorData.deviceId,
       temperature: sensorData.temperature,
@@ -164,7 +163,11 @@ export async function POST(request: NextRequest) {
       weight: sensorData.weight,
       timestamp: sensorData.timestamp.toISOString(),
       createdAt: sensorData.createdAt.toISOString(),
-    }, 201)
+    }
+
+    const response = firebaseFailed
+      ? successResponse(sensorPayload, { status: 201, warning: 'Realtime sync failed' })
+      : successResponse(sensorPayload, 201)
 
     return addCorsHeaders(response, request.headers.get('origin') || undefined)
 

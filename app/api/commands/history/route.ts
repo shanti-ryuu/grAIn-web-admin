@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import dbConnect from '@/lib/db'
 import Command from '@/lib/models/Command'
+import type { ICommand } from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
@@ -23,15 +24,15 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(url.searchParams.get('limit') || '20')
     const deviceId = url.searchParams.get('deviceId')
 
-    const filter: any = {}
+    const filter: Record<string, unknown> = {}
     if (deviceId) filter.deviceId = deviceId
 
     const commands = await Command.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .lean()
+      .lean<ICommand[]>()
 
-    const formatted = commands.map((cmd: any) => ({
+    const formatted = commands.map((cmd: ICommand) => ({
       id: cmd._id,
       deviceId: cmd.deviceId,
       command: cmd.command,

@@ -16,15 +16,17 @@ interface ApiResponse<T = unknown> {
 /**
  * Success response
  */
-export function successResponse<T>(data: T, status: number = 200): NextResponse<ApiResponse<T>> {
-  return NextResponse.json(
-    {
-      success: true,
-      data,
-      timestamp: new Date().toISOString(),
-    },
-    { status }
-  )
+export function successResponse<T>(data: T, statusOrOptions: number | { status?: number; warning?: string } = 200): NextResponse<ApiResponse<T>> {
+  const options = typeof statusOrOptions === 'number'
+    ? { status: statusOrOptions, warning: undefined }
+    : statusOrOptions
+  const body: ApiResponse<T> = {
+    success: true,
+    data,
+    timestamp: new Date().toISOString(),
+  }
+  if (options.warning) body.warning = options.warning
+  return NextResponse.json(body, { status: options.status ?? 200 })
 }
 
 /**

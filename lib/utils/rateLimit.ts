@@ -1,9 +1,5 @@
 import { NextRequest } from 'next/server'
 
-/**
- * Simple in-memory rate limiter
- * Note: For production, use Redis or similar distributed cache
- */
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
 
 export interface RateLimitOptions {
@@ -61,8 +57,8 @@ export function cleanupRateLimitStore() {
   }
 }
 
-// Cleanup every hour
-setInterval(cleanupRateLimitStore, 60 * 60 * 1000)
+// Cleanup every 60 seconds to prevent unbounded memory growth
+setInterval(cleanupRateLimitStore, 60 * 1000)
 
 /**
  * Predefined rate limit configurations

@@ -7,6 +7,7 @@ import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { validateSensorDataRequest } from '@/lib/utils/validation'
 import { syncSensorToFirebase } from '@/lib/utils/firebase-sync'
+import { invalidateAnalyticsCache } from '@/lib/utils/analytics-cache'
 import Alert from '@/lib/models/Alert'
 
 export async function OPTIONS(request: NextRequest) {
@@ -134,6 +135,9 @@ export async function POST(request: NextRequest) {
 
     const sensorData = mongoResult.value
 
+    // Invalidate analytics cache for this device so next request gets fresh data
+    invalidateAnalyticsCache(deviceId)
+
     // Log non-critical failures (device update + Firebase sync)
     if (deviceUpdateResult.status === 'rejected') {
       console.warn('[Device Update Error] Failed to update device status:', deviceUpdateResult.reason)
@@ -143,12 +147,14 @@ export async function POST(request: NextRequest) {
       console.error('[Firebase Sync Failed] Sensor data Firebase sync failed:', firebaseResult.reason)
     }
 
-    // Auto-generate alerts based on sensor thresholds (fully non-blocking)
-    void checkAndCreateAlerts(deviceId, {
-      temperature: Number(temperature),
-      humidity: Number(humidity),
-      moisture: Number(moisture),
-    }).catch((err: unknown) => console.error('[Alert Gen]', err))
+    // Auto-generate alerts based on sensor thresholds (fully non-blocking, deferred to next tick)
+    setImmediate(() => {
+      void checkAndCreateAlerts(deviceId, {
+        temperature: Number(temperature),
+        humidity: Number(humidity),
+        moisture: Number(moisture),
+      }).catch((err: unknown) => console.error('[Alert Gen]', err))
+    })
 
     const sensorPayload = {
       id: sensorData._id,

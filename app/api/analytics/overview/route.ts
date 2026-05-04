@@ -6,10 +6,7 @@ import Device from '@/lib/models/Device'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { getUserFromRequest } from '@/lib/utils/auth'
-
-// In-memory cache for analytics aggregation (5-minute TTL)
-const CACHE_TTL_MS = 5 * 60 * 1000
-const analyticsCache = new Map<string, { data: unknown; cachedAt: number }>()
+import { getAnalyticsCacheEntry, setAnalyticsCacheEntry } from '@/lib/utils/analytics-cache'
 
 export async function OPTIONS(request: NextRequest) {
   return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
@@ -31,16 +28,13 @@ export async function GET(request: NextRequest) {
 
     // Check in-memory cache
     const cacheKey = `${deviceId}_${period}`
-    const cached = analyticsCache.get(cacheKey)
-    if (cached && (Date.now() - cached.cachedAt) < CACHE_TTL_MS) {
-      const response = successResponse(cached.data)
+    const cachedData = getAnalyticsCacheEntry(cacheKey)
+    if (cachedData !== undefined) {
+      const response = successResponse(cachedData)
       response.headers.set('Cache-Control', 'private, max-age=300')
       response.headers.set('X-Cache', 'HIT')
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
-
-    // Evict stale entries to prevent unbounded growth
-    if (cached) analyticsCache.delete(cacheKey)
 
     const now = new Date()
     let startTime: Date
@@ -131,7 +125,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Store in cache
-    analyticsCache.set(cacheKey, { data: result, cachedAt: Date.now() })
+    setAnalyticsCacheEntry(cacheKey, result)
 
     const response = successResponse(result)
     response.headers.set('Cache-Control', 'private, max-age=300')

@@ -81,8 +81,10 @@ export async function GET(
       return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
-    // Parse pagination parameters
-    const { page, limit, skip } = getQueryParams(request, { page: 1, limit: 100 })
+    // Parse pagination parameters (cap limit at 500 to prevent accidental large queries)
+    const MAX_SENSOR_LIMIT = 500
+    const { page, limit: rawLimit, skip } = getQueryParams(request, { page: 1, limit: 100 })
+    const limit = Math.min(rawLimit, MAX_SENSOR_LIMIT)
 
     // Parse optional time filter
     const searchParams = request.nextUrl.searchParams
@@ -104,7 +106,7 @@ export async function GET(
       timestamp: { $gte: hoursAgo },
     })
 
-    // Get paginated sensor data with field projection
+    // Get paginated sensor data with field projection and index hint
     const sensorData = await SensorData.find({
       deviceId,
       timestamp: { $gte: hoursAgo },
@@ -113,6 +115,7 @@ export async function GET(
       .sort({ timestamp: -1 })
       .skip(skip)
       .limit(limit)
+      .hint({ deviceId: 1, timestamp: -1 })
       .lean()
 
     // Format response — only include projected fields

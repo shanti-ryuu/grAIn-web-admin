@@ -1,10 +1,8 @@
 import { NextRequest } from 'next/server'
-import dbConnect from '@/lib/db'
 import SensorData from '@/lib/models/SensorData'
 import Prediction from '@/lib/models/Prediction'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
-import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
-import { getUserFromRequest } from '@/lib/utils/auth'
+import { withAuth } from '@/lib/utils/handler'
 
 function calculateDryingRate(temp: number, fanSpeed: number): number {
   const baseRate = 0.008
@@ -52,62 +50,33 @@ async function calculateConfidence(deviceId: string): Promise<number> {
   }
 }
 
-export async function OPTIONS(request: NextRequest) {
-  return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
-}
+export const POST = withAuth(async (request, user) => {
+  const body = await request.json()
+  const { deviceId, temperature, humidity, moisture, fanSpeed, timeElapsed, solarVoltage } = body
 
-export async function POST(request: NextRequest) {
-  try {
-    await dbConnect()
+  if (!deviceId || temperature == null || humidity == null || moisture == null || fanSpeed == null || timeElapsed == null) {
+    return errorResponse('Missing required fields: deviceId, temperature, humidity, moisture, fanSpeed, timeElapsed', ErrorCodes.INVALID_INPUT, 400)
+  }
 
-    const user = await getUserFromRequest(request)
-    if (!user) {
-      const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
-    }
+  const dryingRate = calculateDryingRate(temperature, fanSpeed)
+  const predictedMoisture30min = Math.max(0, moisture - dryingRate * 30)
+  const estimatedMinutesToTarget = moisture <= 14 ? 0 : Math.max(0, Math.ceil((moisture - 14) / dryingRate))
+  const { recommendation, type: recommendationType } = getRecommendation(temperature, fanSpeed, humidity, moisture)
+  const efficiencyScore = calculateEfficiency(temperature, fanSpeed, humidity)
+  const confidence = await calculateConfidence(deviceId)
+  const isDryingComplete = moisture <= 14
 
-    const body = await request.json()
-    const { deviceId, temperature, humidity, moisture, fanSpeed, timeElapsed, solarVoltage } = body
+  const projectedCurve = []
+  for (let i = 1; i <= 13; i++) {
+    const projectedMoisture = Math.max(0, moisture - dryingRate * 30 * i)
+    projectedCurve.push({ time: i * 30, moisture: Math.round(projectedMoisture * 100) / 100 })
+    if (projectedMoisture <= 14) break
+  }
 
-    if (!deviceId || temperature == null || humidity == null || moisture == null || fanSpeed == null || timeElapsed == null) {
-      const response = errorResponse('Missing required fields: deviceId, temperature, humidity, moisture, fanSpeed, timeElapsed', ErrorCodes.INVALID_INPUT, 400)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
-    }
-
-    const dryingRate = calculateDryingRate(temperature, fanSpeed)
-    const predictedMoisture30min = Math.max(0, moisture - dryingRate * 30)
-    const estimatedMinutesToTarget = moisture <= 14 ? 0 : Math.max(0, Math.ceil((moisture - 14) / dryingRate))
-    const { recommendation, type: recommendationType } = getRecommendation(temperature, fanSpeed, humidity, moisture)
-    const efficiencyScore = calculateEfficiency(temperature, fanSpeed, humidity)
-    const confidence = await calculateConfidence(deviceId)
-    const isDryingComplete = moisture <= 14
-
-    const projectedCurve = []
-    for (let i = 1; i <= 13; i++) {
-      const projectedMoisture = Math.max(0, moisture - dryingRate * 30 * i)
-      projectedCurve.push({ time: i * 30, moisture: Math.round(projectedMoisture * 100) / 100 })
-      if (projectedMoisture <= 14) break
-    }
-
-    await Prediction.create({
-      deviceId,
-      input: { temperature, humidity, moisture, fanSpeed, timeElapsed, solarVoltage },
-      output: {
-        predictedMoisture30min: Math.round(predictedMoisture30min * 100) / 100,
-        estimatedMinutesToTarget,
-        recommendation,
-        recommendationType,
-        efficiencyScore,
-        confidence,
-        isDryingComplete,
-        projectedCurve,
-        targetMoisture: 14,
-        algorithm: 'rule-based-v1',
-      },
-      isDryingComplete,
-    })
-
-    const responseData = {
+  await Prediction.create({
+    deviceId,
+    input: { temperature, humidity, moisture, fanSpeed, timeElapsed, solarVoltage },
+    output: {
       predictedMoisture30min: Math.round(predictedMoisture30min * 100) / 100,
       estimatedMinutesToTarget,
       recommendation,
@@ -118,15 +87,21 @@ export async function POST(request: NextRequest) {
       projectedCurve,
       targetMoisture: 14,
       algorithm: 'rule-based-v1',
-      note: 'Phase 1 model — will be upgraded to Random Forest Regressor after 20-30 experimental drying cycles',
-    }
+    },
+    isDryingComplete,
+  })
 
-    const response = successResponse(responseData)
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
-
-  } catch (error: any) {
-    console.error('AI prediction error:', error)
-    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
-  }
-}
+  return successResponse({
+    predictedMoisture30min: Math.round(predictedMoisture30min * 100) / 100,
+    estimatedMinutesToTarget,
+    recommendation,
+    recommendationType,
+    efficiencyScore,
+    confidence,
+    isDryingComplete,
+    projectedCurve,
+    targetMoisture: 14,
+    algorithm: 'rule-based-v1',
+    note: 'Phase 1 model — will be upgraded to Random Forest Regressor after 20-30 experimental drying cycles',
+  })
+})

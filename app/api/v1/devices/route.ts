@@ -1,128 +1,77 @@
 import { NextRequest } from 'next/server'
-import dbConnect from '@/lib/db'
 import Device from '@/lib/models/Device'
 import User from '@/lib/models/User'
-import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
-import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
-import { getUserFromRequest } from '@/lib/utils/auth'
-import { validateDeviceRequest } from '@/lib/utils/validation'
+import { successResponse, paginatedResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { withAuth } from '@/lib/utils/handler'
+import { validateDeviceRequest, sanitizeString } from '@/lib/utils/validation'
 import type { IDevice } from '@/lib/models/Device'
 
-export async function OPTIONS(request: NextRequest) {
-  return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
-}
+export const GET = withAuth(async (request, user) => {
+  const { searchParams } = request.nextUrl
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
+  const limit = Math.min(100, parseInt(searchParams.get('limit') ?? '50'))
+  const skip = (page - 1) * limit
 
-export async function GET(request: NextRequest) {
-  try {
-    await dbConnect()
+  const filter = user.role === 'admin' ? {} : { assignedUser: user.userId }
 
-    const user = await getUserFromRequest(request)
-    if (!user) {
-      const response = errorResponse('Unauthorized', ErrorCodes.UNAUTHORIZED, 401)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
-    }
+  const [devices, total] = await Promise.all([
+    Device.find(filter)
+      .populate('assignedUser', 'name email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    Device.countDocuments(filter),
+  ])
 
-    let devices
-    if (user.role === 'admin') {
-      devices = await Device.find({})
-        .populate('assignedUser', 'name email')
-        .sort({ createdAt: -1 })
-    } else {
-      devices = await Device.find({ assignedUser: user.userId })
-        .populate('assignedUser', 'name email')
-        .sort({ createdAt: -1 })
-    }
+  const formattedDevices = devices.map((d: IDevice) => ({
+    id: d._id,
+    deviceId: d.deviceId,
+    status: d.status,
+    location: d.location,
+    lastActive: d.lastActive?.toISOString?.() || d.lastActive,
+    assignedUser: d.assignedUser,
+    createdAt: d.createdAt?.toISOString?.() || d.createdAt,
+  }))
 
-    const formattedDevices = devices.map((d: IDevice) => ({
-      id: d._id,
-      deviceId: d.deviceId,
-      status: d.status,
-      location: d.location,
-      lastActive: d.lastActive?.toISOString?.() || d.lastActive,
-      assignedUser: d.assignedUser,
-      createdAt: d.createdAt?.toISOString?.() || d.createdAt,
-    }))
+  return paginatedResponse(formattedDevices, total, page, limit)
+})
 
-    const response = successResponse(formattedDevices)
-    response.headers.set('Cache-Control', 'private, max-age=30')
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
+export const POST = withAuth(async (request, user) => {
+  const body = await request.json()
+  const { deviceId, assignedUser, location } = body
 
-  } catch (error) {
-    console.error('Get devices error:', error)
-    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
+  // Sanitize location (NOT deviceId — it has its own format validation)
+  const safeLocation = typeof location === 'string' ? sanitizeString(location) : location
+
+  const validation = validateDeviceRequest(body)
+  if (!validation.valid) {
+    return errorResponse(Object.values(validation.errors).join(', '), ErrorCodes.INVALID_INPUT, 400)
   }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    await dbConnect()
-
-    const user = await getUserFromRequest(request)
-    if (!user || user.role !== 'admin') {
-      const response = errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
-    }
-
-    const body = await request.json()
-    const { deviceId, assignedUser, location } = body
-
-    // Validate
-    const validation = validateDeviceRequest(body)
-    if (!validation.valid) {
-      const response = errorResponse(
-        Object.values(validation.errors).join(', '),
-        ErrorCodes.INVALID_INPUT,
-        400
-      )
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
-    }
-
-    if (!assignedUser) {
-      const response = errorResponse('Assigned user is required', ErrorCodes.INVALID_INPUT, 400)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
-    }
-
-    // Check if device already exists
-    const existingDevice = await Device.findOne({ deviceId })
-    if (existingDevice) {
-      const response = errorResponse('Device with this ID already exists', ErrorCodes.CONFLICT, 400)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
-    }
-
-    // Check if user exists
-    const userExists = await User.findById(assignedUser)
-    if (!userExists) {
-      const response = errorResponse('Assigned user not found', ErrorCodes.USER_NOT_FOUND, 400)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
-    }
-
-    // Create device
-    const newDevice = await Device.create({
-      deviceId,
-      assignedUser,
-      location,
-      status: 'offline',
-    })
-
-    await newDevice.populate('assignedUser', 'name email')
-
-    const formattedDevice = {
-      id: newDevice._id,
-      deviceId: newDevice.deviceId,
-      status: newDevice.status,
-      location: newDevice.location,
-      lastActive: newDevice.lastActive?.toISOString?.() || newDevice.lastActive,
-      assignedUser: newDevice.assignedUser,
-      createdAt: newDevice.createdAt?.toISOString?.() || newDevice.createdAt,
-    }
-
-    const response = successResponse(formattedDevice, 201)
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
-
-  } catch (error) {
-    console.error('Create device error:', error)
-    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
+  if (!assignedUser) {
+    return errorResponse('Assigned user is required', ErrorCodes.INVALID_INPUT, 400)
   }
-}
+
+  const existingDevice = await Device.findOne({ deviceId })
+  if (existingDevice) {
+    return errorResponse('Device with this ID already exists', ErrorCodes.CONFLICT, 400)
+  }
+
+  const userExists = await User.findById(assignedUser)
+  if (!userExists) {
+    return errorResponse('Assigned user not found', ErrorCodes.USER_NOT_FOUND, 400)
+  }
+
+  const newDevice = await Device.create({ deviceId, assignedUser, location: safeLocation, status: 'offline' })
+  await newDevice.populate('assignedUser', 'name email')
+
+  return successResponse({
+    id: newDevice._id,
+    deviceId: newDevice.deviceId,
+    status: newDevice.status,
+    location: newDevice.location,
+    lastActive: newDevice.lastActive?.toISOString?.() || newDevice.lastActive,
+    assignedUser: newDevice.assignedUser,
+    createdAt: newDevice.createdAt?.toISOString?.() || newDevice.createdAt,
+  }, 201)
+}, { role: 'admin' })

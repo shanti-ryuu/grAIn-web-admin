@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
 import dbConnect from '@/lib/db'
-import User, { IRevokedToken } from '@/lib/models/User'
+import User from '@/lib/models/User'
 
 export interface TokenPayload {
   userId: string
@@ -59,16 +59,19 @@ export async function getUserFromRequest(request: NextRequest): Promise<TokenPay
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload
 
-    // Check if token has been revoked
+    // Check if token has been revoked (direct query — avoids loading full user doc)
     try {
       await dbConnect()
-      const user = await User.findById(decoded.userId)
-      if (user && user.revokedTokens?.some((rt: IRevokedToken) => rt.token === token)) {
+      const revoked = await User.exists({
+        _id: decoded.userId,
+        'revokedTokens.token': token,
+      })
+      if (revoked) {
         console.warn('[getUserFromRequest] Token has been revoked')
         return null
       }
     } catch (dbError) {
-      // If DB check fails, still allow the request (fail open for availability)
+      // If DB check fails, still allow the request (fail open for for availability)
       console.warn('[getUserFromRequest] Revoked token check failed, allowing request:', dbError)
     }
 
@@ -85,6 +88,6 @@ export async function getUserFromRequest(request: NextRequest): Promise<TokenPay
 export function generateToken(payload: Omit<TokenPayload, 'iat' | 'exp'>, expiresIn: number | string = '7d'): string {
   const opts = typeof expiresIn === 'number'
     ? { expiresIn } as jwt.SignOptions
-    : { expiresIn: expiresIn as any }
+    : { expiresIn: expiresIn as jwt.SignOptions['expiresIn'] }
   return jwt.sign(payload, JWT_SECRET, opts)
 }

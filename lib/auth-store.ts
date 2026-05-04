@@ -12,17 +12,18 @@ export interface AuthUser {
 export interface AuthStore {
   user: AuthUser | null
   token: string | null
+  refreshToken: string | null
   isHydrated: boolean
   isAuthenticated: boolean
   isLoading: boolean
-  setAuth: (token: string, user: AuthUser) => void
+  setAuth: (token: string, user: AuthUser, refreshToken?: string) => void
   clearAuth: () => void
   logout: () => void
   setHydrated: () => void
   hydrate: () => void
   setLoading: (loading: boolean) => void
   updateUser: (updates: Partial<AuthUser>) => void
-  login: (token: string, user: AuthUser) => void
+  login: (token: string, user: AuthUser, refreshToken?: string) => void
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -30,24 +31,25 @@ export const useAuthStore = create<AuthStore>()(
     (set) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isHydrated: false,
       isAuthenticated: false,
       isLoading: true,
 
-      setAuth: (token: string, user: AuthUser) => set({
-        token, user, isAuthenticated: true, isLoading: false
+      setAuth: (token: string, user: AuthUser, refreshToken?: string) => set({
+        token, user, refreshToken: refreshToken ?? null, isAuthenticated: true, isLoading: false
       }),
 
-      login: (token: string, user: AuthUser) => set({
-        token, user, isAuthenticated: true, isLoading: false
+      login: (token: string, user: AuthUser, refreshToken?: string) => set({
+        token, user, refreshToken: refreshToken ?? null, isAuthenticated: true, isLoading: false
       }),
 
       clearAuth: () => set({
-        token: null, user: null, isAuthenticated: false, isLoading: false
+        token: null, user: null, refreshToken: null, isAuthenticated: false, isLoading: false
       }),
 
       logout: () => set({
-        token: null, user: null, isAuthenticated: false, isLoading: false
+        token: null, user: null, refreshToken: null, isAuthenticated: false, isLoading: false
       }),
 
       setHydrated: () => set((state) => ({
@@ -72,7 +74,7 @@ export const useAuthStore = create<AuthStore>()(
     {
       name: 'grain-auth',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ token: state.token, user: state.user }),
+      partialize: (state) => ({ token: state.token, user: state.user, refreshToken: state.refreshToken }),
       onRehydrateStorage: () => (state) => {
         state?.setHydrated()
       },

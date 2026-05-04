@@ -3,16 +3,11 @@ import dbConnect from '@/lib/db'
 import Device from '@/lib/models/Device'
 import Command from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
-import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { isValidDeviceId } from '@/lib/utils/validation'
 import { getRealtimeDb } from '@/lib/firebase-admin'
 
-export async function OPTIONS(request: NextRequest) {
-  return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
-}
-
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -20,50 +15,48 @@ export async function POST(
 
     const { id } = await params
 
-    // Validate device ID
-    const deviceId = isValidDeviceId(id) ? id : null
-    if (!deviceId) {
-      const response = errorResponse('Invalid device ID format', ErrorCodes.INVALID_INPUT, 400)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    if (!isValidDeviceId(id)) {
+      return errorResponse('Invalid device ID format', ErrorCodes.INVALID_INPUT, 400)
     }
 
-    // No JWT — ESP32 lightweight call; security: validate deviceId format + check device exists
-    const device = await Device.findOne({ deviceId })
+    const device = await Device.findOneAndUpdate(
+      { deviceId: id },
+      { status: 'online', lastActive: new Date() },
+      { new: true }
+    )
+
     if (!device) {
-      const response = errorResponse('Device not found', ErrorCodes.DEVICE_NOT_FOUND, 404)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+      return errorResponse(`Device ${id} not found`, ErrorCodes.DEVICE_NOT_FOUND, 404)
     }
 
-    // Update device status to online and lastActive
-    await Device.findByIdAndUpdate(device._id, {
-      status: 'online',
-      lastActive: new Date(),
-    })
-
-    // Sync to Firebase
-    const db = getRealtimeDb()
-    if (db) {
-      await db.ref(`grain/devices/${deviceId}`).update({
-        status: 'online',
-        lastActive: Date.now(),
-      })
+    // Update Firebase Realtime Database
+    try {
+      const firebaseDb = getRealtimeDb()
+      if (firebaseDb) {
+        await firebaseDb.ref(`grain/devices/${id}`).update({
+          status: 'online',
+          lastActive: new Date().toISOString(),
+        })
+      }
+    } catch (firebaseError) {
+      console.error('Firebase heartbeat sync failed:', firebaseError)
     }
 
-    // Return pending commands count so ESP32 knows to hit GET /commands
-    const pendingCmds = await Command.find({
-      deviceId,
+    // Return count of pending commands
+    const pendingCommands = await Command.countDocuments({
+      deviceId: id,
       status: 'pending',
-    }).lean()
-
-    const response = successResponse({
-      ok: true,
-      pendingCommands: pendingCmds.length,
     })
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
+
+    return successResponse({
+      deviceId: id,
+      status: 'online',
+      lastActive: device.lastActive?.toISOString?.() || null,
+      pendingCommands,
+    })
 
   } catch (error) {
     console.error('Heartbeat error:', error)
-    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    return errorResponse('Heartbeat processing failed', ErrorCodes.INTERNAL_ERROR, 500)
   }
 }

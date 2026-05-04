@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { useToast } from '@/hooks/useToast'
+import { useAuthStore } from '@/lib/auth-store'
 
 interface ApiResponse<T> {
   success: boolean
@@ -22,13 +23,38 @@ function unwrapResponse<T>(responseData: ApiResponse<T>): T {
 // Auth
 export const useLogin = () => {
   const { toast } = useToast()
+  const { login: storeLogin } = useAuthStore()
   return useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
-      const { data: responseData } = await api.post<ApiResponse<{ token: string; user: any; expiresIn: number }>>('/auth/login', credentials)
+      const { data: responseData } = await api.post<ApiResponse<{ accessToken: string; refreshToken: string; user: { id: string; email: string; name: string; role: 'admin' | 'farmer' } }>>('/auth/login', credentials)
       return unwrapResponse(responseData)
     },
-    onError: (error: any) => {
-      toast({ title: 'Login Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    onSuccess: (data) => {
+      storeLogin(data.accessToken, data.user, data.refreshToken)
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Login failed'
+      toast({ title: 'Login Failed', description: message, variant: 'destructive' })
+    },
+  })
+}
+
+export const useLogout = () => {
+  const { logout: storeLogout, refreshToken } = useAuthStore()
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: async () => {
+      try { await api.post('/auth/logout', { refreshToken }) } catch { /* best-effort server logout */ }
+    },
+    onSuccess: () => {
+      localStorage.removeItem('auth_token')
+      storeLogout()
+      queryClient.clear()
+      toast({ title: 'Logged Out', description: 'You have been logged out successfully' })
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login'
+      }
     },
   })
 }
@@ -397,25 +423,6 @@ export const usePredictions = (deviceId?: string) => {
     staleTime: 60_000,
     refetchInterval: 60_000,
     enabled: !!deviceId || deviceId === undefined,
-  })
-}
-
-// Logout
-export const useLogout = () => {
-  const queryClient = useQueryClient()
-  const { toast } = useToast()
-  return useMutation({
-    mutationFn: async () => {
-      const { data: responseData } = await api.post<ApiResponse<any>>('/auth/logout')
-      return unwrapResponse(responseData)
-    },
-    onSuccess: () => {
-      queryClient.clear()
-      toast({ title: 'Logged Out', description: 'You have been logged out successfully' })
-    },
-    onError: (error: any) => {
-      toast({ title: 'Logout Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
-    },
   })
 }
 

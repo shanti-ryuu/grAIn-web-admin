@@ -1,8 +1,24 @@
 import { NextRequest } from 'next/server'
+import { escape, trim } from 'validator'
 
 export interface ValidationResult {
   valid: boolean
   errors: Record<string, string>
+}
+
+
+export function sanitizeString(input: string): string {
+  return escape(trim(input))
+}
+
+export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
+  const result: Record<string, unknown> = { ...obj }
+  for (const key of Object.keys(result)) {
+    if (typeof result[key] === 'string') {
+      result[key] = sanitizeString(result[key] as string)
+    }
+  }
+  return result as T
 }
 
 /**

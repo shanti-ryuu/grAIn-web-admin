@@ -1,15 +1,9 @@
 import { NextRequest } from 'next/server'
 import dbConnect from '@/lib/db'
 import Command from '@/lib/models/Command'
-import Device from '@/lib/models/Device'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
-import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { isValidDeviceId } from '@/lib/utils/validation'
-import { getRealtimeDb } from '@/lib/firebase-admin'
-
-export async function OPTIONS(request: NextRequest) {
-  return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
-}
+import { markCommandExecuted } from '@/lib/utils/firebase-sync'
 
 export async function POST(
   request: NextRequest,
@@ -20,49 +14,46 @@ export async function POST(
 
     const { deviceId } = await params
 
-    // Validate device ID format
     if (!isValidDeviceId(deviceId)) {
-      const response = errorResponse('Invalid device ID format', ErrorCodes.INVALID_INPUT, 400)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
-    }
-
-    // Verify device exists (no JWT — ESP32 can't hold tokens)
-    const device = await Device.findOne({ deviceId })
-    if (!device) {
-      const response = errorResponse('Device not found', ErrorCodes.DEVICE_NOT_FOUND, 404)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+      return errorResponse('Invalid device ID format', ErrorCodes.INVALID_INPUT, 400)
     }
 
     const body = await request.json()
-    const { commandId, status, executedAt } = body
+    const { commandId, status } = body
 
     if (!commandId) {
-      const response = errorResponse('commandId is required', ErrorCodes.INVALID_INPUT, 400)
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+      return errorResponse('commandId is required', ErrorCodes.INVALID_INPUT, 400)
     }
 
-    // Update command status
-    await Command.findByIdAndUpdate(commandId, {
-      status: status === 'ok' ? 'executed' : 'failed',
-      executedAt: executedAt ? new Date(executedAt) : new Date(),
+    const validStatuses = ['executed', 'failed', 'error']
+    const commandStatus = validStatuses.includes(status) ? status : 'executed'
+
+    const command = await Command.findByIdAndUpdate(
+      commandId,
+      { status: commandStatus, executedAt: new Date() },
+      { new: true }
+    )
+
+    if (!command) {
+      return errorResponse('Command not found', ErrorCodes.NOT_FOUND, 404)
+    }
+
+    try {
+      await markCommandExecuted(commandId, commandStatus)
+    } catch (firebaseError) {
+      console.error('Firebase ack sync failed:', firebaseError)
+    }
+
+    return successResponse({
+      id: command._id,
+      deviceId: command.deviceId,
+      command: command.command,
+      status: command.status,
+      executedAt: command.executedAt?.toISOString?.() || null,
     })
-
-    // Write ack to Firebase so mobile app gets instant feedback
-    const db = getRealtimeDb()
-    if (db) {
-      await db.ref(`grain/commands/${deviceId}/executed`).set({
-        commandId,
-        status,
-        executedAt: Date.now(),
-      })
-    }
-
-    const response = successResponse({ acknowledged: true })
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
 
   } catch (error) {
     console.error('Command ack error:', error)
-    const response = errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    return errorResponse('Failed to acknowledge command', ErrorCodes.INTERNAL_ERROR, 500)
   }
 }

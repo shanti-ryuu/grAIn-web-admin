@@ -5,6 +5,12 @@ export interface IRevokedToken {
   revokedAt: Date
 }
 
+export interface IRefreshToken {
+  token: string
+  createdAt: Date
+  expiresAt: Date
+}
+
 export interface IUser extends Document {
   name: string
   email: string
@@ -16,6 +22,7 @@ export interface IUser extends Document {
   phoneNumber: string
   location: string
   revokedTokens: IRevokedToken[]
+  refreshTokens: IRefreshToken[]
   createdAt: Date
   updatedAt: Date
 }
@@ -71,10 +78,20 @@ const UserSchema: Schema = new Schema({
     }],
     default: [],
   },
+  refreshTokens: {
+    type: [{
+      token: { type: String, required: true },
+      createdAt: { type: Date, default: Date.now },
+      expiresAt: { type: Date, required: true },
+    }],
+    default: [],
+  },
 }, {
   timestamps: true,
 })
 
 UserSchema.index({ 'revokedTokens.revokedAt': 1 })
+UserSchema.index({ 'refreshTokens.token': 1 }, { sparse: true })
+UserSchema.index({ 'refreshTokens.expiresAt': 1 })
 
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema)

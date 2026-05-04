@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth-store'
-import { useLogin } from '@/hooks/useAuth'
+import { useLogin } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import Image from 'next/image'
 

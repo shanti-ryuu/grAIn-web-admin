@@ -3,16 +3,11 @@ import dbConnect from '@/lib/db'
 import SensorData from '@/lib/models/SensorData'
 import Device from '@/lib/models/Device'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
-import { addCorsHeaders, handleCorsPrelight } from '@/lib/utils/cors'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
-import { validateSensorDataRequest } from '@/lib/utils/validation'
+import { validateSensorDataRequest, sanitizeString } from '@/lib/utils/validation'
 import { syncSensorToFirebase } from '@/lib/utils/firebase-sync'
 import { invalidateAnalyticsCache } from '@/lib/utils/analytics-cache'
 import Alert from '@/lib/models/Alert'
-
-export async function OPTIONS(request: NextRequest) {
-  return addCorsHeaders(handleCorsPrelight(request) || new Response(), request.headers.get('origin') || undefined)
-}
 
 async function checkAndCreateAlerts(deviceId: string, data: { temperature: number; humidity: number; moisture: number }): Promise<void> {
   const alerts: { deviceId: string; type: 'critical' | 'warning' | 'info'; message: string; severity: number }[] = []
@@ -46,52 +41,36 @@ async function checkAndCreateAlerts(deviceId: string, data: { temperature: numbe
 
 export async function POST(request: NextRequest) {
   try {
-    // Check rate limit for ESP32 public endpoint
-    const rateLimit = checkRateLimit(request, RateLimits.PUBLIC_API)
+    const rateLimit = await checkRateLimit(request, RateLimits.PUBLIC_API)
     if (!rateLimit.allowed) {
-      const response = errorResponse(
-        'Rate limit exceeded. Please reduce request frequency.',
-        ErrorCodes.RATE_LIMIT,
-        429
-      )
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+      return errorResponse('Rate limit exceeded. Please reduce request frequency.', ErrorCodes.RATE_LIMIT, 429)
     }
 
     await dbConnect()
 
     const body = await request.json()
 
-    // Log raw incoming data for IoT debugging
     if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_SENSORS === 'true') {
       console.log('[ESP32 RAW]', JSON.stringify(body, null, 2))
     }
 
-    // Validate sensor data
     const validation = validateSensorDataRequest(body)
     if (!validation.valid) {
       const failedFields = Object.keys(validation.errors)
-      const response = errorResponse(
+      return errorResponse(
         `Validation failed: ${failedFields.join(', ')}. Received: temp=${body.temperature}, hum=${body.humidity}, moisture=${body.moisture}`,
         ErrorCodes.INVALID_INPUT,
         400
       )
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
     }
 
     const { deviceId, temperature, humidity, moisture, fanSpeed, energy, status, solarVoltage, weight } = body
 
-    // Check if device exists
     const device = await Device.findOne({ deviceId })
     if (!device) {
-      const response = errorResponse(
-        `Device ${deviceId} not found`,
-        ErrorCodes.DEVICE_NOT_FOUND,
-        404
-      )
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+      return errorResponse(`Device ${deviceId} not found`, ErrorCodes.DEVICE_NOT_FOUND, 404)
     }
 
-    // Run MongoDB save, device update, and Firebase sync in parallel to cut latency
     const [mongoResult, deviceUpdateResult, firebaseResult] = await Promise.allSettled([
       SensorData.create({
         deviceId,
@@ -100,7 +79,7 @@ export async function POST(request: NextRequest) {
         moisture: Number(moisture),
         fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
         energy: energy !== undefined ? Number(energy) : 0,
-        status: status && ['running', 'idle', 'paused', 'error'].includes(status) ? status : 'idle',
+        status: status && ['running', 'idle', 'paused', 'error'].includes(status) ? sanitizeString(status) : 'idle',
         solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
         weight: weight !== undefined ? Number(weight) : 0,
         timestamp: new Date(),
@@ -122,23 +101,15 @@ export async function POST(request: NextRequest) {
       }),
     ])
 
-    // MongoDB save is critical — return error if it failed
     if (mongoResult.status === 'rejected') {
       console.error('Sensor data MongoDB save failed:', mongoResult.reason)
-      const response = errorResponse(
-        'Failed to store sensor data',
-        ErrorCodes.INTERNAL_ERROR,
-        500
-      )
-      return addCorsHeaders(response, request.headers.get('origin') || undefined)
+      return errorResponse('Failed to store sensor data', ErrorCodes.INTERNAL_ERROR, 500)
     }
 
     const sensorData = mongoResult.value
 
-    // Invalidate analytics cache for this device so next request gets fresh data
-    invalidateAnalyticsCache(deviceId)
+    await invalidateAnalyticsCache(deviceId)
 
-    // Log non-critical failures (device update + Firebase sync)
     if (deviceUpdateResult.status === 'rejected') {
       console.warn('[Device Update Error] Failed to update device status:', deviceUpdateResult.reason)
     }
@@ -147,7 +118,6 @@ export async function POST(request: NextRequest) {
       console.error('[Firebase Sync Failed] Sensor data Firebase sync failed:', firebaseResult.reason)
     }
 
-    // Auto-generate alerts based on sensor thresholds (fully non-blocking, deferred to next tick)
     setImmediate(() => {
       void checkAndCreateAlerts(deviceId, {
         temperature: Number(temperature),
@@ -171,19 +141,12 @@ export async function POST(request: NextRequest) {
       createdAt: sensorData.createdAt.toISOString(),
     }
 
-    const response = firebaseFailed
+    return firebaseFailed
       ? successResponse(sensorPayload, { status: 201, warning: 'Realtime sync failed' })
       : successResponse(sensorPayload, 201)
 
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
-
   } catch (error) {
     console.error('Sensor data error:', error)
-    const response = errorResponse(
-      'Failed to store sensor data',
-      ErrorCodes.INTERNAL_ERROR,
-      500
-    )
-    return addCorsHeaders(response, request.headers.get('origin') || undefined)
+    return errorResponse('Failed to store sensor data', ErrorCodes.INTERNAL_ERROR, 500)
   }
 }

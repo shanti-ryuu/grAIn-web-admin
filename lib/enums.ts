@@ -98,19 +98,31 @@ export enum AnalyticsPeriod {
 }
 
 /**
- * Error codes for API responses
+ * Error codes for API responses — single source of truth.
+ * Re-exported from lib/utils/response.ts for backward compatibility.
  */
-export const enum ErrorCodes {
-  InvalidInput = 'INVALID_INPUT',
-  Unauthorized = 'UNAUTHORIZED',
-  Forbidden = 'FORBIDDEN',
-  NotFound = 'NOT_FOUND',
-  Conflict = 'CONFLICT',
-  RateLimit = 'RATE_LIMIT',
-  InternalError = 'INTERNAL_ERROR',
-  InvalidCredentials = 'INVALID_CREDENTIALS',
-  AccountInactive = 'ACCOUNT_INACTIVE',
-  DeviceNotFound = 'DEVICE_NOT_FOUND',
-  UserNotFound = 'USER_NOT_FOUND',
-  ValidationError = 'VALIDATION_ERROR',
-}
+export const ErrorCodes = {
+  INVALID_INPUT: 'INVALID_INPUT',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  FORBIDDEN: 'FORBIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+  CONFLICT: 'CONFLICT',
+  RATE_LIMIT: 'RATE_LIMIT',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  ACCOUNT_INACTIVE: 'ACCOUNT_INACTIVE',
+  DEVICE_NOT_FOUND: 'DEVICE_NOT_FOUND',
+  USER_NOT_FOUND: 'USER_NOT_FOUND',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+} as const
+
+/**
+ * bcrypt salt rounds — standardize across all hash calls.
+ * register uses 12, users/route.ts uses 10; now统一 to 12.
+ */
+export const BCRYPT_ROUNDS = 12
+
+/**
+ * API version prefix — used for URL construction and middleware rewrites.
+ */
+export const API_VERSION = 'v1'

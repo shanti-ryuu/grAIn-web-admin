@@ -14,6 +14,23 @@ import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
 
+ type IdLike = string | { id?: string; _id?: string } | null | undefined
+
+ const toIdString = (value: unknown): string | null => {
+   if (typeof value === 'string' && value.length > 0) return value
+   if (value && typeof value === 'object' && 'toString' in value && typeof (value as { toString?: unknown }).toString === 'function') {
+     const str = (value as { toString: () => string }).toString()
+     return str && str !== '[object Object]' ? str : null
+   }
+   return null
+ }
+
+ const getIdFromIdLike = (value: IdLike): string | null => {
+   if (!value) return null
+   if (typeof value === 'string') return value
+   return value.id || value._id || null
+ }
+
 interface UserRow {
   id: string
   name: string
@@ -48,23 +65,35 @@ export default function UsersPage() {
   const deleteUser = useDeleteUser()
   const bulkDeleteUsers = useBulkDeleteUsers()
 
-  const users = (usersData as any)?.users || []
+  const users = (usersData as { users?: Array<Record<string, unknown>> } | undefined)?.users || []
 
   const deviceCounts: Record<string, number> = {}
-  ;(devices || []).forEach((d: any) => {
-    const uid = d.assignedUser?.id || d.assignedUser?._id || d.assignedUser
+  ;(devices || []).forEach((d: { assignedUser?: IdLike }) => {
+    const uid = getIdFromIdLike(d.assignedUser)
     if (uid) deviceCounts[uid] = (deviceCounts[uid] || 0) + 1
   })
 
-  const tableData: UserRow[] = (users || []).map((u: any) => ({
-    id: u._id?.toString?.() || u.id,
-    name: u.name,
-    email: u.email,
-    role: u.role,
-    status: u.status,
-    createdAt: u.createdAt,
-    deviceCount: deviceCounts[u._id?.toString?.() || u.id] || 0,
-  }))
+  const tableData: UserRow[] = (users || []).flatMap((u: Record<string, unknown>) => {
+    const id = toIdString((u as { _id?: unknown })._id) ?? toIdString((u as { id?: unknown }).id)
+    if (!id) return []
+
+    const name = typeof (u as { name?: unknown }).name === 'string' ? (u as { name: string }).name : ''
+    const email = typeof (u as { email?: unknown }).email === 'string' ? (u as { email: string }).email : ''
+    const role = typeof (u as { role?: unknown }).role === 'string' ? (u as { role: string }).role : ''
+    const status = typeof (u as { status?: unknown }).status === 'string' ? (u as { status: string }).status : ''
+    const createdAtRaw = (u as { createdAt?: unknown }).createdAt
+    const createdAt = typeof createdAtRaw === 'string' ? createdAtRaw : createdAtRaw ? new Date(createdAtRaw as Date).toISOString() : ''
+
+    return [{
+      id,
+      name,
+      email,
+      role,
+      status,
+      createdAt,
+      deviceCount: deviceCounts[id] || 0,
+    }]
+  })
 
   const validateAddForm = (): boolean => {
     const errors: Record<string, string> = {}
@@ -85,8 +114,9 @@ export default function UsersPage() {
       setAddForm({ name: '', email: '', password: '', role: 'farmer' })
       setAddErrors({})
       queryClient.invalidateQueries({ queryKey: ['users'] })
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to create user. Please try again.'
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
+      const msg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to create user. Please try again.'
       toast({ title: 'Creation Failed', description: msg, variant: 'destructive' })
       if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('already')) {
         setAddErrors(prev => ({ ...prev, email: msg }))
@@ -119,10 +149,11 @@ export default function UsersPage() {
         setSelectedRows([])
       }
       queryClient.invalidateQueries({ queryKey: ['users'] })
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
       toast({
         title: 'Action Failed',
-        description: err?.response?.data?.error || err?.response?.data?.message || 'Failed to perform action',
+        description: axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to perform action',
         variant: 'destructive',
       })
     }

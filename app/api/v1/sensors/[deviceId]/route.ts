@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import SensorData from '@/lib/models/SensorData'
 import Device from '@/lib/models/Device'
 import { paginatedResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'

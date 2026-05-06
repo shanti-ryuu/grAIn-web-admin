@@ -51,8 +51,9 @@ export default function Topbar() {
   const markAlertRead = useMarkAlertRead()
   const clearAllAlerts = useClearAllAlerts()
 
-  const alerts = (alertsData as any)?.data || alertsData || []
-  const unreadCount = alerts.filter((a: any) => !a.isRead).length
+  type AlertItem = { id: string; deviceId?: string; type?: string; message?: string; createdAt?: string; isRead?: boolean }
+  const alerts = (alertsData as { data?: AlertItem[] } | undefined)?.data || (alertsData as AlertItem[] | undefined) || []
+  const unreadCount = alerts.filter((a) => !a.isRead).length
   const badgeText = unreadCount > 9 ? '9+' : String(unreadCount)
 
   const handleMarkAllRead = async () => {
@@ -115,16 +116,16 @@ export default function Topbar() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-50">
-                  {alerts.slice(0, 20).map((alert: any) => (
+                  {alerts.slice(0, 20).map((alert) => (
                     <button
                       key={alert.id}
                       onClick={() => handleMarkSingleRead(alert.id, alert.deviceId)}
                       className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${!alert.isRead ? 'bg-green-50/40 border-l-2 border-l-green-600' : ''}`}
                     >
-                      <AlertIcon type={alert.type} />
+                      <AlertIcon type={alert.type || 'info'} />
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm ${!alert.isRead ? 'font-medium text-gray-900' : 'text-gray-700'}`}>{alert.message}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{timeAgo(alert.createdAt)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{timeAgo(alert.createdAt || '')}</p>
                       </div>
                       {!alert.isRead && <span className="w-2 h-2 bg-green-600 rounded-full mt-1.5 shrink-0" />}
                     </button>

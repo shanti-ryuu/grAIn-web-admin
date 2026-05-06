@@ -1,10 +1,10 @@
-import { NextRequest } from 'next/server'
 import Command from '@/lib/models/Command'
 import type { ICommand } from '@/lib/models/Command'
 import { successResponse } from '@/lib/utils/response'
 import { withAuth } from '@/lib/utils/handler'
 
 export const GET = withAuth(async (request, user) => {
+  void user
   const url = new URL(request.url)
   const limit = parseInt(url.searchParams.get('limit') || '20')
   const deviceId = url.searchParams.get('deviceId')

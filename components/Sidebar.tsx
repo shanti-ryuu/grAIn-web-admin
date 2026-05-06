@@ -39,8 +39,8 @@ export default function Sidebar() {
     localStorage.setItem('sidebar-collapsed', String(next))
   }
 
-  const unreadAlerts = (alerts || []).filter((a: any) => !a.isRead).length
-  const onlineDevices = (devices || []).filter((d: any) => d.status === 'online').length
+  const unreadAlerts = (alerts || []).filter((a: { isRead?: boolean }) => !a.isRead).length
+  const onlineDevices = (devices || []).filter((d: { status?: string }) => d.status === 'online').length
 
   const badges: Record<string, number> = {
     Alerts: unreadAlerts,
@@ -105,7 +105,10 @@ export default function Sidebar() {
         {!collapsed && (
           <div className="flex items-center gap-3 mb-3">
             {user?.profileImage ? (
-              <img src={user.profileImage} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={user.profileImage} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
+              </>
             ) : (
               <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
                 <span className="text-green-800 font-semibold text-sm">{user?.name?.charAt(0) || 'U'}</span>
@@ -118,7 +121,10 @@ export default function Sidebar() {
           </div>
         )}
         {collapsed && user?.profileImage && (
-          <img src={user.profileImage} alt="Avatar" className="w-8 h-8 rounded-full object-cover mb-2" />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={user.profileImage} alt="Avatar" className="w-8 h-8 rounded-full object-cover mb-2" />
+          </>
         )}
         <button onClick={handleLogout} title="Logout" className={`w-full flex items-center gap-3 ${collapsed ? 'justify-center px-2' : 'px-3'} py-2.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors`}>
           <LogOut className="w-5 h-5 shrink-0" />

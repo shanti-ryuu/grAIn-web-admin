@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import Device from '@/lib/models/Device'
 import User from '@/lib/models/User'
 import { successResponse, paginatedResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
@@ -37,6 +36,7 @@ export const GET = withAuth(async (request, user) => {
 })
 
 export const POST = withAuth(async (request, user) => {
+  void user
   const body = await request.json()
   const { deviceId, assignedUser, location } = body
 

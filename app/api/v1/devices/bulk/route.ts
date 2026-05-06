@@ -6,6 +6,7 @@ import { withAuth } from '@/lib/utils/handler'
 import { IDevice } from '@/lib/models/Device'
 
 export const DELETE = withAuth(async (request, user) => {
+  void user
   const { ids } = await request.json()
 
   if (!ids || !Array.isArray(ids) || ids.length === 0) {

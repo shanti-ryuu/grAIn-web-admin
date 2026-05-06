@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import User from '@/lib/models/User'
 import Device from '@/lib/models/Device'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'

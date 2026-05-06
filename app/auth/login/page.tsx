@@ -50,8 +50,9 @@ export default function LoginPage() {
       await login.mutateAsync({ email, password })
       toast({ title: 'Welcome back!', description: 'You have been logged in successfully.' })
       router.push('/dashboard')
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || 'Invalid email or password. Please try again.'
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } }
+      const msg = axiosErr?.response?.data?.error || 'Invalid email or password. Please try again.'
       setFormError(msg)
       toast({ title: 'Login Failed', description: msg, variant: 'destructive' })
     }

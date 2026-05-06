@@ -81,18 +81,19 @@ export function getQueryParams(
 /**
  * Validate login request body
  */
-export function validateLoginRequest(body: any): ValidationResult {
+export function validateLoginRequest(body: unknown): ValidationResult {
+  const b = body as Record<string, unknown>
   const errors: Record<string, string> = {}
 
-  if (!body.email || typeof body.email !== 'string') {
+  if (!b.email || typeof b.email !== 'string') {
     errors.email = 'Email is required'
-  } else if (!isValidEmail(body.email)) {
+  } else if (!isValidEmail(b.email)) {
     errors.email = 'Invalid email format'
   }
 
-  if (!body.password || typeof body.password !== 'string') {
+  if (!b.password || typeof b.password !== 'string') {
     errors.password = 'Password is required'
-  } else if (body.password.length < 6) {
+  } else if ((b.password as string).length < 6) {
     errors.password = 'Password must be at least 6 characters'
   }
 
@@ -105,60 +106,61 @@ export function validateLoginRequest(body: any): ValidationResult {
 /**
  * Validate sensor data request body
  */
-export function validateSensorDataRequest(body: any): ValidationResult {
+export function validateSensorDataRequest(body: unknown): ValidationResult {
+  const b = body as Record<string, unknown>
   const errors: Record<string, string> = {}
 
-  if (!body.deviceId || typeof body.deviceId !== 'string') {
+  if (!b.deviceId || typeof b.deviceId !== 'string') {
     errors.deviceId = 'Device ID is required'
-  } else if (!isValidDeviceId(body.deviceId)) {
+  } else if (!isValidDeviceId(b.deviceId)) {
     errors.deviceId = 'Invalid device ID format'
   }
 
-  if (body.temperature === undefined || body.temperature === null) {
+  if (b.temperature === undefined || b.temperature === null) {
     errors.temperature = 'Temperature is required'
-  } else if (!isValidTemperature(body.temperature)) {
+  } else if (!isValidTemperature(b.temperature as number)) {
     errors.temperature = 'Temperature out of valid range (-50°C to 150°C)'
   }
 
-  if (body.humidity === undefined || body.humidity === null) {
+  if (b.humidity === undefined || b.humidity === null) {
     errors.humidity = 'Humidity is required'
-  } else if (!isValidHumidity(body.humidity)) {
+  } else if (!isValidHumidity(b.humidity as number)) {
     errors.humidity = 'Humidity must be between 0 and 100'
   }
 
-  if (body.moisture === undefined || body.moisture === null) {
+  if (b.moisture === undefined || b.moisture === null) {
     errors.moisture = 'Moisture is required'
-  } else if (!isValidMoisture(body.moisture)) {
+  } else if (!isValidMoisture(b.moisture as number)) {
     errors.moisture = 'Moisture out of valid range'
   }
 
   // fanSpeed, energy, status, solarVoltage, weight are optional with validation
-  if (body.fanSpeed !== undefined && body.fanSpeed !== null) {
-    if (typeof body.fanSpeed !== 'number' || body.fanSpeed < 0 || body.fanSpeed > 100) {
+  if (b.fanSpeed !== undefined && b.fanSpeed !== null) {
+    if (typeof b.fanSpeed !== 'number' || (b.fanSpeed as number) < 0 || (b.fanSpeed as number) > 100) {
       errors.fanSpeed = 'Fan speed must be between 0 and 100'
     }
   }
 
-  if (body.energy !== undefined && body.energy !== null) {
-    if (typeof body.energy !== 'number' || body.energy < 0) {
+  if (b.energy !== undefined && b.energy !== null) {
+    if (typeof b.energy !== 'number' || (b.energy as number) < 0) {
       errors.energy = 'Energy must be a positive number'
     }
   }
 
-  if (body.status !== undefined && body.status !== null) {
-    if (typeof body.status !== 'string' || !['running', 'idle', 'paused', 'error'].includes(body.status)) {
+  if (b.status !== undefined && b.status !== null) {
+    if (typeof b.status !== 'string' || !['running', 'idle', 'paused', 'error'].includes(b.status as string)) {
       errors.status = 'Status must be one of: running, idle, paused, error'
     }
   }
 
-  if (body.solarVoltage !== undefined && body.solarVoltage !== null) {
-    if (typeof body.solarVoltage !== 'number' || body.solarVoltage < 0) {
+  if (b.solarVoltage !== undefined && b.solarVoltage !== null) {
+    if (typeof b.solarVoltage !== 'number' || (b.solarVoltage as number) < 0) {
       errors.solarVoltage = 'Solar voltage must be a positive number'
     }
   }
 
-  if (body.weight !== undefined && body.weight !== null) {
-    if (typeof body.weight !== 'number' || body.weight < 0) {
+  if (b.weight !== undefined && b.weight !== null) {
+    if (typeof b.weight !== 'number' || (b.weight as number) < 0) {
       errors.weight = 'Weight must be a positive number'
     }
   }
@@ -172,16 +174,17 @@ export function validateSensorDataRequest(body: any): ValidationResult {
 /**
  * Validate device registration request
  */
-export function validateDeviceRequest(body: any): ValidationResult {
+export function validateDeviceRequest(body: unknown): ValidationResult {
+  const b = body as Record<string, unknown>
   const errors: Record<string, string> = {}
 
-  if (!body.deviceId || typeof body.deviceId !== 'string') {
+  if (!b.deviceId || typeof b.deviceId !== 'string') {
     errors.deviceId = 'Device ID is required'
-  } else if (!isValidDeviceId(body.deviceId)) {
+  } else if (!isValidDeviceId(b.deviceId)) {
     errors.deviceId = 'Invalid device ID format'
   }
 
-  if (body.location && typeof body.location !== 'string') {
+  if (b.location && typeof b.location !== 'string') {
     errors.location = 'Location must be a string'
   }
 

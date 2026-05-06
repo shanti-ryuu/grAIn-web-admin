@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
 import User from '@/lib/models/User'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
@@ -7,6 +6,7 @@ import { BCRYPT_ROUNDS } from '@/lib/enums'
 import { sanitizeString } from '@/lib/utils/validation'
 
 export const GET = withAuth(async (request, user) => {
+  void user
   const { searchParams } = request.nextUrl
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
   const limit = Math.min(100, parseInt(searchParams.get('limit') ?? '10'))
@@ -32,6 +32,7 @@ export const GET = withAuth(async (request, user) => {
 }, { role: 'admin' })
 
 export const POST = withAuth(async (request, user) => {
+  void user
   const { name, email, password, role } = await request.json()
 
   // Sanitize user-input string fields (NOT email, password)

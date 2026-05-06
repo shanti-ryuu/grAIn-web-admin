@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Cpu, Activity, AlertTriangle, Users } from 'lucide-react'
 import MetricCard from '@/components/MetricCard'
 import Card from '@/components/Card'
@@ -19,27 +19,32 @@ export default function DashboardPage() {
   const { data: alerts } = useAlerts()
   const { data: usersData } = useUsers(1, 1)
 
-  const [liveData, setLiveData] = useState<Record<string, any>>({})
+  const [liveData, setLiveData] = useState<Record<string, Record<string, number>>>({})
   const [isLive, setIsLive] = useState(false)
+
+  // Stable device IDs — only re-subscribe when actual IDs change, not array reference
+  const deviceIds = useMemo(
+    () => (devices || []).map((d: { deviceId: string }) => d.deviceId),
+    [devices]
+  )
 
   // Real-time Firebase listener for all devices
   useEffect(() => {
-    if (!devices || devices.length === 0 || typeof window === 'undefined') return
+    if (deviceIds.length === 0 || typeof window === 'undefined') return
 
-    let app: any
+    let app: ReturnType<typeof getFirebaseApp>
     try { app = getFirebaseApp() } catch { return }
-    if (!app) return
 
     const unsubscribes: (() => void)[] = []
 
     import('firebase/database').then(({ getDatabase, ref, onValue }) => {
       const db = getDatabase(app)
-      devices.forEach((d: any) => {
-        const sensorRef = ref(db, `grain/devices/${d.deviceId}/sensors`)
-        const unsub = onValue(sensorRef, (snapshot: any) => {
+      deviceIds.forEach((deviceId) => {
+        const sensorRef = ref(db, `grain/devices/${deviceId}/sensors`)
+        const unsub = onValue(sensorRef, (snapshot: { val: () => Record<string, number> | null }) => {
           const data = snapshot.val()
           if (data) {
-            setLiveData(prev => ({ ...prev, [d.deviceId]: data }))
+            setLiveData(prev => ({ ...prev, [deviceId]: data }))
             setIsLive(true)
           }
         })
@@ -48,12 +53,27 @@ export default function DashboardPage() {
     })
 
     return () => { unsubscribes.forEach(u => u()) }
-  }, [devices])
+  }, [deviceIds])
 
   const totalDevices = devices?.length || 0
-  const onlineDevices = devices?.filter((d: any) => d.status === 'online').length || 0
-  const unreadAlerts = (alerts || []).filter((a: any) => !a.isRead).length
-  const totalUsers = (usersData as any)?.total || 0
+  const onlineDevices = useMemo(
+    () => devices?.filter((d: { status: string }) => d.status === 'online').length || 0,
+    [devices]
+  )
+  const unreadAlerts = useMemo(
+    () => (alerts || []).filter((a: { isRead: boolean }) => !a.isRead).length,
+    [alerts]
+  )
+  const totalUsers = (usersData as { total?: number })?.total || 0
+
+  const moistureTrend = useMemo(
+    () => (analyticsData?.moistureTrend || []).map((item: { time: string; value: number }) => ({ time: item.time, moisture: item.value })),
+    [analyticsData?.moistureTrend]
+  )
+  const energyData = useMemo(
+    () => (analyticsData?.energyConsumption || []).map((item: { day: string; value: number }) => ({ time: item.day, energy: item.value })),
+    [analyticsData?.energyConsumption]
+  )
 
   if (devicesLoading || analyticsLoading) {
     return (
@@ -96,9 +116,6 @@ export default function DashboardPage() {
     )
   }
 
-  const moistureTrend = (analyticsData?.moistureTrend || []).map((item: any) => ({ time: item.time, moisture: item.value }))
-  const energyData = (analyticsData?.energyConsumption || []).map((item: any) => ({ time: item.day, energy: item.value }))
-
   return (
     <div className="space-y-8">
       {/* Live indicator + header */}
@@ -125,16 +142,16 @@ export default function DashboardPage() {
       {/* Live Device Cards */}
       {Object.keys(liveData).length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {Object.entries(liveData).map(([deviceId, sensors]: [string, any]) => (
+          {Object.entries(liveData).map(([deviceId, sensors]: [string, Record<string, number | string>]) => (
             <Card key={deviceId} className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-semibold text-gray-900">{deviceId}</p>
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div><span className="text-gray-500">Temp:</span> <span className="font-medium text-gray-900">{sensors.temperature?.toFixed(1) ?? '--'}°C</span></div>
-                <div><span className="text-gray-500">Moisture:</span> <span className="font-medium text-gray-900">{sensors.moisture?.toFixed(1) ?? '--'}%</span></div>
-                <div><span className="text-gray-500">Humidity:</span> <span className="font-medium text-gray-900">{sensors.humidity?.toFixed(1) ?? '--'}%</span></div>
+                <div><span className="text-gray-500">Temp:</span> <span className="font-medium text-gray-900">{(sensors.temperature as number | undefined)?.toFixed(1) ?? '--'}°C</span></div>
+                <div><span className="text-gray-500">Moisture:</span> <span className="font-medium text-gray-900">{(sensors.moisture as number | undefined)?.toFixed(1) ?? '--'}%</span></div>
+                <div><span className="text-gray-500">Humidity:</span> <span className="font-medium text-gray-900">{(sensors.humidity as number | undefined)?.toFixed(1) ?? '--'}%</span></div>
                 <div><span className="text-gray-500">Status:</span> <span className="font-medium text-green-700">{sensors.status ?? '--'}</span></div>
               </div>
             </Card>

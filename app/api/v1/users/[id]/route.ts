@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import bcrypt from 'bcryptjs'
 import User from '@/lib/models/User'
 import Device from '@/lib/models/Device'

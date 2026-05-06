@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import SensorData from '@/lib/models/SensorData'
 import Prediction from '@/lib/models/Prediction'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
@@ -37,7 +36,7 @@ async function calculateConfidence(deviceId: string): Promise<number> {
 
     if (recentReadings.length < 2) return 65
 
-    const moistures = recentReadings.map((r: any) => r.moisture)
+    const moistures = recentReadings.map((r: { moisture?: number }) => r.moisture ?? 0)
     const mean = moistures.reduce((a: number, b: number) => a + b, 0) / moistures.length
     const variance = moistures.reduce((sum: number, v: number) => sum + Math.pow(v - mean, 2), 0) / moistures.length
 
@@ -51,6 +50,7 @@ async function calculateConfidence(deviceId: string): Promise<number> {
 }
 
 export const POST = withAuth(async (request, user) => {
+  void user
   const body = await request.json()
   const { deviceId, temperature, humidity, moisture, fanSpeed, timeElapsed, solarVoltage } = body
 

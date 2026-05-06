@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import Alert from '@/lib/models/Alert'
 import Command from '@/lib/models/Command'
 import { successResponse, paginatedResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
@@ -6,6 +5,7 @@ import { withAuth } from '@/lib/utils/handler'
 import { getQueryParams, sanitizeObject, sanitizeString } from '@/lib/utils/validation'
 
 export const GET = withAuth(async (request, user) => {
+  void user
   const { page, limit, skip } = getQueryParams(request)
   const url = new URL(request.url)
   const deviceId = url.searchParams.get('deviceId')
@@ -37,8 +37,8 @@ export const GET = withAuth(async (request, user) => {
     severity: 8,
     isRead: false,
     source: 'command',
-    createdAt: cmd.createdAt.toISOString(),
-    updatedAt: cmd.updatedAt.toISOString(),
+    createdAt: cmd.createdAt?.toISOString?.() ?? '',
+    updatedAt: cmd.updatedAt?.toISOString?.() ?? '',
   }))
 
   const allAlerts = [
@@ -50,8 +50,8 @@ export const GET = withAuth(async (request, user) => {
       severity: a.severity,
       isRead: a.isRead,
       source: 'alert',
-      createdAt: a.createdAt.toISOString(),
-      updatedAt: a.updatedAt.toISOString(),
+      createdAt: a.createdAt?.toISOString?.() ?? '',
+      updatedAt: a.updatedAt?.toISOString?.() ?? '',
     })),
     ...commandAlerts,
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -62,6 +62,7 @@ export const GET = withAuth(async (request, user) => {
 })
 
 export const POST = withAuth(async (request, user) => {
+  void user
   const body = sanitizeObject(await request.json())
   const { deviceId, type, message, severity } = body
 

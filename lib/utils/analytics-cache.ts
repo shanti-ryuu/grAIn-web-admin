@@ -7,6 +7,7 @@ const CACHE_TTL_S = 300 // same, in seconds for Redis EX
 let redis: Redis | null = null
 function getRedis(): Redis | null {
   if (redis) return redis
+  if (process.env.UPSTASH_REDIS_DISABLED === 'true') return null
   const url = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
   if (!url || !token) return null
@@ -48,7 +49,7 @@ export async function getAnalyticsCacheEntry(key: string): Promise<unknown | und
     const raw = await r.get(`analytics:${key}`)
     return raw ?? undefined
   } catch (err) {
-    console.warn('[analytics-cache] Redis GET failed, falling back to memory:', err)
+    console.warn('[analytics-cache] Redis GET failed, falling back to memory:', (err as Error).message)
     return getMemory(key)
   }
 }
@@ -60,7 +61,7 @@ export async function setAnalyticsCacheEntry(key: string, data: unknown): Promis
   try {
     await r.set(`analytics:${key}`, JSON.stringify(data), { ex: CACHE_TTL_S })
   } catch (err) {
-    console.warn('[analytics-cache] Redis SET failed, falling back to memory:', err)
+    console.warn('[analytics-cache] Redis SET failed, falling back to memory:', (err as Error).message)
     setMemory(key, data)
   }
 }
@@ -80,6 +81,6 @@ export async function invalidateAnalyticsCache(deviceId: string): Promise<void> 
   try {
     await r.del(...keys)
   } catch (err) {
-    console.warn('[analytics-cache] Redis DEL failed:', err)
+    console.warn('[analytics-cache] Redis DEL failed:', (err as Error).message)
   }
 }

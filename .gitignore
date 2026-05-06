@@ -1,11 +1,10 @@
+# Dependencies & build artifacts
 node_modules/
 .next/
 out/
 build/
 dist/
-.env
-.env.local
-.env.*.local
+
 *.log
 .DS_Store
 .idea/
@@ -16,5 +15,32 @@ dist/
 .turbo/
 tsconfig.tsbuildinfo
 *.tsbuildinfo
-.env.local.example
-.env.example
+
+# Environment files — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env*.local
+.env*.example
+
+# Certificates & keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Firebase & service account keys
+serviceAccountKey.json
+firebase-adminsdk*.json
+*adminsdk*.json
+
+# Secrets directories
+secrets/
+.secret*
+.secrets/
+
+# Bruno collections (may contain tokens)
+scripts/bruno/environments/*.bru

@@ -3,7 +3,7 @@ import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response
 import { withAuth } from '@/lib/utils/handler'
 import { sanitizeString } from '@/lib/utils/validation'
 
-export const GET = withAuth(async (request, user) => {
+export const GET = withAuth(async (_request, user) => {
   const dbUser = await User.findById(user.userId).select('-password')
   if (!dbUser) {
     return errorResponse('User not found', ErrorCodes.USER_NOT_FOUND, 404)

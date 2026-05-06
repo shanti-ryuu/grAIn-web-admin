@@ -39,10 +39,10 @@ type AuthenticatedHandler = (
 export function withAuth(
   handler: AuthenticatedHandler,
   options: HandlerOptions = {}
-): (request: NextRequest, ctx?: { params: Promise<Record<string, string>> }) => Promise<NextResponse> {
+): (request: NextRequest, ctx: { params: Promise<Record<string, string>> }) => Promise<NextResponse> {
   const { role = 'any', dbConnect: shouldConnect = true } = options
 
-  return async (request: NextRequest, ctx?: { params: Promise<Record<string, string>> }) => {
+  return async (request: NextRequest, ctx: { params: Promise<Record<string, string>> }) => {
     try {
       // 1. Connect to MongoDB
       if (shouldConnect) await dbConnect()
@@ -61,7 +61,7 @@ export function withAuth(
       }
 
       // 4. Run the handler
-      return await handler(request, user, { params: ctx?.params ?? Promise.resolve({}) })
+      return await handler(request, user, { params: ctx.params })
 
     } catch (error) {
       console.error('[withAuth] Unhandled error:', error)

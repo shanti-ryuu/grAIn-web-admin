@@ -63,7 +63,7 @@ export const PATCH = withAuth(async (request, authUser, { params }) => {
   })
 })
 
-export const DELETE = withAuth(async (request, authUser, { params }) => {
+export const DELETE = withAuth(async (_request, authUser, { params }) => {
   const { id } = await params
 
   if (authUser.userId === id) {

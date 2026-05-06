@@ -268,7 +268,7 @@ export default function DeviceDetailPage() {
             <Brain className="w-5 h-5 text-purple-600" /> AI Prediction History
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {predictions.slice(0, 10).map((p: { id: string; createdAt: string; isDryingComplete?: boolean; output?: { recommendation?: string } }) => (
+            {predictions.slice(0, 10).map((p: { id: string; createdAt: string; isDryingComplete?: boolean; output?: { recommendation?: string; confidence?: number; estimatedMinutesToTarget?: number; predictedMoisture30min?: number; efficiencyScore?: number } }) => (
               <Card key={p.id} className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-gray-500">{new Date(p.createdAt).toLocaleString()}</p>

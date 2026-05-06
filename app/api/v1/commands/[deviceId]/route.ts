@@ -5,7 +5,7 @@ import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response
 import { isValidDeviceId } from '@/lib/utils/validation'
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ deviceId: string }> }
 ) {
   try {

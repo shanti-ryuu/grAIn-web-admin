@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ZodSchema } from 'zod'
 import { errorResponse, ErrorCodes } from '@/lib/utils/response'
 
 const MAX_BODY_SIZE = 10 * 1024 // 10 KB
+
+type ValidationIssue = { path: Array<string | number>; message: string }
+
+type SchemaLike<T> = {
+  safeParse: (
+    data: unknown
+  ) =>
+    | { success: true; data: T }
+    | { success: false; error: { issues: ValidationIssue[] } }
+}
 
 
 function sanitizeString(value: string): string {
@@ -36,7 +45,7 @@ export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
 
 export async function validateRequest<T>(
   request: NextRequest,
-  schema: ZodSchema<T>,
+  schema: SchemaLike<T>,
   options: { requireJson?: boolean; maxBodySize?: number } = {}
 ): Promise<{ success: true; data: T; response?: never } | { success: false; data?: never; response: NextResponse }> {
   const { requireJson = true, maxBodySize = MAX_BODY_SIZE } = options
@@ -94,7 +103,12 @@ export async function validateRequest<T>(
   // 5. Zod validation — return generic message, log details server-side
   const result = schema.safeParse(parsed)
   if (!result.success) {
-    console.warn('[validateRequest] Validation failed:', result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '))
+    console.warn(
+      '[validateRequest] Validation failed:',
+      result.error.issues
+        .map((i: ValidationIssue) => `${i.path.join('.')}: ${i.message}`)
+        .join('; ')
+    )
     return {
       success: false,
       response: errorResponse('Invalid input', ErrorCodes.VALIDATION_ERROR, 400),

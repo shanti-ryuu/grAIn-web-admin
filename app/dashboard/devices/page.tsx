@@ -24,6 +24,31 @@ interface DeviceRow {
   moisture: string
 }
 
+interface AssignedUser {
+  name?: string
+  id?: string
+  _id?: string
+  email?: string
+}
+
+interface DeviceApiItem {
+  id: string
+  deviceId: string
+  location?: string
+  assignedUser?: AssignedUser | string
+  status: string
+  lastActive: string
+}
+
+interface FarmerItem {
+  id: string
+  _id?: string
+  name: string
+  email: string
+  role: string
+  status: string
+}
+
 function timeAgo(dateStr: string): string {
   if (!dateStr) return 'Never'
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -67,14 +92,14 @@ export default function DevicesPage() {
   const updateDevice = useUpdateDevice()
   const bulkDeleteDevices = useBulkDeleteDevices()
 
-  const farmers = ((allUsers as any)?.users || []).filter((u: any) => u.role === 'farmer' && u.status === 'active')
+  const farmers = ((allUsers as { users: FarmerItem[] } | undefined)?.users || []).filter((u) => u.role === 'farmer' && u.status === 'active')
 
-  const allTableData: DeviceRow[] = (devices || []).map((d: any) => ({
+  const allTableData: DeviceRow[] = (devices as DeviceApiItem[] || []).map((d) => ({
     id: d.id,
     deviceId: d.deviceId,
     location: d.location || '—',
-    assignedUser: d.assignedUser?.name || 'Unassigned',
-    assignedUserId: d.assignedUser?.id || d.assignedUser?._id || d.assignedUser || '',
+    assignedUser: typeof d.assignedUser === 'object' ? d.assignedUser?.name || 'Unassigned' : 'Unassigned',
+    assignedUserId: typeof d.assignedUser === 'object' ? d.assignedUser?.id || d.assignedUser?._id || '' : d.assignedUser || '',
     status: d.status,
     lastActive: d.lastActive,
     moisture: '—',
@@ -103,15 +128,16 @@ export default function DevicesPage() {
         await updateDevice.mutateAsync({ id: device.id, location: editLocationValue })
         toast({ title: 'Location Updated', description: `Location updated for ${device.deviceId}` })
       } else if (type === 'reassign_user') {
-        const newFarmer = farmers.find((f: any) => f.id === reassignUserId)
+        const newFarmer = farmers.find((f) => f.id === reassignUserId)
         await updateDevice.mutateAsync({ id: device.id, assignedUser: reassignUserId })
         toast({ title: 'Device Reassigned', description: `Device ${device.deviceId} reassigned to ${newFarmer?.name || 'new user'}` })
       } else if (type === 'delete') {
         await deleteDevice.mutateAsync(device.id)
       }
       queryClient.invalidateQueries({ queryKey: ['devices'] })
-    } catch (err: any) {
-      toast({ title: 'Action Failed', description: err?.response?.data?.error || err?.response?.data?.message || 'Failed', variant: 'error' })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      toast({ title: 'Action Failed', description: message, variant: 'destructive' })
     }
     setPendingDeviceAction(null)
     setEditLocationValue('')
@@ -335,7 +361,7 @@ export default function DevicesPage() {
                 <select value={registerForm.assignedUser} onChange={(e) => setRegisterForm({ ...registerForm, assignedUser: e.target.value })}
                   required className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
                   <option value="">Select a farmer...</option>
-                  {farmers.map((f: any) => (<option key={f._id?.toString() || f.id} value={f._id?.toString() || f.id}>{f.name} ({f.email})</option>))}
+                  {farmers.map((f) => (<option key={f._id?.toString() || f.id} value={f._id?.toString() || f.id}>{f.name} ({f.email})</option>))}
                 </select>
               </div>
               <div className="flex gap-3 pt-4">
@@ -389,7 +415,7 @@ export default function DevicesPage() {
                 <select value={reassignUserId} onChange={(e) => setReassignUserId(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
                   <option value="">Select a farmer...</option>
-                  {farmers.map((f: any) => (<option key={f._id?.toString() || f.id} value={f._id?.toString() || f.id}>{f.name} ({f.email})</option>))}
+                  {farmers.map((f) => (<option key={f._id?.toString() || f.id} value={f._id?.toString() || f.id}>{f.name} ({f.email})</option>))}
                 </select>
               </div>
               <div className="flex gap-3 pt-4">
@@ -426,8 +452,9 @@ export default function DevicesPage() {
               await bulkDeleteDevices.mutateAsync(selectedDeviceRows)
               setSelectedDeviceRows([])
               queryClient.invalidateQueries({ queryKey: ['devices'] })
-            } catch (err: any) {
-              toast({ title: 'Bulk Delete Failed', description: err?.response?.data?.error || err?.message || 'Failed', variant: 'error' })
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err)
+              toast({ title: 'Bulk Delete Failed', description: message, variant: 'destructive' })
             }
             setPendingDeviceAction(null)
           }}

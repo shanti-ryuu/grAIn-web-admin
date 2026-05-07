@@ -30,24 +30,22 @@ export default function DeviceDetailPage() {
   const [fanSpeed, setFanSpeed] = useState(75)
 
   // Real-time sensor data from Firebase
-  const [liveSensors, setLiveSensors] = useState<any>(null)
+  const [liveSensors, setLiveSensors] = useState<Record<string, number | string> | null>(null)
 
   useEffect(() => {
     if (!device?.deviceId || typeof window === 'undefined') return
 
-    let app: any
+    let app: ReturnType<typeof getFirebaseApp>
     try {
       app = getFirebaseApp()
     } catch { return }
-    if (!app) return
 
-    let db: any
     let unsubscribe: (() => void) | null = null
 
     import('firebase/database').then(({ getDatabase, ref, onValue }) => {
-      db = getDatabase(app)
+      const db = getDatabase(app)
       const sensorRef = ref(db, `grain/devices/${device.deviceId}/sensors`)
-      unsubscribe = onValue(sensorRef, (snapshot: any) => {
+      unsubscribe = onValue(sensorRef, (snapshot: { val: () => Record<string, number | string> | null }) => {
         const data = snapshot.val()
         if (data) setLiveSensors(data)
       })
@@ -116,7 +114,7 @@ export default function DeviceDetailPage() {
     )
   }
 
-  const chartData = (sensorData || []).map((d: any) => ({
+  const chartData = (sensorData || []).map((d: { timestamp: string; temperature?: number; moisture?: number; humidity?: number }) => ({
     time: new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     temperature: d.temperature,
     moisture: d.moisture,
@@ -270,7 +268,7 @@ export default function DeviceDetailPage() {
             <Brain className="w-5 h-5 text-purple-600" /> AI Prediction History
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {predictions.slice(0, 10).map((p: any) => (
+            {predictions.slice(0, 10).map((p: { id: string; createdAt: string; isDryingComplete?: boolean; output?: { recommendation?: string; confidence?: number; estimatedMinutesToTarget?: number; predictedMoisture30min?: number; efficiencyScore?: number } }) => (
               <Card key={p.id} className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-gray-500">{new Date(p.createdAt).toLocaleString()}</p>

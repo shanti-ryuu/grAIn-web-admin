@@ -73,16 +73,17 @@ export default function SettingsPage() {
       toast({ title: 'Password Changed', description: 'Your password has been updated successfully' })
       setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
       setPwErrors({})
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to change password. Please try again.'
-      toast({ title: 'Change Failed', description: msg, variant: 'error' })
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
+      const msg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to change password. Please try again.'
+      toast({ title: 'Change Failed', description: msg, variant: 'destructive' })
       if (msg.toLowerCase().includes('incorrect') || msg.toLowerCase().includes('wrong') || msg.toLowerCase().includes('current')) {
         setPwErrors(prev => ({ ...prev, currentPassword: msg }))
       }
     }
   }
 
-  const onlineDevices = (devices || []).filter((d: any) => d.status === 'online')
+  const onlineDevices = (devices || []).filter((d: { status?: string }) => d.status === 'online')
 
   return (
     <div className="space-y-8">
@@ -241,7 +242,7 @@ export default function SettingsPage() {
           <p className="text-sm text-gray-500">No devices currently online.</p>
         ) : (
           <div className="space-y-3">
-            {onlineDevices.map((d: any) => (
+            {onlineDevices.map((d: { deviceId?: string; location?: string; assignedUser?: { name?: string } }) => (
               <div key={d.deviceId} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-2.5 h-2.5 bg-green-500 rounded-full" />

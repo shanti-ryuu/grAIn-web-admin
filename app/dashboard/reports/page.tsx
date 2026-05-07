@@ -23,14 +23,14 @@ export default function ReportsPage() {
 
   const totalCycles = analytics?.totalCycles || 0
   const avgMoisture = analytics?.moistureTrend?.length
-    ? (analytics.moistureTrend.reduce((s: number, r: any) => s + r.value, 0) / analytics.moistureTrend.length).toFixed(1)
+    ? (analytics.moistureTrend.reduce((s: number, r: { value?: number }) => s + (r.value ?? 0), 0) / analytics.moistureTrend.length).toFixed(1)
     : '--'
-  const totalEnergy = analytics?.energyConsumption?.reduce((s: number, r: any) => s + r.value, 0).toFixed(1) || '--'
-  const activeDevices = (devices || []).filter((d: any) => d.status === 'online').length
+  const totalEnergy = analytics?.energyConsumption?.reduce((s: number, r: { value?: number }) => s + (r.value ?? 0), 0).toFixed(1) || '--'
+  const activeDevices = (devices || []).filter((d: { status?: string }) => d.status === 'online').length
 
-  const filteredCommands = (commands || []).filter((cmd: any) => {
+  const filteredCommands = (commands || []).filter((cmd: { createdAt?: string }) => {
     if (!dateFrom && !dateTo) return true
-    const cmdDate = new Date(cmd.createdAt)
+    const cmdDate = cmd.createdAt ? new Date(cmd.createdAt) : new Date(0)
     if (dateFrom && cmdDate < new Date(dateFrom)) return false
     if (dateTo && cmdDate > new Date(dateTo + 'T23:59:59')) return false
     return true
@@ -39,7 +39,7 @@ export default function ReportsPage() {
   const handleExportCSV = () => {
     if (filteredCommands.length === 0) return
     const rows = ['DeviceID,Command,Mode,Status,Temperature,FanSpeed,Timestamp']
-    filteredCommands.forEach((cmd: any) => {
+    filteredCommands.forEach((cmd: { deviceId?: string; command?: string; mode?: string; status?: string; temperature?: number; fanSpeed?: number; createdAt?: string }) => {
       rows.push(`${cmd.deviceId},${cmd.command},${cmd.mode},${cmd.status},${cmd.temperature ?? ''},${cmd.fanSpeed ?? ''},${cmd.createdAt}`)
     })
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
@@ -130,7 +130,10 @@ export default function ReportsPage() {
           <p className="text-sm text-gray-500">No commands recorded for the selected period.</p>
         </Card>
       ) : (
-        <Table columns={commandColumns} data={filteredCommands} title="Recent Activity" />
+        <>
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          <Table columns={commandColumns as any} data={filteredCommands} title="Recent Activity" />
+        </>
       )}
     </div>
   )

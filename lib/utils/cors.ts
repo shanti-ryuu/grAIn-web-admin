@@ -17,8 +17,7 @@ export function getAllowedOrigins(): string[] {
   }
 
   return [
-    'https://grain-web-admin.onrender.com',
-    process.env.NEXT_PUBLIC_ADMIN_URL || '',
+    process.env.NEXT_PUBLIC_ADMIN_URL || 'https://grain-web-admin.onrender.com',
     process.env.NEXT_PUBLIC_APP_URL || '',
   ].filter(Boolean)
 }

@@ -40,13 +40,12 @@ export default function AlertsPage() {
     }
   }
 
-  const allAlerts = alerts || []
-
   const filteredAlerts = useMemo(() => {
+    const allAlerts = alerts || []
     if (activeTab === 'all') return allAlerts
-    if (activeTab === 'unread') return allAlerts.filter((a: any) => !a.isRead)
-    return allAlerts.filter((a: any) => a.type === activeTab)
-  }, [allAlerts, activeTab])
+    if (activeTab === 'unread') return allAlerts.filter((a: { isRead?: boolean }) => !a.isRead)
+    return allAlerts.filter((a: { type?: string }) => a.type === activeTab)
+  }, [alerts, activeTab])
 
   const severityConfig: Record<string, { badge: string; dot: string }> = {
     critical: { badge: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' },
@@ -76,7 +75,7 @@ export default function AlertsPage() {
     <div className="space-y-8">
       <div className="flex items-start justify-between">
         <div><h1 className="text-3xl font-bold text-gray-900 mb-2">Alert Log</h1><p className="text-base text-gray-500">View all system alerts and notifications.</p></div>
-        {allAlerts.length > 0 && (
+        {(alerts || []).length > 0 && (
           <button onClick={handleClearAll} disabled={clearAll.isPending}
             className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-red-600 rounded-lg font-medium hover:bg-red-50 disabled:opacity-50 transition-colors">
             <Trash2 className="w-4 h-4" /> Clear All
@@ -106,7 +105,7 @@ export default function AlertsPage() {
       ) : (
         <Card className="p-6">
           <div className="space-y-3">
-            {filteredAlerts.map((alert: any) => {
+            {filteredAlerts.map((alert: { id: string; isRead?: boolean; type: string; message?: string; createdAt?: string; deviceId?: string }) => {
               const config = severityConfig[alert.type] || severityConfig.info
               return (
                 <div key={alert.id} className={`flex items-start gap-4 p-4 border rounded-lg transition-colors ${alert.isRead ? 'border-gray-100 bg-gray-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>

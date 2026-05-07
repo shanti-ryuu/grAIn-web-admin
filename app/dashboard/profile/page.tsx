@@ -8,6 +8,8 @@ import { useAuthStore } from '@/lib/auth-store'
 import { useUserProfile, useUpdateProfile, useUpdateAvatar } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 
+type ProfileData = { name?: string; bio?: string; phoneNumber?: string; location?: string; profileImage?: string }
+
 export default function ProfilePage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -19,7 +21,7 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Form state initialized from profile API
-  const profile = (profileData as any) || {}
+  const profile = (profileData as ProfileData | undefined) || {}
   const [form, setForm] = useState({
     name: profile.name || user?.name || '',
     bio: profile.bio || '',
@@ -31,12 +33,12 @@ export default function ProfilePage() {
   // Sync form when profile data loads
   useEffect(() => {
     if (profileData) {
-      const p = profileData as any
+      const p = profileData as ProfileData
       setForm({
-        name: p.name || '',
-        bio: p.bio || '',
-        phoneNumber: p.phoneNumber || '',
-        location: p.location || '',
+        name: p?.name || '',
+        bio: p?.bio || '',
+        phoneNumber: p?.phoneNumber || '',
+        location: p?.location || '',
       })
     }
   }, [profileData])
@@ -53,8 +55,9 @@ export default function ProfilePage() {
       updateStoreUser({ name: form.name })
       toast({ title: 'Profile Updated', description: 'Your profile has been updated successfully' })
       setIsDirty(false)
-    } catch (err: any) {
-      toast({ title: 'Update Failed', description: err?.response?.data?.error || err?.response?.data?.message || 'Failed to update profile', variant: 'error' })
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
+      toast({ title: 'Update Failed', description: axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to update profile', variant: 'destructive' })
     }
   }
 
@@ -88,11 +91,11 @@ export default function ProfilePage() {
 
   const handleRemovePhoto = async () => {
     try {
-      await updateProfile.mutateAsync({ profileImage: null } as any)
+      await updateProfile.mutateAsync({ profileImage: null } as Record<string, null>)
       updateStoreUser({ profileImage: null })
       toast({ title: 'Photo Removed', description: 'Profile photo has been removed' })
-    } catch (err: any) {
-      toast({ title: 'Failed', description: 'Could not remove photo', variant: 'error' })
+    } catch {
+      toast({ title: 'Failed', description: 'Could not remove photo', variant: 'destructive' })
     }
   }
 
@@ -122,7 +125,10 @@ export default function ProfilePage() {
         <Card className="p-8 flex flex-col items-center">
           <div className="relative mb-4">
             {currentAvatar ? (
-              <img src={currentAvatar} alt="Profile" className="w-[120px] h-[120px] rounded-full object-cover border-4 border-gray-100" />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={currentAvatar} alt="Profile" className="w-[120px] h-[120px] rounded-full object-cover border-4 border-gray-100" />
+              </>
             ) : (
               <div className="w-[120px] h-[120px] rounded-full bg-green-800 flex items-center justify-center text-white text-4xl font-bold border-4 border-gray-100">
                 {user?.name?.charAt(0).toUpperCase() || 'A'}

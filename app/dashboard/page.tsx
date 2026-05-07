@@ -1,11 +1,12 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
-import { Cpu, Activity, AlertTriangle, Users } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Cpu, Activity, AlertTriangle, Users, Wheat, ArrowRight } from 'lucide-react'
 import MetricCard from '@/components/MetricCard'
 import Card from '@/components/Card'
-import { useDevices, useAnalyticsOverview, useAlerts, useUsers } from '@/hooks/useApi'
+import { useDevices, useAnalyticsOverview, useAlerts, useUsers, useDryingSessions } from '@/hooks/useApi'
+import { useEventStream } from '@/hooks/useEventStream'
 import ErrorState from '@/components/ErrorState'
 import { getFirebaseApp } from '@/lib/firebase'
 import {
@@ -19,27 +20,55 @@ export default function DashboardPage() {
   const { data: alerts } = useAlerts()
   const { data: usersData } = useUsers(1, 1)
 
-  const [liveData, setLiveData] = useState<Record<string, any>>({})
+  const [liveData, setLiveData] = useState<Record<string, Record<string, number>>>({})
   const [isLive, setIsLive] = useState(false)
+
+  const { data: sessionsData } = useDryingSessions({ status: 'active' })
+  const activeSessions = (sessionsData as any)?.data || sessionsData || []
+  const { subscribe, isConnected } = useEventStream()
+
+  // SSE real-time sensor updates
+  useEffect(() => {
+    const unsub = subscribe('sensor_update', (data) => {
+      const deviceId = data.deviceId as string
+      setLiveData(prev => ({
+        ...prev,
+        [deviceId]: {
+          temperature: data.temperature as number,
+          humidity: data.humidity as number,
+          moisture: data.moisture as number,
+          fanSpeed: data.fanSpeed as number,
+          status: data.status as unknown as number,
+        },
+      }))
+      setIsLive(true)
+    })
+    return unsub
+  }, [subscribe])
+
+  // Stable device IDs — only re-subscribe when actual IDs change, not array reference
+  const deviceIds = useMemo(
+    () => (devices || []).map((d: { deviceId: string }) => d.deviceId),
+    [devices]
+  )
 
   // Real-time Firebase listener for all devices
   useEffect(() => {
-    if (!devices || devices.length === 0 || typeof window === 'undefined') return
+    if (deviceIds.length === 0 || typeof window === 'undefined') return
 
-    let app: any
+    let app: ReturnType<typeof getFirebaseApp>
     try { app = getFirebaseApp() } catch { return }
-    if (!app) return
 
     const unsubscribes: (() => void)[] = []
 
     import('firebase/database').then(({ getDatabase, ref, onValue }) => {
       const db = getDatabase(app)
-      devices.forEach((d: any) => {
-        const sensorRef = ref(db, `grain/devices/${d.deviceId}/sensors`)
-        const unsub = onValue(sensorRef, (snapshot: any) => {
+      deviceIds.forEach((deviceId) => {
+        const sensorRef = ref(db, `grain/devices/${deviceId}/sensors`)
+        const unsub = onValue(sensorRef, (snapshot: { val: () => Record<string, number> | null }) => {
           const data = snapshot.val()
           if (data) {
-            setLiveData(prev => ({ ...prev, [d.deviceId]: data }))
+            setLiveData(prev => ({ ...prev, [deviceId]: data }))
             setIsLive(true)
           }
         })
@@ -48,12 +77,27 @@ export default function DashboardPage() {
     })
 
     return () => { unsubscribes.forEach(u => u()) }
-  }, [devices])
+  }, [deviceIds])
 
   const totalDevices = devices?.length || 0
-  const onlineDevices = devices?.filter((d: any) => d.status === 'online').length || 0
-  const unreadAlerts = (alerts || []).filter((a: any) => !a.isRead).length
-  const totalUsers = (usersData as any)?.total || 0
+  const onlineDevices = useMemo(
+    () => devices?.filter((d: { status: string }) => d.status === 'online').length || 0,
+    [devices]
+  )
+  const unreadAlerts = useMemo(
+    () => (alerts || []).filter((a: { isRead: boolean }) => !a.isRead).length,
+    [alerts]
+  )
+  const totalUsers = (usersData as { total?: number })?.total || 0
+
+  const moistureTrend = useMemo(
+    () => (analyticsData?.moistureTrend || []).map((item: { time: string; value: number }) => ({ time: item.time, moisture: item.value })),
+    [analyticsData?.moistureTrend]
+  )
+  const energyData = useMemo(
+    () => (analyticsData?.energyConsumption || []).map((item: { day: string; value: number }) => ({ time: item.day, energy: item.value })),
+    [analyticsData?.energyConsumption]
+  )
 
   if (devicesLoading || analyticsLoading) {
     return (
@@ -96,9 +140,6 @@ export default function DashboardPage() {
     )
   }
 
-  const moistureTrend = (analyticsData?.moistureTrend || []).map((item: any) => ({ time: item.time, moisture: item.value }))
-  const energyData = (analyticsData?.energyConsumption || []).map((item: any) => ({ time: item.day, energy: item.value }))
-
   return (
     <div className="space-y-8">
       {/* Live indicator + header */}
@@ -107,7 +148,7 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-1">Dashboard</h1>
           <p className="text-base text-gray-500">Welcome to the grAIn Admin Dashboard.</p>
         </div>
-        {isLive && (
+        {(isLive || isConnected) && (
           <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-semibold">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> LIVE
           </span>
@@ -125,20 +166,58 @@ export default function DashboardPage() {
       {/* Live Device Cards */}
       {Object.keys(liveData).length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {Object.entries(liveData).map(([deviceId, sensors]: [string, any]) => (
+          {Object.entries(liveData).map(([deviceId, sensors]: [string, Record<string, number | string>]) => (
             <Card key={deviceId} className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-semibold text-gray-900">{deviceId}</p>
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div><span className="text-gray-500">Temp:</span> <span className="font-medium text-gray-900">{sensors.temperature?.toFixed(1) ?? '--'}°C</span></div>
-                <div><span className="text-gray-500">Moisture:</span> <span className="font-medium text-gray-900">{sensors.moisture?.toFixed(1) ?? '--'}%</span></div>
-                <div><span className="text-gray-500">Humidity:</span> <span className="font-medium text-gray-900">{sensors.humidity?.toFixed(1) ?? '--'}%</span></div>
+                <div><span className="text-gray-500">Temp:</span> <span className="font-medium text-gray-900">{(sensors.temperature as number | undefined)?.toFixed(1) ?? '--'}°C</span></div>
+                <div><span className="text-gray-500">Moisture:</span> <span className="font-medium text-gray-900">{(sensors.moisture as number | undefined)?.toFixed(1) ?? '--'}%</span></div>
+                <div><span className="text-gray-500">Humidity:</span> <span className="font-medium text-gray-900">{(sensors.humidity as number | undefined)?.toFixed(1) ?? '--'}%</span></div>
                 <div><span className="text-gray-500">Status:</span> <span className="font-medium text-green-700">{sensors.status ?? '--'}</span></div>
               </div>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Active Drying Sessions */}
+      {Array.isArray(activeSessions) && activeSessions.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Wheat className="w-5 h-5 text-green-700" /> Active Sessions
+            </h2>
+            <button onClick={() => router.push('/dashboard/sessions')} className="text-sm text-green-800 hover:text-green-700 font-medium inline-flex items-center gap-1">
+              View all <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(activeSessions as any[]).slice(0, 3).map((session: any) => {
+              const progress = session.startMoisture > session.targetMoisture
+                ? Math.min(100, Math.round(((session.startMoisture - session.currentMoisture) / (session.startMoisture - session.targetMoisture)) * 100))
+                : 0
+              return (
+                <Card key={session._id} className="p-4 border-l-4 border-l-green-500">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-sm text-gray-900">{session.deviceId}</span>
+                    <span className="text-xs text-green-700 font-medium bg-green-50 px-2 py-0.5 rounded-full">{session.grainType}</span>
+                  </div>
+                  <div className="mb-2">
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>{session.currentMoisture?.toFixed(1)}% → {session.targetMoisture}%</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
         </div>
       )}
 

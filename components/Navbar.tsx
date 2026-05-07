@@ -1,9 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bell, AlertTriangle, XCircle, Info, BellOff, User, Settings, LogOut, ChevronRight } from 'lucide-react'
+import { Bell, AlertTriangle, XCircle, Info, BellOff, User, Settings, LogOut, ChevronRight, Droplets, Cpu, Wheat } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth-store'
-import { useAlerts, useMarkAlertRead, useClearAllAlerts } from '@/hooks/useApi'
+import { useAlerts, useMarkAlertRead, useClearAllAlerts, useNotifications, useMarkNotificationsRead } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/useToast'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -12,6 +13,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 const pageNames: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/dashboard/devices': 'Devices',
+  '/dashboard/sessions': 'Drying Sessions',
   '/dashboard/analytics': 'Analytics',
   '/dashboard/reports': 'Reports',
   '/dashboard/users': 'Users',
@@ -38,6 +40,16 @@ function AlertIcon({ type }: { type: string }) {
   return <Info className="w-4 h-4 text-blue-500 shrink-0" />
 }
 
+function NotifIcon({ type }: { type: string }) {
+  if (type === 'drying_complete') return <Droplets className="w-4 h-4 text-green-500 shrink-0" />
+  if (type === 'session_started') return <Wheat className="w-4 h-4 text-green-600 shrink-0" />
+  if (type === 'session_aborted') return <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+  if (type === 'device_offline') return <Cpu className="w-4 h-4 text-gray-500 shrink-0" />
+  if (type === 'alert_critical') return <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+  if (type === 'alert_warning') return <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+  return <Bell className="w-4 h-4 text-blue-500 shrink-0" />
+}
+
 export default function Topbar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -46,22 +58,38 @@ export default function Topbar() {
   const { toast } = useToast()
   const pageTitle = pageNames[pathname] || 'Dashboard'
 
-  // FIX 5: Notification bell data
+  const [notifTab, setNotifTab] = useState<'alerts' | 'notifications'>('alerts')
+
+  // Alerts
   const { data: alertsData } = useAlerts()
   const markAlertRead = useMarkAlertRead()
   const clearAllAlerts = useClearAllAlerts()
 
-  type AlertItem = { id: string; deviceId?: string; type?: string; message?: string; createdAt?: string; isRead?: boolean }
+  // Push Notifications
+  const { data: notificationsData } = useNotifications()
+  const markNotificationsRead = useMarkNotificationsRead()
+
+  type AlertItem = { id: string; _id?: string; deviceId?: string; type?: string; message?: string; createdAt?: string; isRead?: boolean }
   const alerts = (alertsData as { data?: AlertItem[] } | undefined)?.data || (alertsData as AlertItem[] | undefined) || []
-  const unreadCount = alerts.filter((a) => !a.isRead).length
+  const unreadAlertCount = alerts.filter((a) => !a.isRead).length
+
+  type NotifItem = { _id: string; type: string; title: string; body: string; deviceId?: string; isRead: boolean; createdAt: string }
+  const notifications: NotifItem[] = (notificationsData as any)?.data || (notificationsData as NotifItem[] | undefined) || []
+  const unreadNotifCount = notifications.filter(n => !n.isRead).length
+
+  const unreadCount = unreadAlertCount + unreadNotifCount
   const badgeText = unreadCount > 9 ? '9+' : String(unreadCount)
 
   const handleMarkAllRead = async () => {
     try {
-      await clearAllAlerts.mutateAsync()
-      queryClient.invalidateQueries({ queryKey: ['alerts'] })
+      if (notifTab === 'alerts') {
+        await clearAllAlerts.mutateAsync()
+        queryClient.invalidateQueries({ queryKey: ['alerts'] })
+      } else {
+        await markNotificationsRead.mutateAsync({ markAll: true })
+      }
     } catch {
-      toast({ title: 'Failed', description: 'Failed to mark notifications as read', variant: 'destructive' })
+      toast({ title: 'Failed', description: 'Failed to mark as read', variant: 'destructive' })
     }
   }
 
@@ -71,6 +99,13 @@ export default function Topbar() {
       queryClient.invalidateQueries({ queryKey: ['alerts'] })
       if (deviceId) router.push(`/dashboard/devices/${deviceId}`)
     } catch {}
+  }
+
+  const handleNotifClick = async (notif: NotifItem) => {
+    if (!notif.isRead) {
+      await markNotificationsRead.mutateAsync({ ids: [notif._id] })
+    }
+    if (notif.deviceId) router.push(`/dashboard/devices/${notif.deviceId}`)
   }
 
   const handleLogout = () => {
@@ -98,39 +133,78 @@ export default function Topbar() {
               )}
             </button>
           </PopoverTrigger>
-          <PopoverContent align="end" className="w-[380px] p-0">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+          <PopoverContent align="end" className="w-[400px] p-0">
+            {/* Tabs */}
+            <div className="flex items-center border-b border-gray-100">
+              <button
+                onClick={() => setNotifTab('alerts')}
+                className={`flex-1 px-4 py-3 text-xs font-semibold transition-colors ${notifTab === 'alerts' ? 'text-green-800 border-b-2 border-green-800' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Alerts {unreadAlertCount > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px]">{unreadAlertCount}</span>}
+              </button>
+              <button
+                onClick={() => setNotifTab('notifications')}
+                className={`flex-1 px-4 py-3 text-xs font-semibold transition-colors ${notifTab === 'notifications' ? 'text-green-800 border-b-2 border-green-800' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Notifications {unreadNotifCount > 0 && <span className="ml-1.5 px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px]">{unreadNotifCount}</span>}
+              </button>
               {unreadCount > 0 && (
-                <button onClick={handleMarkAllRead} disabled={clearAllAlerts.isPending}
-                  className="text-xs text-green-800 hover:text-green-700 font-medium disabled:opacity-50">
-                  Mark all as read
+                <button onClick={handleMarkAllRead} className="px-3 text-[10px] text-green-800 hover:text-green-700 font-medium">
+                  Read all
                 </button>
               )}
             </div>
+
             <div className="max-h-[400px] overflow-y-auto">
-              {alerts.length === 0 ? (
-                <div className="py-12 text-center">
-                  <BellOff className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No notifications yet</p>
-                </div>
+              {notifTab === 'alerts' ? (
+                alerts.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <BellOff className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No alerts</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {alerts.slice(0, 20).map((alert) => (
+                      <button
+                        key={alert.id || alert._id}
+                        onClick={() => handleMarkSingleRead(alert.id || alert._id!, alert.deviceId)}
+                        className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${!alert.isRead ? 'bg-green-50/40 border-l-2 border-l-green-600' : ''}`}
+                      >
+                        <AlertIcon type={alert.type || 'info'} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm ${!alert.isRead ? 'font-medium text-gray-900' : 'text-gray-700'}`}>{alert.message}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{timeAgo(alert.createdAt || '')}</p>
+                        </div>
+                        {!alert.isRead && <span className="w-2 h-2 bg-green-600 rounded-full mt-1.5 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )
               ) : (
-                <div className="divide-y divide-gray-50">
-                  {alerts.slice(0, 20).map((alert) => (
-                    <button
-                      key={alert.id}
-                      onClick={() => handleMarkSingleRead(alert.id, alert.deviceId)}
-                      className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${!alert.isRead ? 'bg-green-50/40 border-l-2 border-l-green-600' : ''}`}
-                    >
-                      <AlertIcon type={alert.type || 'info'} />
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm ${!alert.isRead ? 'font-medium text-gray-900' : 'text-gray-700'}`}>{alert.message}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{timeAgo(alert.createdAt || '')}</p>
-                      </div>
-                      {!alert.isRead && <span className="w-2 h-2 bg-green-600 rounded-full mt-1.5 shrink-0" />}
-                    </button>
-                  ))}
-                </div>
+                notifications.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <BellOff className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">No notifications</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-50">
+                    {notifications.slice(0, 20).map((notif) => (
+                      <button
+                        key={notif._id}
+                        onClick={() => handleNotifClick(notif)}
+                        className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors ${!notif.isRead ? 'bg-green-50/40 border-l-2 border-l-green-600' : ''}`}
+                      >
+                        <NotifIcon type={notif.type} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm ${!notif.isRead ? 'font-medium text-gray-900' : 'text-gray-700'}`}>{notif.title}</p>
+                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notif.body}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{timeAgo(notif.createdAt)}</p>
+                        </div>
+                        {!notif.isRead && <span className="w-2 h-2 bg-green-600 rounded-full mt-1.5 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )
               )}
             </div>
           </PopoverContent>

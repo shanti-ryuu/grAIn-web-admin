@@ -8,6 +8,9 @@ import { validateSensorDataRequest, sanitizeString } from '@/lib/utils/validatio
 import { syncSensorToFirebase } from '@/lib/utils/firebase-sync'
 import { invalidateAnalyticsCache } from '@/lib/utils/analytics-cache'
 import Alert from '@/lib/models/Alert'
+import DryingSession from '@/lib/models/DryingSession'
+import { eventBroadcaster } from '@/lib/utils/event-stream'
+import { sendNotificationToDeviceOwner } from '@/lib/utils/notifications'
 
 async function checkAndCreateAlerts(deviceId: string, data: { temperature: number; humidity: number; moisture: number }): Promise<void> {
   const alerts: { deviceId: string; type: 'critical' | 'warning' | 'info'; message: string; severity: number }[] = []
@@ -36,6 +39,60 @@ async function checkAndCreateAlerts(deviceId: string, data: { temperature: numbe
 
   if (alerts.length > 0) {
     await Alert.insertMany(alerts)
+  }
+}
+
+async function updateDryingSession(deviceId: string, data: { moisture: number; temperature: number; humidity: number; fanSpeed: number; energy: number }): Promise<void> {
+  const session = await DryingSession.findOne({ deviceId, status: 'active' })
+  if (!session) return
+
+  session.dataPoints += 1
+  session.currentMoisture = data.moisture
+  session.totalEnergyUsed += data.energy
+  session.avgTemperature = ((session.avgTemperature * (session.dataPoints - 1)) + data.temperature) / session.dataPoints
+  session.avgHumidity = ((session.avgHumidity * (session.dataPoints - 1)) + data.humidity) / session.dataPoints
+  session.avgFanSpeed = ((session.avgFanSpeed * (session.dataPoints - 1)) + data.fanSpeed) / session.dataPoints
+  await session.save()
+
+  // Auto-complete if target moisture reached
+  if (data.moisture <= session.targetMoisture && session.dataPoints >= 3) {
+    const now = new Date()
+    const duration = Math.round((now.getTime() - session.startedAt.getTime()) / 1000)
+    const moistureDrop = session.startMoisture - data.moisture
+    const efficiency = moistureDrop > 0
+      ? Math.min(100, Math.round((moistureDrop / (session.startMoisture - session.targetMoisture)) * 100))
+      : 0
+
+    session.status = 'completed'
+    session.completedAt = now
+    session.duration = duration
+    session.finalMoisture = data.moisture
+    session.efficiency = efficiency
+    await session.save()
+
+    eventBroadcaster.broadcast('session_complete', {
+      deviceId,
+      sessionId: session._id.toString(),
+      finalMoisture: data.moisture,
+      duration,
+      efficiency,
+    })
+
+    await sendNotificationToDeviceOwner(
+      deviceId,
+      'drying_complete',
+      'Drying Complete!',
+      `Target moisture reached (${data.moisture}%). Duration: ${Math.round(duration / 60)} min. Efficiency: ${efficiency}%`,
+      { sessionId: session._id.toString() }
+    )
+  } else {
+    eventBroadcaster.broadcast('session_update', {
+      deviceId,
+      sessionId: session._id.toString(),
+      currentMoisture: data.moisture,
+      targetMoisture: session.targetMoisture,
+      dataPoints: session.dataPoints,
+    })
   }
 }
 
@@ -117,6 +174,31 @@ export async function POST(request: NextRequest) {
     if (firebaseFailed) {
       console.error('[Firebase Sync Failed] Sensor data Firebase sync failed:', firebaseResult.reason)
     }
+
+    // Broadcast real-time event via SSE
+    eventBroadcaster.broadcast('sensor_update', {
+      deviceId,
+      temperature: Number(temperature),
+      humidity: Number(humidity),
+      moisture: Number(moisture),
+      fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
+      energy: energy !== undefined ? Number(energy) : 0,
+      status: status || 'idle',
+      solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
+      weight: weight !== undefined ? Number(weight) : 0,
+      timestamp: new Date().toISOString(),
+    })
+
+    // Update active drying session for this device
+    setImmediate(() => {
+      void updateDryingSession(deviceId, {
+        moisture: Number(moisture),
+        temperature: Number(temperature),
+        humidity: Number(humidity),
+        fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
+        energy: energy !== undefined ? Number(energy) : 0,
+      }).catch((err: unknown) => console.error('[Session Update]', err))
+    })
 
     setImmediate(() => {
       void checkAndCreateAlerts(deviceId, {

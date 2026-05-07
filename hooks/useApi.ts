@@ -526,3 +526,106 @@ export const useChangePassword = () => {
     },
   })
 }
+
+// Drying Sessions
+export const useDryingSessions = (params?: { status?: string; deviceId?: string; page?: number; limit?: number }) => {
+  const queryParams = new URLSearchParams()
+  if (params?.status) queryParams.set('status', params.status)
+  if (params?.deviceId) queryParams.set('deviceId', params.deviceId)
+  if (params?.page) queryParams.set('page', String(params.page))
+  if (params?.limit) queryParams.set('limit', String(params.limit))
+
+  return useQuery({
+    queryKey: ['sessions', params],
+    queryFn: async () => {
+      const { data: responseData } = await api.get<ApiResponse<any>>(`/sessions?${queryParams}`)
+      return unwrapResponse(responseData)
+    },
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+  })
+}
+
+export const useDryingSession = (id: string) => {
+  return useQuery({
+    queryKey: ['session', id],
+    queryFn: async () => {
+      const { data: responseData } = await api.get<ApiResponse<any>>(`/sessions/${id}`)
+      return unwrapResponse(responseData)
+    },
+    enabled: !!id,
+  })
+}
+
+export const useStartDryingSession = () => {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: async (payload: { deviceId: string; grainType?: string; targetMoisture?: number }) => {
+      const { data: responseData } = await api.post<ApiResponse<any>>('/sessions', payload)
+      return unwrapResponse(responseData)
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      toast({ title: 'Session Started', description: `Drying session started for ${data.deviceId}` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Start Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export const useEndDryingSession = () => {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: 'complete' | 'abort' }) => {
+      const { data: responseData } = await api.patch<ApiResponse<any>>(`/sessions/${id}`, { action })
+      return unwrapResponse(responseData)
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      const msg = variables.action === 'complete' ? 'Session completed' : 'Session aborted'
+      toast({ title: msg, description: 'Drying session has been updated' })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Action Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
+// Notifications
+export const useNotifications = (unreadOnly = false) => {
+  return useQuery({
+    queryKey: ['notifications', unreadOnly],
+    queryFn: async () => {
+      const params = unreadOnly ? '?unread=true' : ''
+      const { data: responseData } = await api.get<ApiResponse<any>>(`/notifications${params}`)
+      return unwrapResponse(responseData)
+    },
+    staleTime: 10_000,
+    refetchInterval: 15_000,
+  })
+}
+
+export const useMarkNotificationsRead = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { ids?: string[]; markAll?: boolean }) => {
+      const { data: responseData } = await api.patch<ApiResponse<any>>('/notifications', payload)
+      return unwrapResponse(responseData)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    },
+  })
+}
+
+export const useRegisterFCMToken = () => {
+  return useMutation({
+    mutationFn: async (payload: { token: string; platform?: string }) => {
+      const { data: responseData } = await api.post<ApiResponse<any>>('/notifications/fcm-token', payload)
+      return unwrapResponse(responseData)
+    },
+  })
+}

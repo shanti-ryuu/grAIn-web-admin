@@ -2,10 +2,11 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useMemo } from 'react'
-import { Cpu, Activity, AlertTriangle, Users } from 'lucide-react'
+import { Cpu, Activity, AlertTriangle, Users, Wheat, ArrowRight } from 'lucide-react'
 import MetricCard from '@/components/MetricCard'
 import Card from '@/components/Card'
-import { useDevices, useAnalyticsOverview, useAlerts, useUsers } from '@/hooks/useApi'
+import { useDevices, useAnalyticsOverview, useAlerts, useUsers, useDryingSessions } from '@/hooks/useApi'
+import { useEventStream } from '@/hooks/useEventStream'
 import ErrorState from '@/components/ErrorState'
 import { getFirebaseApp } from '@/lib/firebase'
 import {
@@ -21,6 +22,29 @@ export default function DashboardPage() {
 
   const [liveData, setLiveData] = useState<Record<string, Record<string, number>>>({})
   const [isLive, setIsLive] = useState(false)
+
+  const { data: sessionsData } = useDryingSessions({ status: 'active' })
+  const activeSessions = (sessionsData as any)?.data || sessionsData || []
+  const { subscribe, isConnected } = useEventStream()
+
+  // SSE real-time sensor updates
+  useEffect(() => {
+    const unsub = subscribe('sensor_update', (data) => {
+      const deviceId = data.deviceId as string
+      setLiveData(prev => ({
+        ...prev,
+        [deviceId]: {
+          temperature: data.temperature as number,
+          humidity: data.humidity as number,
+          moisture: data.moisture as number,
+          fanSpeed: data.fanSpeed as number,
+          status: data.status as unknown as number,
+        },
+      }))
+      setIsLive(true)
+    })
+    return unsub
+  }, [subscribe])
 
   // Stable device IDs — only re-subscribe when actual IDs change, not array reference
   const deviceIds = useMemo(
@@ -124,7 +148,7 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-1">Dashboard</h1>
           <p className="text-base text-gray-500">Welcome to the grAIn Admin Dashboard.</p>
         </div>
-        {isLive && (
+        {(isLive || isConnected) && (
           <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 rounded-full text-xs font-semibold">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> LIVE
           </span>
@@ -156,6 +180,44 @@ export default function DashboardPage() {
               </div>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Active Drying Sessions */}
+      {Array.isArray(activeSessions) && activeSessions.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Wheat className="w-5 h-5 text-green-700" /> Active Sessions
+            </h2>
+            <button onClick={() => router.push('/dashboard/sessions')} className="text-sm text-green-800 hover:text-green-700 font-medium inline-flex items-center gap-1">
+              View all <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(activeSessions as any[]).slice(0, 3).map((session: any) => {
+              const progress = session.startMoisture > session.targetMoisture
+                ? Math.min(100, Math.round(((session.startMoisture - session.currentMoisture) / (session.startMoisture - session.targetMoisture)) * 100))
+                : 0
+              return (
+                <Card key={session._id} className="p-4 border-l-4 border-l-green-500">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-semibold text-sm text-gray-900">{session.deviceId}</span>
+                    <span className="text-xs text-green-700 font-medium bg-green-50 px-2 py-0.5 rounded-full">{session.grainType}</span>
+                  </div>
+                  <div className="mb-2">
+                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                      <span>{session.currentMoisture?.toFixed(1)}% → {session.targetMoisture}%</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-green-500 to-green-600 rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
+                    </div>
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
         </div>
       )}
 

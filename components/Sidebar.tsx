@@ -2,15 +2,16 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { LayoutDashboard, Cpu, Users, AlertTriangle, BarChart3, FileText, Settings, LogOut, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { LayoutDashboard, Cpu, Users, AlertTriangle, BarChart3, FileText, Settings, LogOut, ChevronsLeft, ChevronsRight, Wheat } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth-store'
 import { useQueryClient } from '@tanstack/react-query'
-import { useAlerts, useDevices } from '@/hooks/useApi'
+import { useAlerts, useDevices, useDryingSessions } from '@/hooks/useApi'
 import Image from 'next/image'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Devices', href: '/dashboard/devices', icon: Cpu },
+  { name: 'Sessions', href: '/dashboard/sessions', icon: Wheat },
   { name: 'Users', href: '/dashboard/users', icon: Users },
   { name: 'Alerts', href: '/dashboard/alerts', icon: AlertTriangle },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
@@ -25,6 +26,7 @@ export default function Sidebar() {
   const queryClient = useQueryClient()
   const { data: alerts } = useAlerts()
   const { data: devices } = useDevices()
+  const { data: sessionsData } = useDryingSessions({ status: 'active' })
 
   const [collapsed, setCollapsed] = useState(false)
 
@@ -41,10 +43,13 @@ export default function Sidebar() {
 
   const unreadAlerts = (alerts || []).filter((a: { isRead?: boolean }) => !a.isRead).length
   const onlineDevices = (devices || []).filter((d: { status?: string }) => d.status === 'online').length
+  const activeSessionsList = (sessionsData as any)?.data || sessionsData || []
+  const activeSessionCount = Array.isArray(activeSessionsList) ? activeSessionsList.length : 0
 
   const badges: Record<string, number> = {
     Alerts: unreadAlerts,
     Devices: onlineDevices,
+    Sessions: activeSessionCount,
   }
 
   const handleLogout = () => {

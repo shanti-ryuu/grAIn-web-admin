@@ -56,8 +56,9 @@ export default function SessionsPage() {
     return () => { unsub1(); unsub2() }
   }, [subscribe, refetch])
 
-  const sessions = (sessionsData as any)?.data || sessionsData || []
-  const activeSessions = Array.isArray(sessions) ? sessions.filter((s: any) => s.status === 'active') : []
+  type Session = { _id: string; deviceId: string; grainType: string; status: string; startMoisture: number; currentMoisture: number; targetMoisture: number; avgTemperature?: number; totalEnergyUsed?: number; startedAt: string; duration?: number; efficiency?: number; finalMoisture?: number }
+  const sessions: Session[] = (sessionsData as { data?: Session[] } | undefined)?.data || (sessionsData as Session[]) || []
+  const activeSessions = sessions.filter((s) => s.status === 'active')
 
   const handleStart = async () => {
     if (!newSession.deviceId) return
@@ -115,7 +116,7 @@ export default function SessionsPage() {
         <div>
           <h2 className="text-lg font-semibold text-gray-900 mb-3">Active Sessions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {activeSessions.map((session: any) => {
+            {activeSessions.map((session) => {
               const live = liveSessions[session._id]
               const moisture = live?.currentMoisture ?? session.currentMoisture
               const progress = session.startMoisture > session.targetMoisture
@@ -239,7 +240,7 @@ export default function SessionsPage() {
               </tr>
             </thead>
             <tbody>
-              {sessions.map((session: any) => (
+              {sessions.map((session) => (
                 <tr key={session._id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
                   <td className="py-3 px-4 font-medium text-gray-900">{session.deviceId}</td>
                   <td className="py-3 px-4 text-gray-600 capitalize">{session.grainType}</td>
@@ -299,7 +300,7 @@ export default function SessionsPage() {
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
                 >
                   <option value="">Select a device...</option>
-                  {(devices || []).map((d: any) => (
+                  {(devices as Array<{ deviceId: string; status: string }> || []).map((d) => (
                     <option key={d.deviceId} value={d.deviceId}>{d.deviceId} {d.status === 'online' ? '(Online)' : '(Offline)'}</option>
                   ))}
                 </select>

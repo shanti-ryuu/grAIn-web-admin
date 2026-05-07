@@ -74,7 +74,7 @@ export default function Topbar() {
   const unreadAlertCount = alerts.filter((a) => !a.isRead).length
 
   type NotifItem = { _id: string; type: string; title: string; body: string; deviceId?: string; isRead: boolean; createdAt: string }
-  const notifications: NotifItem[] = (notificationsData as any)?.data || (notificationsData as NotifItem[] | undefined) || []
+  const notifications: NotifItem[] = (notificationsData as { data?: NotifItem[] } | undefined)?.data || (notificationsData as NotifItem[] | undefined) || []
   const unreadNotifCount = notifications.filter(n => !n.isRead).length
 
   const unreadCount = unreadAlertCount + unreadNotifCount

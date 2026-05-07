@@ -24,7 +24,7 @@ export default function DashboardPage() {
   const [isLive, setIsLive] = useState(false)
 
   const { data: sessionsData } = useDryingSessions({ status: 'active' })
-  const activeSessions = (sessionsData as any)?.data || sessionsData || []
+  const activeSessions = (sessionsData as { data?: unknown[] } | undefined)?.data || (sessionsData as unknown[]) || []
   const { subscribe, isConnected } = useEventStream()
 
   // SSE real-time sensor updates
@@ -195,7 +195,7 @@ export default function DashboardPage() {
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(activeSessions as any[]).slice(0, 3).map((session: any) => {
+            {(activeSessions as Array<{ _id: string; deviceId: string; grainType: string; startMoisture: number; currentMoisture: number; targetMoisture: number }>).slice(0, 3).map((session) => {
               const progress = session.startMoisture > session.targetMoisture
                 ? Math.min(100, Math.round(((session.startMoisture - session.currentMoisture) / (session.startMoisture - session.targetMoisture)) * 100))
                 : 0

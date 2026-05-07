@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import { withAuth } from '@/lib/utils/handler'
 import { successResponse, errorResponse, paginatedResponse, ErrorCodes } from '@/lib/utils/response'
 import DryingSession from '@/lib/models/DryingSession'

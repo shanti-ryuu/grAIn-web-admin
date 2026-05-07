@@ -70,17 +70,23 @@ export async function checkRateLimit(
     return checkMemory(key, windowMs, maxRequests)
   }
 
-  const limiter = new Ratelimit({
-    redis: r,
-    limiter: Ratelimit.fixedWindow(maxRequests, `${windowMs / 1000}s`),
-    analytics: false,
-  })
+  try {
+    const limiter = new Ratelimit({
+      redis: r,
+      limiter: Ratelimit.fixedWindow(maxRequests, `${windowMs / 1000}s`),
+      analytics: false,
+    })
 
-  const { success, remaining, reset } = await limiter.limit(key)
-  return {
-    allowed: success,
-    remaining,
-    resetTime: reset,
+    const { success, remaining, reset } = await limiter.limit(key)
+    return {
+      allowed: success,
+      remaining,
+      resetTime: reset,
+    }
+  } catch (err) {
+    console.warn('[rateLimit] Redis rate limit failed, falling back to in-memory:', (err as Error)?.message)
+    redis = null // reset so next request retries Redis init
+    return checkMemory(key, windowMs, maxRequests)
   }
 }
 

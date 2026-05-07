@@ -43,7 +43,7 @@ export default function Sidebar() {
 
   const unreadAlerts = (alerts || []).filter((a: { isRead?: boolean }) => !a.isRead).length
   const onlineDevices = (devices || []).filter((d: { status?: string }) => d.status === 'online').length
-  const activeSessionsList = (sessionsData as any)?.data || sessionsData || []
+  const activeSessionsList = (sessionsData as { data?: unknown[] } | undefined)?.data || (sessionsData as unknown[]) || []
   const activeSessionCount = Array.isArray(activeSessionsList) ? activeSessionsList.length : 0
 
   const badges: Record<string, number> = {

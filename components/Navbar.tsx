@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bell, AlertTriangle, XCircle, Info, BellOff, User, Settings, LogOut, ChevronRight, Droplets, Cpu, Wheat } from 'lucide-react'
+import { Bell, AlertTriangle, XCircle, Info, BellOff, User, Settings, LogOut, ChevronRight, Droplets, Cpu, Wheat, Menu } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth-store'
 import { useAlerts, useMarkAlertRead, useClearAllAlerts, useNotifications, useMarkNotificationsRead } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
@@ -50,7 +50,11 @@ function NotifIcon({ type }: { type: string }) {
   return <Bell className="w-4 h-4 text-blue-500 shrink-0" />
 }
 
-export default function Topbar() {
+interface TopbarProps {
+  onMenuClick?: () => void
+}
+
+export default function Topbar({ onMenuClick }: TopbarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuthStore()
@@ -117,8 +121,18 @@ export default function Topbar() {
   const userInitial = user?.name?.charAt(0).toUpperCase() || 'A'
 
   return (
-    <header className="h-16 glass-header flex items-center justify-between px-8 no-print">
-      <h1 className="text-xl font-semibold text-[#111827]">{pageTitle}</h1>
+    <header className="h-14 lg:h-16 glass-header flex items-center justify-between px-4 lg:px-8 no-print">
+      <div className="flex items-center gap-3">
+        {/* Hamburger — mobile only */}
+        <button
+          onClick={onMenuClick}
+          className="lg:hidden p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+          aria-label="Open menu"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <h1 className="text-lg lg:text-xl font-semibold text-[#111827]">{pageTitle}</h1>
+      </div>
 
       <div className="flex items-center gap-6">
         {/* FIX 5: Notification Bell with Popover */}

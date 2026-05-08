@@ -15,8 +15,8 @@ export const POST = withAuth(async (request) => {
     return errorResponse('messages array required', ErrorCodes.INVALID_INPUT, 400)
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return errorResponse('AI service not configured', ErrorCodes.INTERNAL_ERROR, 503)
+  if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+    return errorResponse('AI service not configured — set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY', ErrorCodes.INTERNAL_ERROR, 503)
   }
 
   const reply = await chatWithAssistant(

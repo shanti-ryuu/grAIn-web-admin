@@ -3,7 +3,7 @@ import Prediction from '@/lib/models/Prediction'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { withAuth } from '@/lib/utils/handler'
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:5000'
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'https://grain-ml-service.onrender.com'
 
 interface MLPrediction {
   predictedMoisture30min: number
@@ -19,20 +19,41 @@ interface MLPrediction {
   modelMetrics?: { moistureR2: number; timeR2: number }
 }
 
+let mlServiceWarm = false
+let lastWarmCheck = 0
+
+function triggerWarmUp() {
+  if (mlServiceWarm) return
+  const now = Date.now()
+  if (now - lastWarmCheck < 60000) return
+  lastWarmCheck = now
+  fetch(`${ML_SERVICE_URL}/health`, { signal: AbortSignal.timeout(60000) })
+    .then(r => { if (r.ok) mlServiceWarm = true })
+    .catch(() => {})
+}
+
 async function callMLService(payload: Record<string, unknown>): Promise<MLPrediction | null> {
   try {
     const response = await fetch(`${ML_SERVICE_URL}/predict`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(mlServiceWarm ? 10000 : 20000),
     })
 
-    if (!response.ok) return null
+    if (!response.ok) {
+      console.warn(`[ML] Service returned ${response.status}`)
+      mlServiceWarm = false
+      return null
+    }
 
+    mlServiceWarm = true
     const data = await response.json()
     return data as MLPrediction
-  } catch {
+  } catch (err) {
+    console.warn('[ML] Prediction failed:', (err as Error)?.message)
+    mlServiceWarm = false
+    triggerWarmUp()
     return null
   }
 }

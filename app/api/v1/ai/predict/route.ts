@@ -10,6 +10,7 @@ interface MLPrediction {
   estimatedMinutesToTarget: number
   recommendation: string
   recommendationType: string
+  action: string
   efficiencyScore: number
   confidence: number
   isDryingComplete: boolean
@@ -163,6 +164,7 @@ export const POST = withAuth(async (request, user) => {
       estimatedMinutesToTarget: mlResult.estimatedMinutesToTarget,
       recommendation: mlResult.recommendation,
       recommendationType: mlResult.recommendationType,
+      action: mlResult.action ?? 'MAINTAIN',
       efficiencyScore: mlResult.efficiencyScore,
       confidence: mlResult.confidence <= 1 ? Math.round(mlResult.confidence * 100) : mlResult.confidence,
       isDryingComplete: mlResult.isDryingComplete,

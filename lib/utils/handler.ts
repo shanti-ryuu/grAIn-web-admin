@@ -64,6 +64,10 @@ export function withAuth(
       return await handler(request, user, { params: ctx.params })
 
     } catch (error) {
+      const code = (error as NodeJS.ErrnoException)?.code
+      if (code === 'ECONNRESET' || code === 'EPIPE' || (error as Error)?.message === 'aborted') {
+        return NextResponse.json(null, { status: 499 })
+      }
       console.error('[withAuth] Unhandled error:', error)
       return errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
     }

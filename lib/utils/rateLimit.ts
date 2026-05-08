@@ -10,13 +10,15 @@ export interface RateLimitOptions {
 
 // ── Upstash Redis client (singleton) ──────────────────────────────────────────
 let redis: Redis | null = null
+let redisDisabled = false
 function getRedis(): Redis | null {
+  if (redisDisabled) return null
   if (redis) return redis
-  if (process.env.UPSTASH_REDIS_DISABLED === 'true') return null
+  if (process.env.UPSTASH_REDIS_DISABLED === 'true') { redisDisabled = true; return null }
   const url = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
   if (!url || !token) {
-    console.warn('[rateLimit] UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN not set — falling back to in-memory')
+    redisDisabled = true
     return null
   }
   redis = new Redis({ url, token })
@@ -84,8 +86,9 @@ export async function checkRateLimit(
       resetTime: reset,
     }
   } catch (err) {
-    console.warn('[rateLimit] Redis rate limit failed, falling back to in-memory:', (err as Error)?.message)
-    redis = null // reset so next request retries Redis init
+    console.warn('[rateLimit] Redis failed, permanently disabling:', (err as Error)?.message)
+    redis = null
+    redisDisabled = true
     return checkMemory(key, windowMs, maxRequests)
   }
 }

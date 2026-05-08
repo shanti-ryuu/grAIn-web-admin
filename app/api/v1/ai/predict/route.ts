@@ -19,41 +19,41 @@ interface MLPrediction {
   modelMetrics?: { moistureR2: number; timeR2: number }
 }
 
-let mlServiceWarm = false
-let lastWarmCheck = 0
-
-function triggerWarmUp() {
-  if (mlServiceWarm) return
-  const now = Date.now()
-  if (now - lastWarmCheck < 60000) return
-  lastWarmCheck = now
-  fetch(`${ML_SERVICE_URL}/health`, { signal: AbortSignal.timeout(60000) })
-    .then(r => { if (r.ok) mlServiceWarm = true })
-    .catch(() => {})
-}
+let mlServiceAvailable = true
+let lastFailureTime = 0
+const COOLDOWN_MS = 60000
 
 async function callMLService(payload: Record<string, unknown>): Promise<MLPrediction | null> {
+  const now = Date.now()
+
+  // If ML service failed recently, skip it entirely (no timeout spam)
+  if (!mlServiceAvailable && now - lastFailureTime < COOLDOWN_MS) {
+    return null
+  }
+
   try {
     const response = await fetch(`${ML_SERVICE_URL}/predict`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(mlServiceWarm ? 10000 : 20000),
+      signal: AbortSignal.timeout(15000),
     })
 
     if (!response.ok) {
-      console.warn(`[ML] Service returned ${response.status}`)
-      mlServiceWarm = false
+      mlServiceAvailable = false
+      lastFailureTime = now
+      console.warn(`[ML] Service returned ${response.status}, cooling down 60s`)
       return null
     }
 
-    mlServiceWarm = true
-    const data = await response.json()
-    return data as MLPrediction
-  } catch (err) {
-    console.warn('[ML] Prediction failed:', (err as Error)?.message)
-    mlServiceWarm = false
-    triggerWarmUp()
+    mlServiceAvailable = true
+    return await response.json() as MLPrediction
+  } catch {
+    if (mlServiceAvailable) {
+      console.warn('[ML] Service unavailable, cooling down 60s')
+    }
+    mlServiceAvailable = false
+    lastFailureTime = now
     return null
   }
 }

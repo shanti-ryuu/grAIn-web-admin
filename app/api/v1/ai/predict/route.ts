@@ -25,7 +25,7 @@ async function callMLService(payload: Record<string, unknown>): Promise<MLPredic
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(30000),
     })
 
     if (!response.ok) return null
@@ -143,7 +143,7 @@ export const POST = withAuth(async (request, user) => {
       recommendation: mlResult.recommendation,
       recommendationType: mlResult.recommendationType,
       efficiencyScore: mlResult.efficiencyScore,
-      confidence: mlResult.confidence,
+      confidence: mlResult.confidence <= 1 ? Math.round(mlResult.confidence * 100) : mlResult.confidence,
       isDryingComplete: mlResult.isDryingComplete,
       projectedCurve,
       targetMoisture: 14,

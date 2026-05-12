@@ -2,12 +2,16 @@ import mongoose, { Document, Schema } from 'mongoose'
 
 export interface ICommand extends Document {
   deviceId: string
-  command: 'START' | 'STOP' | 'FAN_CONTROL'
+  command: 'START' | 'STOP' | 'FAN_CONTROL' | 'RELAY_CONTROL' | 'STEPPER_CONTROL' | 'HEATER_CONTROL'
+  commandStr?: string
   mode: 'AUTO' | 'MANUAL'
   temperature?: number
   fanSpeed?: number
   fanTarget?: 'FAN1' | 'FAN2' | 'ALL'
   fanAction?: 'ON' | 'OFF'
+  relayAction?: 'ON' | 'OFF'
+  stepperAction?: 'START' | 'STOP' | 'CW' | 'CCW'
+  heaterAction?: 'ON' | 'OFF'
   status: 'pending' | 'executed' | 'failed' | 'error'
   executedAt?: Date
   createdAt: Date
@@ -22,8 +26,12 @@ const CommandSchema: Schema = new Schema({
   },
   command: {
     type: String,
-    enum: ['START', 'STOP', 'FAN_CONTROL'],
+    enum: ['START', 'STOP', 'FAN_CONTROL', 'RELAY_CONTROL', 'STEPPER_CONTROL', 'HEATER_CONTROL'],
     required: true,
+  },
+  commandStr: {
+    type: String,
+    trim: true,
   },
   mode: {
     type: String,
@@ -43,6 +51,18 @@ const CommandSchema: Schema = new Schema({
     enum: ['FAN1', 'FAN2', 'ALL'],
   },
   fanAction: {
+    type: String,
+    enum: ['ON', 'OFF'],
+  },
+  relayAction: {
+    type: String,
+    enum: ['ON', 'OFF'],
+  },
+  stepperAction: {
+    type: String,
+    enum: ['START', 'STOP', 'CW', 'CCW'],
+  },
+  heaterAction: {
     type: String,
     enum: ['ON', 'OFF'],
   },

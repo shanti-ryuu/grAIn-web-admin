@@ -50,11 +50,15 @@ export async function pushCommandToFirebase(
   commandId: string,
   command: {
     command: string
+    commandStr?: string
     mode: string
     temperature?: number
     fanSpeed?: number
     fanTarget?: string
     fanAction?: string
+    relayAction?: string
+    stepperAction?: string
+    heaterAction?: string
   }
 ): Promise<void> {
   const db = getRealtimeDb()
@@ -62,11 +66,15 @@ export async function pushCommandToFirebase(
 
   await db.ref(`grain/commands/${deviceId}/pending/${commandId}`).set({
     command: command.command,
+    commandStr: command.commandStr ?? null,
     mode: command.mode,
     temperature: command.temperature ?? null,
     fanSpeed: command.fanSpeed ?? null,
     fanTarget: command.fanTarget ?? null,
     fanAction: command.fanAction ?? null,
+    relayAction: command.relayAction ?? null,
+    stepperAction: command.stepperAction ?? null,
+    heaterAction: command.heaterAction ?? null,
     createdAt: Date.now(),
   })
 
@@ -74,11 +82,15 @@ export async function pushCommandToFirebase(
   await db.ref(`grain/commands/${deviceId}/latest`).set({
     commandId,
     command: command.command,
+    commandStr: command.commandStr ?? null,
     mode: command.mode,
     temperature: command.temperature ?? null,
     fanSpeed: command.fanSpeed ?? null,
     fanTarget: command.fanTarget ?? null,
     fanAction: command.fanAction ?? null,
+    relayAction: command.relayAction ?? null,
+    stepperAction: command.stepperAction ?? null,
+    heaterAction: command.heaterAction ?? null,
     issuedAt: Date.now(),
   })
 }

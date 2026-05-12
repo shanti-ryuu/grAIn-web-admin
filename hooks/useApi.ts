@@ -302,20 +302,80 @@ export function useControlFan() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   return useMutation({
-    mutationFn: ({ deviceId, fan, action }: {
+    mutationFn: ({ deviceId, fanTarget, fanAction }: {
       deviceId: string;
-      fan: 'FAN1' | 'FAN2' | 'ALL';
-      action: 'ON' | 'OFF';
+      fanTarget: 'FAN1' | 'FAN2' | 'ALL';
+      fanAction: 'ON' | 'OFF';
     }) =>
-      api.post<ApiResponse<any>>(`/dryer/${deviceId}/fan`, { fan, action })
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/fan`, { fanTarget, fanAction })
         .then(r => unwrapResponse(r.data)),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
       queryClient.invalidateQueries({ queryKey: ['commands'] })
-      toast({ title: 'Fan Control', description: `${variables.fan} turned ${variables.action.toLowerCase()}` })
+      toast({ title: 'Fan Control', description: `${variables.fanTarget} turned ${variables.fanAction.toLowerCase()}` })
     },
     onError: (error: any) => {
       toast({ title: 'Fan Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export function useControlStepper() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, stepperAction }: {
+      deviceId: string;
+      stepperAction: 'START' | 'STOP' | 'CW' | 'CCW';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/stepper`, { stepperAction })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Stepper Control', description: `Stepper ${variables.stepperAction.toLowerCase()} command sent` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Stepper Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export function useControlRelay() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, relayAction }: {
+      deviceId: string;
+      relayAction: 'ON' | 'OFF';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/relay`, { relayAction })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Auger / Conveyor', description: `Relay turned ${variables.relayAction.toLowerCase()}` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Relay Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export function useControlHeater() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, heaterAction }: {
+      deviceId: string;
+      heaterAction: 'ON' | 'OFF';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/heater`, { heaterAction })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Heater Control', description: `Heater turned ${variables.heaterAction.toLowerCase()}` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Heater Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
     },
   })
 }

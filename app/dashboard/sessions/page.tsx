@@ -59,6 +59,7 @@ export default function SessionsPage() {
   type Session = { _id: string; deviceId: string; grainType: string; status: string; startMoisture: number; currentMoisture: number; targetMoisture: number; avgTemperature?: number; totalEnergyUsed?: number; startedAt: string; duration?: number; efficiency?: number; finalMoisture?: number }
   const sessions: Session[] = (sessionsData as { data?: Session[] } | undefined)?.data || (sessionsData as Session[]) || []
   const activeSessions = sessions.filter((s) => s.status === 'active')
+  const onlineDevices = (devices as Array<{ deviceId: string; status: string }> | undefined)?.filter(d => d.status === 'online') || []
 
   const handleStart = async () => {
     if (!newSession.deviceId) return
@@ -301,9 +302,12 @@ export default function SessionsPage() {
                 >
                   <option value="">Select a device...</option>
                   {(devices as Array<{ deviceId: string; status: string }> || []).map((d) => (
-                    <option key={d.deviceId} value={d.deviceId}>{d.deviceId} {d.status === 'online' ? '(Online)' : '(Offline)'}</option>
+                    <option key={d.deviceId} value={d.deviceId} disabled={d.status !== 'online'}>{d.deviceId} {d.status === 'online' ? '(Online)' : '(Offline)'}</option>
                   ))}
                 </select>
+                {onlineDevices.length === 0 && (
+                  <p className="mt-2 text-xs text-red-600">No online prototypes available. Power on a device and wait for live sensor data before starting a session.</p>
+                )}
               </div>
 
               <div>
@@ -343,7 +347,7 @@ export default function SessionsPage() {
               </button>
               <button
                 onClick={handleStart}
-                disabled={!newSession.deviceId || startSession.isPending}
+                disabled={!newSession.deviceId || startSession.isPending || onlineDevices.length === 0}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-green-800 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Play className="w-4 h-4" />

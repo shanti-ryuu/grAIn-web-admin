@@ -5,6 +5,7 @@ import Alert from '@/lib/models/Alert'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { withAuth } from '@/lib/utils/handler'
 import { getRealtimeDb } from '@/lib/firebase-admin'
+import { getDeviceLiveness } from '@/lib/utils/device-liveness'
 
 export const GET = withAuth(async (_request, user, { params }) => {
   const { id } = await params
@@ -25,12 +26,15 @@ export const GET = withAuth(async (_request, user, { params }) => {
     return errorResponse('Forbidden', ErrorCodes.FORBIDDEN, 403)
   }
 
+  const liveness = await getDeviceLiveness(device.deviceId, { status: device.status, lastActive: device.lastActive })
+
   return successResponse({
     id: device._id,
     deviceId: device.deviceId,
-    status: device.status,
+    status: liveness.status,
+    isOnline: liveness.isOnline,
     location: device.location,
-    lastActive: device.lastActive?.toISOString?.() || device.lastActive,
+    lastActive: liveness.lastActive?.toISOString?.() || device.lastActive?.toISOString?.() || device.lastActive,
     assignedUser: device.assignedUser,
     createdAt: device.createdAt?.toISOString?.() || device.createdAt,
   })

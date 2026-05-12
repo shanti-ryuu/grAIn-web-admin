@@ -4,6 +4,7 @@ import { successResponse, paginatedResponse, errorResponse, ErrorCodes } from '@
 import { withAuth } from '@/lib/utils/handler'
 import { validateDeviceRequest, sanitizeString } from '@/lib/utils/validation'
 import type { IDevice } from '@/lib/models/Device'
+import { getDeviceLiveness } from '@/lib/utils/device-liveness'
 
 export const GET = withAuth(async (request, user) => {
   const { searchParams } = request.nextUrl
@@ -22,14 +23,18 @@ export const GET = withAuth(async (request, user) => {
     Device.countDocuments(filter),
   ])
 
-  const formattedDevices = devices.map((d: IDevice) => ({
-    id: d._id,
-    deviceId: d.deviceId,
-    status: d.status,
-    location: d.location,
-    lastActive: d.lastActive?.toISOString?.() || d.lastActive,
-    assignedUser: d.assignedUser,
-    createdAt: d.createdAt?.toISOString?.() || d.createdAt,
+  const formattedDevices = await Promise.all(devices.map(async (d: IDevice) => {
+    const liveness = await getDeviceLiveness(d.deviceId, { status: d.status, lastActive: d.lastActive })
+    return {
+      id: d._id,
+      deviceId: d.deviceId,
+      status: liveness.status,
+      isOnline: liveness.isOnline,
+      location: d.location,
+      lastActive: liveness.lastActive?.toISOString?.() || d.lastActive?.toISOString?.() || d.lastActive,
+      assignedUser: d.assignedUser,
+      createdAt: d.createdAt?.toISOString?.() || d.createdAt,
+    }
   }))
 
   return paginatedResponse(formattedDevices, total, page, limit)

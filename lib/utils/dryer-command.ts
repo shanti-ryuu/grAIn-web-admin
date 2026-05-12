@@ -6,6 +6,7 @@ import { TokenPayload } from '@/lib/utils/auth'
 import { isValidDeviceId } from '@/lib/utils/validation'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { pushCommandToFirebase } from '@/lib/utils/firebase-sync'
+import { getDeviceLiveness } from '@/lib/utils/device-liveness'
 
 interface CommandSpec {
   /** The command string sent to ESP32 (e.g. 'START', 'STOP', 'FAN_CONTROL') */
@@ -66,6 +67,11 @@ export async function createDryerCommand(
   }
   if (user.role !== 'admin' && device.assignedUser?.toString() !== user.userId) {
     return errorResponse('Forbidden: You do not have access to this device', ErrorCodes.FORBIDDEN, 403)
+  }
+
+  const liveness = await getDeviceLiveness(deviceId, { status: device.status, lastActive: device.lastActive })
+  if (!liveness.isOnline) {
+    return errorResponse(`Device ${deviceId} is offline. Power on the prototype and wait for live sensor data before sending commands.`, ErrorCodes.CONFLICT, 409)
   }
 
   // 4. Create command in MongoDB

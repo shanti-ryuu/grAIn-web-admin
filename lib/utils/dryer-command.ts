@@ -5,11 +5,12 @@ import { successResponse, multiStatusResponse, errorResponse, ErrorCodes } from 
 import { TokenPayload } from '@/lib/utils/auth'
 import { isValidDeviceId } from '@/lib/utils/validation'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
-import { pushCommandToFirebase } from '@/lib/utils/firebase-sync'
+import { markCommandExecuted, pushCommandToFirebase } from '@/lib/utils/firebase-sync'
 import { getDeviceLiveness } from '@/lib/utils/device-liveness'
-import { getRealtimeDb } from '@/lib/firebase-admin'
 
-const PENDING_COMMAND_TIMEOUT_MS = 30_000
+const PENDING_COMMAND_TIMEOUT_MS = 20_000
+const POLLED_COMMAND_TIMEOUT_MS = 30_000
+const ACTIVE_COMMAND_STATUSES = ['pending', 'polled', 'executing'] as const
 
 interface CommandSpec {
   /** The command string sent to ESP32 (e.g. 'START', 'STOP', 'FAN_CONTROL') */
@@ -21,42 +22,28 @@ interface CommandSpec {
 }
 
 export async function expireStalePendingCommands(deviceId: string): Promise<number> {
-  const cutoff = new Date(Date.now() - PENDING_COMMAND_TIMEOUT_MS)
+  return expireStaleCommands({ deviceId })
+}
+
+export async function expireStaleCommands(filter: { deviceId?: string } = {}): Promise<number> {
+  const now = Date.now()
+  const pendingCutoff = new Date(now - PENDING_COMMAND_TIMEOUT_MS)
+  const polledCutoff = new Date(now - POLLED_COMMAND_TIMEOUT_MS)
   const staleCommands = await Command.find({
-    deviceId,
-    status: 'pending',
-    createdAt: { $lt: cutoff },
-  }).select('_id').lean()
+    ...(filter.deviceId && { deviceId: filter.deviceId }),
+    $or: [
+      { status: 'pending', createdAt: { $lt: pendingCutoff } },
+      { status: { $in: ['polled', 'executing'] }, polledAt: { $lt: polledCutoff } },
+      { status: { $in: ['polled', 'executing'] }, polledAt: { $exists: false }, updatedAt: { $lt: polledCutoff } },
+    ],
+  }).select('_id deviceId command commandStr status').lean()
 
   if (staleCommands.length === 0) return 0
 
-  await Command.updateMany(
-    { _id: { $in: staleCommands.map(command => command._id) } },
-    { $set: { status: 'failed', executedAt: new Date() } }
-  )
-
-  await Device.findOneAndUpdate(
-    { deviceId },
-    {
-      $set: {
-        'runtimeState.pendingCommand': null,
-        'runtimeState.activeCommand': null,
-        'runtimeState.commandAcknowledged': false,
-      },
-    }
-  )
-
-  const db = getRealtimeDb()
-  if (db) {
-    await Promise.all(staleCommands.map(command =>
-      db.ref(`grain/commands/${deviceId}/pending/${command._id.toString()}`).remove()
-    ))
-    await db.ref(`grain/devices/${deviceId}/runtimeState`).update({
-      pendingCommand: null,
-      activeCommand: null,
-      commandAcknowledged: false,
-    })
-  }
+  await Promise.all(staleCommands.map(async command => {
+    console.warn(`[Command Timeout] ${command.deviceId} ${command._id.toString()} ${command.commandStr ?? command.command} expired from ${command.status}`)
+    await markCommandExecuted(command.deviceId, command._id.toString(), 'timeout')
+  }))
 
   return staleCommands.length
 }
@@ -120,10 +107,10 @@ export async function createDryerCommand(
 
   await expireStalePendingCommands(deviceId)
 
-  const existingPending = await Command.findOne({ deviceId, status: 'pending' }).sort({ createdAt: 1 }).lean()
+  const existingPending = await Command.findOne({ deviceId, status: { $in: ACTIVE_COMMAND_STATUSES } }).sort({ createdAt: 1 }).lean()
   if (existingPending) {
     return errorResponse(
-      `Device ${deviceId} already has a pending command. Wait for hardware acknowledgement before sending another command.`,
+      `Device ${deviceId} already has an active ${existingPending.status} command. Wait for hardware acknowledgement or timeout before sending another command.`,
       ErrorCodes.CONFLICT,
       409
     )
@@ -153,10 +140,15 @@ export async function createDryerCommand(
       $set: {
         'runtimeState.pendingCommand': command._id.toString(),
         'runtimeState.activeCommand': commandStr ?? spec.command,
+        'runtimeState.lastCommand': commandStr ?? spec.command,
+        'runtimeState.commandStatus': 'pending',
         'runtimeState.commandAcknowledged': false,
+        'runtimeState.updatedAt': new Date(),
       },
     }
   )
+
+  console.info(`[Command Inserted] device=${deviceId} id=${command._id.toString()} command=${commandStr ?? spec.command}`)
 
   // 5. Push to Firebase with 1-retry
   const firebasePayload = {

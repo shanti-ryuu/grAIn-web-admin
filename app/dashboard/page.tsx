@@ -13,7 +13,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 
-const DEVICE_ONLINE_TIMEOUT_MS = 45_000
+const DEVICE_ONLINE_TIMEOUT_MS = 2 * 60 * 1000
 
 interface DashboardLiveSnapshot {
   temperature?: number
@@ -45,6 +45,12 @@ function isFreshDeviceOnline(firebaseDevice: { sensors?: DashboardLiveSnapshot; 
   return latestHeartbeat > 0 && currentTime - latestHeartbeat <= DEVICE_ONLINE_TIMEOUT_MS
 }
 
+function shallowOnlineEqual(a: Record<string, boolean>, b: Record<string, boolean>): boolean {
+  const aKeys = Object.keys(a)
+  const bKeys = Object.keys(b)
+  return aKeys.length === bKeys.length && aKeys.every(key => a[key] === b[key])
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const { data: devices, isLoading: devicesLoading, error: devicesError, refetch: refetchDevices } = useDevices()
@@ -59,6 +65,14 @@ export default function DashboardPage() {
   const { data: sessionsData } = useDryingSessions({ status: 'active' })
   const activeSessions = (sessionsData as { data?: unknown[] } | undefined)?.data || (sessionsData as unknown[]) || []
   const { subscribe } = useEventStream()
+
+  useEffect(() => {
+    const next = Object.fromEntries((devices || []).map((device: { deviceId: string; status?: string; isOnline?: boolean }) => [
+      device.deviceId,
+      Boolean(device.isOnline || device.status === 'online'),
+    ]))
+    setLiveOnline(prev => shallowOnlineEqual(prev, next) ? prev : next)
+  }, [devices])
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 5000)
@@ -82,7 +96,7 @@ export default function DashboardPage() {
           updatedAt: Date.now(),
         },
       }))
-      setLiveOnline(prev => ({ ...prev, [deviceId]: true }))
+      setLiveOnline(prev => prev[deviceId] ? prev : { ...prev, [deviceId]: true })
     })
     return unsub
   }, [subscribe])
@@ -110,7 +124,8 @@ export default function DashboardPage() {
           const data = snapshot.val()
           if (data) {
             setLiveData(prev => ({ ...prev, [deviceId]: data.sensors ?? {} }))
-            setLiveOnline(prev => ({ ...prev, [deviceId]: isFreshDeviceOnline(data, Date.now()) }))
+            const online = isFreshDeviceOnline(data, Date.now())
+            setLiveOnline(prev => prev[deviceId] === online ? prev : { ...prev, [deviceId]: online })
           }
         })
         unsubscribes.push(unsub)
@@ -127,13 +142,13 @@ export default function DashboardPage() {
         const updatedAt = toTimestampMs(sensors.updatedAt)
         if (updatedAt) next[deviceId] = now - updatedAt <= DEVICE_ONLINE_TIMEOUT_MS
       })
-      return next
+      return shallowOnlineEqual(prev, next) ? prev : next
     })
   }, [liveData, now])
 
   const totalDevices = devices?.length || 0
   const onlineDevices = useMemo(
-    () => devices?.filter((d: { deviceId: string }) => liveOnline[d.deviceId]).length || 0,
+    () => devices?.filter((d: { deviceId: string; status?: string; isOnline?: boolean }) => liveOnline[d.deviceId] ?? Boolean(d.isOnline || d.status === 'online')).length || 0,
     [devices, liveOnline]
   )
   const unreadAlerts = useMemo(

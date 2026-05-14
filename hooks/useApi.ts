@@ -621,7 +621,13 @@ export const useStartDryingSession = () => {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   return useMutation({
-    mutationFn: async (payload: { deviceId: string; grainType?: string; targetMoisture?: number }) => {
+    mutationFn: async (payload: { deviceId: string; grainType?: string; targetMoisture?: number; mode?: string; temperature?: number; fanSpeed?: number }) => {
+      const startPayload = {
+        mode: payload.mode ?? 'AUTO',
+        temperature: payload.temperature ?? 45,
+        fanSpeed: payload.fanSpeed ?? 80,
+      }
+      await api.post<ApiResponse<any>>(`/dryer/${payload.deviceId}/start`, startPayload)
       const { data: responseData } = await api.post<ApiResponse<any>>('/sessions', payload)
       return unwrapResponse(responseData)
     },

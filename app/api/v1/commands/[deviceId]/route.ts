@@ -3,6 +3,7 @@ import dbConnect from '@/lib/db'
 import Command, { ICommand } from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { isValidDeviceId } from '@/lib/utils/validation'
+import { markCommandExecuted } from '@/lib/utils/firebase-sync'
 
 export async function GET(
   _request: NextRequest,
@@ -19,13 +20,15 @@ export async function GET(
 
     const commands = await Command.find({ deviceId, status: 'pending' })
       .sort({ createdAt: 1 })
-      .limit(10)
+      .limit(1)
       .lean()
 
     const formattedCommands = commands.map((cmd: ICommand) => ({
-      id: cmd._id,
+      id: cmd._id.toString(),
+      _id: cmd._id.toString(),
       deviceId: cmd.deviceId,
-      command: cmd.command,
+      command: cmd.commandStr ?? cmd.command,
+      commandType: cmd.command,
       ...(cmd.commandStr && { commandStr: cmd.commandStr }),
       mode: cmd.mode,
       ...(cmd.fanTarget && { fanTarget: cmd.fanTarget }),
@@ -37,12 +40,12 @@ export async function GET(
       createdAt: cmd.createdAt.toISOString(),
     }))
 
-    const commandIds = commands.map(cmd => cmd._id)
-    if (commandIds.length > 0) {
-      await Command.updateMany(
-        { _id: { $in: commandIds } },
-        { status: 'executed', executedAt: new Date() }
-      )
+    if (commands.length > 0) {
+      try {
+        await markCommandExecuted(deviceId, commands[0]._id.toString(), 'executed')
+      } catch (ackError) {
+        console.error('[Commands Poll] Auto-ack failed:', ackError)
+      }
     }
 
     return successResponse({ commands: formattedCommands, count: formattedCommands.length })

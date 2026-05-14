@@ -19,9 +19,11 @@ export async function POST(
       return errorResponse('Invalid device ID format', ErrorCodes.INVALID_INPUT, 400)
     }
 
+    const heartbeatAt = new Date()
+
     const device = await Device.findOneAndUpdate(
       { deviceId: id },
-      { status: 'online', lastActive: new Date() },
+      { status: 'online', lastActive: heartbeatAt },
       { new: true }
     )
 
@@ -35,7 +37,7 @@ export async function POST(
       if (firebaseDb) {
         await firebaseDb.ref(`grain/devices/${id}`).update({
           status: 'online',
-          lastActive: new Date().toISOString(),
+          lastActive: heartbeatAt.getTime(),
         })
       }
     } catch (firebaseError) {

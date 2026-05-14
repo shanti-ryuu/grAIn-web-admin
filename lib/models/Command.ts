@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose'
 
 export interface ICommand extends Document {
   deviceId: string
-  command: 'START' | 'STOP' | 'FAN_CONTROL' | 'RELAY_CONTROL' | 'STEPPER_CONTROL' | 'HEATER_CONTROL'
+  command: 'START' | 'STOP' | 'FAN_CONTROL' | 'RELAY_CONTROL' | 'STEPPER_CONTROL' | 'HEATER_CONTROL' | 'STATUS'
   commandStr?: string
   mode: 'AUTO' | 'MANUAL'
   temperature?: number
@@ -13,6 +13,7 @@ export interface ICommand extends Document {
   stepperAction?: 'START' | 'STOP' | 'CW' | 'CCW'
   heaterAction?: 'ON' | 'OFF'
   status: 'pending' | 'executed' | 'failed' | 'error'
+  acknowledgedAt?: Date
   executedAt?: Date
   createdAt: Date
   updatedAt: Date
@@ -26,7 +27,7 @@ const CommandSchema: Schema = new Schema({
   },
   command: {
     type: String,
-    enum: ['START', 'STOP', 'FAN_CONTROL', 'RELAY_CONTROL', 'STEPPER_CONTROL', 'HEATER_CONTROL'],
+    enum: ['START', 'STOP', 'FAN_CONTROL', 'RELAY_CONTROL', 'STEPPER_CONTROL', 'HEATER_CONTROL', 'STATUS'],
     required: true,
   },
   commandStr: {
@@ -72,6 +73,9 @@ const CommandSchema: Schema = new Schema({
     default: 'pending',
   },
   executedAt: {
+    type: Date,
+  },
+  acknowledgedAt: {
     type: Date,
   },
 }, {

@@ -12,7 +12,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 
-const DEVICE_ONLINE_TIMEOUT_MS = 45_000
+const DEVICE_ONLINE_TIMEOUT_MS = 2 * 60 * 1000
 
 interface LiveSensorSnapshot {
   temperature?: number

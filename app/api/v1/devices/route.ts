@@ -5,8 +5,11 @@ import { withAuth } from '@/lib/utils/handler'
 import { validateDeviceRequest, sanitizeString } from '@/lib/utils/validation'
 import type { IDevice } from '@/lib/models/Device'
 import { getDeviceLiveness } from '@/lib/utils/device-liveness'
+import { markStaleDevicesOffline } from '@/lib/utils/firebase-sync'
 
 export const GET = withAuth(async (request, user) => {
+  await markStaleDevicesOffline()
+
   const { searchParams } = request.nextUrl
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
   const limit = Math.min(100, parseInt(searchParams.get('limit') ?? '50'))
@@ -31,6 +34,7 @@ export const GET = withAuth(async (request, user) => {
       status: liveness.status,
       isOnline: liveness.isOnline,
       location: d.location,
+      runtimeState: d.runtimeState,
       lastActive: liveness.lastActive?.toISOString?.() || d.lastActive?.toISOString?.() || d.lastActive,
       assignedUser: d.assignedUser,
       createdAt: d.createdAt?.toISOString?.() || d.createdAt,

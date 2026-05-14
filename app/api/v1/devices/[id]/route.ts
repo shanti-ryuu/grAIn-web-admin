@@ -6,8 +6,11 @@ import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response
 import { withAuth } from '@/lib/utils/handler'
 import { getRealtimeDb } from '@/lib/firebase-admin'
 import { getDeviceLiveness } from '@/lib/utils/device-liveness'
+import { markStaleDevicesOffline } from '@/lib/utils/firebase-sync'
 
 export const GET = withAuth(async (_request, user, { params }) => {
+  await markStaleDevicesOffline()
+
   const { id } = await params
 
   // Support both MongoDB ObjectId and business deviceId (e.g., GR-001)
@@ -34,6 +37,7 @@ export const GET = withAuth(async (_request, user, { params }) => {
     status: liveness.status,
     isOnline: liveness.isOnline,
     location: device.location,
+    runtimeState: device.runtimeState,
     lastActive: liveness.lastActive?.toISOString?.() || device.lastActive?.toISOString?.() || device.lastActive,
     assignedUser: device.assignedUser,
     createdAt: device.createdAt?.toISOString?.() || device.createdAt,

@@ -39,7 +39,7 @@ export async function POST(
     }
 
     try {
-      await markCommandExecuted(commandId, commandStatus)
+      await markCommandExecuted(deviceId, commandId, commandStatus)
     } catch (firebaseError) {
       console.error('Firebase ack sync failed:', firebaseError)
     }

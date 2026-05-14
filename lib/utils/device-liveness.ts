@@ -1,6 +1,6 @@
 import { getRealtimeDb } from '@/lib/firebase-admin'
 
-export const DEVICE_ONLINE_TIMEOUT_MS = 45_000
+export const DEVICE_ONLINE_TIMEOUT_MS = 2 * 60 * 1000
 
 export interface DeviceLiveness {
   status: 'online' | 'offline'

@@ -38,6 +38,7 @@ export default function SessionsPage() {
   const [liveSessions, setLiveSessions] = useState<Record<string, { currentMoisture: number }>>({})
 
   const { data: sessionsData, isLoading, error, refetch } = useDryingSessions({ status: statusFilter || undefined })
+  const { data: activeSessionsData } = useDryingSessions({ status: 'active' })
   const { data: devices } = useDevices()
   const startSession = useStartDryingSession()
   const endSession = useEndDryingSession()
@@ -59,10 +60,14 @@ export default function SessionsPage() {
   type Session = { _id: string; deviceId: string; grainType: string; status: string; startMoisture: number; currentMoisture: number; targetMoisture: number; avgTemperature?: number; totalEnergyUsed?: number; startedAt: string; duration?: number; efficiency?: number; finalMoisture?: number }
   const sessions: Session[] = (sessionsData as { data?: Session[] } | undefined)?.data || (sessionsData as Session[]) || []
   const activeSessions = sessions.filter((s) => s.status === 'active')
+  const allActiveSessions: Session[] = (activeSessionsData as { data?: Session[] } | undefined)?.data || (activeSessionsData as Session[]) || activeSessions
   const onlineDevices = (devices as Array<{ deviceId: string; status: string }> | undefined)?.filter(d => d.status === 'online') || []
 
   const handleStart = async () => {
     if (!newSession.deviceId) return
+    if (allActiveSessions.some(session => session.deviceId === newSession.deviceId)) {
+      return
+    }
     await startSession.mutateAsync(newSession)
     setShowStartModal(false)
     setNewSession({ deviceId: '', grainType: 'rice', targetMoisture: 14 })
@@ -302,7 +307,14 @@ export default function SessionsPage() {
                 >
                   <option value="">Select a device...</option>
                   {(devices as Array<{ deviceId: string; status: string }> || []).map((d) => (
-                    <option key={d.deviceId} value={d.deviceId} disabled={d.status !== 'online'}>{d.deviceId} {d.status === 'online' ? '(Online)' : '(Offline)'}</option>
+                    <option
+                      key={d.deviceId}
+                      value={d.deviceId}
+                      disabled={d.status !== 'online' || allActiveSessions.some(session => session.deviceId === d.deviceId)}
+                    >
+                      {d.deviceId} {d.status === 'online' ? '(Online)' : '(Offline)'}
+                      {allActiveSessions.some(session => session.deviceId === d.deviceId) ? ' · Active session' : ''}
+                    </option>
                   ))}
                 </select>
                 {onlineDevices.length === 0 && (

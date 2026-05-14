@@ -49,6 +49,7 @@ export enum CommandType {
   RelayControl = 'RELAY_CONTROL',
   StepperControl = 'STEPPER_CONTROL',
   HeaterControl = 'HEATER_CONTROL',
+  Status = 'STATUS',
 }
 
 export enum FanTarget {

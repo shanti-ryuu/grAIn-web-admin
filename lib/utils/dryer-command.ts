@@ -7,6 +7,9 @@ import { isValidDeviceId } from '@/lib/utils/validation'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { pushCommandToFirebase } from '@/lib/utils/firebase-sync'
 import { getDeviceLiveness } from '@/lib/utils/device-liveness'
+import { getRealtimeDb } from '@/lib/firebase-admin'
+
+const PENDING_COMMAND_TIMEOUT_MS = 30_000
 
 interface CommandSpec {
   /** The command string sent to ESP32 (e.g. 'START', 'STOP', 'FAN_CONTROL') */
@@ -15,6 +18,47 @@ interface CommandSpec {
   mode?: string
   /** Additional fields to include in the MongoDB Command doc and Firebase payload */
   extraFields?: Record<string, unknown>
+}
+
+export async function expireStalePendingCommands(deviceId: string): Promise<number> {
+  const cutoff = new Date(Date.now() - PENDING_COMMAND_TIMEOUT_MS)
+  const staleCommands = await Command.find({
+    deviceId,
+    status: 'pending',
+    createdAt: { $lt: cutoff },
+  }).select('_id').lean()
+
+  if (staleCommands.length === 0) return 0
+
+  await Command.updateMany(
+    { _id: { $in: staleCommands.map(command => command._id) } },
+    { $set: { status: 'failed', executedAt: new Date() } }
+  )
+
+  await Device.findOneAndUpdate(
+    { deviceId },
+    {
+      $set: {
+        'runtimeState.pendingCommand': null,
+        'runtimeState.activeCommand': null,
+        'runtimeState.commandAcknowledged': false,
+      },
+    }
+  )
+
+  const db = getRealtimeDb()
+  if (db) {
+    await Promise.all(staleCommands.map(command =>
+      db.ref(`grain/commands/${deviceId}/pending/${command._id.toString()}`).remove()
+    ))
+    await db.ref(`grain/devices/${deviceId}/runtimeState`).update({
+      pendingCommand: null,
+      activeCommand: null,
+      commandAcknowledged: false,
+    })
+  }
+
+  return staleCommands.length
 }
 
 interface DryerCommandResult {
@@ -74,20 +118,51 @@ export async function createDryerCommand(
     return errorResponse(`Device ${deviceId} is offline. Power on the prototype and wait for live sensor data before sending commands.`, ErrorCodes.CONFLICT, 409)
   }
 
+  await expireStalePendingCommands(deviceId)
+
+  const existingPending = await Command.findOne({ deviceId, status: 'pending' }).sort({ createdAt: 1 }).lean()
+  if (existingPending) {
+    return errorResponse(
+      `Device ${deviceId} already has a pending command. Wait for hardware acknowledgement before sending another command.`,
+      ErrorCodes.CONFLICT,
+      409
+    )
+  }
+
   // 4. Create command in MongoDB
   const commandMode = spec.mode ?? 'MANUAL'
+  const commandStr = typeof spec.extraFields?.commandStr === 'string'
+    ? spec.extraFields.commandStr
+    : spec.command === 'START'
+      ? `START:${commandMode}:${Number(spec.extraFields?.temperature ?? 45)}:${Number(spec.extraFields?.fanSpeed ?? 80)}`
+      : spec.command === 'STOP'
+        ? 'STOP'
+        : undefined
   const command = await Command.create({
     deviceId,
     command: spec.command,
     mode: commandMode,
     status: 'pending',
+    ...(commandStr && { commandStr }),
     ...spec.extraFields,
   })
+
+  await Device.findOneAndUpdate(
+    { deviceId },
+    {
+      $set: {
+        'runtimeState.pendingCommand': command._id.toString(),
+        'runtimeState.activeCommand': commandStr ?? spec.command,
+        'runtimeState.commandAcknowledged': false,
+      },
+    }
+  )
 
   // 5. Push to Firebase with 1-retry
   const firebasePayload = {
     command: spec.command,
     mode: commandMode,
+    ...(commandStr && { commandStr }),
     ...spec.extraFields,
   }
 
@@ -113,6 +188,7 @@ export async function createDryerCommand(
     mode: command.mode,
     status: command.status,
     createdAt: command.createdAt.toISOString(),
+    ...(commandStr && { commandStr }),
     ...spec.extraFields,
   }
 

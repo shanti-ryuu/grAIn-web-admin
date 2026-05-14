@@ -171,7 +171,7 @@ export async function markCommandPolled(deviceId: string, commandId: string): Pr
   const command = await Command.findOneAndUpdate(
     { _id: commandId, deviceId, status: 'pending' },
     { $set: { status: 'polled', polledAt: now } },
-    { new: true }
+    { returnDocument: 'after' }
   )
 
   if (!command) return
@@ -244,7 +244,7 @@ export async function markCommandExecuted(
   if (status === 'executed') {
     commandUpdate.acknowledgedAt = new Date()
   }
-  const command = await Command.findByIdAndUpdate(commandId, commandUpdate, { new: true })
+  const command = await Command.findByIdAndUpdate(commandId, commandUpdate, { returnDocument: 'after' })
 
   if (!command) return
 

@@ -43,7 +43,7 @@ export const PATCH = withAuth(async (request, user) => {
     return errorResponse('No updatable fields provided', ErrorCodes.INVALID_INPUT, 400)
   }
 
-  const updatedUser = await User.findByIdAndUpdate(user.userId, updates, { new: true }).select('-password')
+  const updatedUser = await User.findByIdAndUpdate(user.userId, updates, { returnDocument: 'after' }).select('-password')
   if (!updatedUser) {
     return errorResponse('User not found', ErrorCodes.USER_NOT_FOUND, 404)
   }

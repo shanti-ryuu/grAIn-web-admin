@@ -30,7 +30,7 @@ export async function POST(
         'runtimeState.lastHeartbeat': heartbeatAt,
         'runtimeState.updatedAt': heartbeatAt,
       },
-      { new: true }
+      { returnDocument: 'after' }
     )
 
     if (!device) {

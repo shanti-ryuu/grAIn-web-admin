@@ -4,7 +4,7 @@ import { withAuth } from '@/lib/utils/handler'
 
 export const PATCH = withAuth(async (_request, _user, { params }) => {
   const { id } = await params
-  const alert = await Alert.findByIdAndUpdate(id, { isRead: true }, { new: true }).lean()
+  const alert = await Alert.findByIdAndUpdate(id, { isRead: true }, { returnDocument: 'after' }).lean()
 
   if (!alert) {
     return errorResponse('Alert not found', ErrorCodes.NOT_FOUND, 404)

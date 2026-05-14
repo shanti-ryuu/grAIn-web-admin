@@ -7,9 +7,13 @@ import { withAuth } from '@/lib/utils/handler'
 import { getRealtimeDb } from '@/lib/firebase-admin'
 import { getDeviceLiveness } from '@/lib/utils/device-liveness'
 import { markStaleDevicesOffline } from '@/lib/utils/firebase-sync'
+import { expireStaleCommands } from '@/lib/utils/dryer-command'
 
 export const GET = withAuth(async (_request, user, { params }) => {
-  await markStaleDevicesOffline()
+  await Promise.all([
+    markStaleDevicesOffline(),
+    expireStaleCommands(),
+  ])
 
   const { id } = await params
 

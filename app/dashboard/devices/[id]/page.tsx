@@ -225,8 +225,8 @@ export default function DeviceDetailPage() {
     { key: 'status', label: 'Status', render: (v: string) => (
       <span className={`px-2 py-1 rounded text-xs font-semibold ${
         v === 'executed' ? 'bg-green-50 text-green-600' :
-        v === 'pending' ? 'bg-yellow-50 text-yellow-600' :
-        v === 'failed' || v === 'error' ? 'bg-red-50 text-red-600' :
+        v === 'pending' || v === 'polled' || v === 'executing' ? 'bg-yellow-50 text-yellow-600' :
+        v === 'failed' || v === 'timeout' || v === 'error' ? 'bg-red-50 text-red-600' :
         'bg-gray-50 text-gray-600'
       }`}>{v}</span>
     )},

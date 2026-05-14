@@ -6,9 +6,13 @@ import { validateDeviceRequest, sanitizeString } from '@/lib/utils/validation'
 import type { IDevice } from '@/lib/models/Device'
 import { getDeviceLiveness } from '@/lib/utils/device-liveness'
 import { markStaleDevicesOffline } from '@/lib/utils/firebase-sync'
+import { expireStaleCommands } from '@/lib/utils/dryer-command'
 
 export const GET = withAuth(async (request, user) => {
-  await markStaleDevicesOffline()
+  await Promise.all([
+    markStaleDevicesOffline(),
+    expireStaleCommands(),
+  ])
 
   const { searchParams } = request.nextUrl
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))

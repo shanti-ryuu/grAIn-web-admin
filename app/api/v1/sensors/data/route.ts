@@ -2,15 +2,38 @@ import { NextRequest } from 'next/server'
 import dbConnect from '@/lib/db'
 import SensorData from '@/lib/models/SensorData'
 import Device from '@/lib/models/Device'
+import Command from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { validateSensorDataRequest, sanitizeString } from '@/lib/utils/validation'
-import { syncSensorToFirebase } from '@/lib/utils/firebase-sync'
+import { markCommandExecuted, syncSensorToFirebase } from '@/lib/utils/firebase-sync'
 import { invalidateAnalyticsCache } from '@/lib/utils/analytics-cache'
 import Alert from '@/lib/models/Alert'
 import DryingSession from '@/lib/models/DryingSession'
 import { eventBroadcaster } from '@/lib/utils/event-stream'
 import { sendNotificationToDeviceOwner } from '@/lib/utils/notifications'
+
+async function reconcileCommandFromSensor(deviceId: string, runtimeStatus: string, fanSpeed: number): Promise<void> {
+  const activeCommand = await Command.findOne({
+    deviceId,
+    status: { $in: ['polled', 'executing'] },
+  }).sort({ createdAt: 1 }).lean()
+
+  if (!activeCommand) return
+
+  const hardwareCommand = activeCommand.commandStr ?? activeCommand.command
+  const shouldComplete =
+    activeCommand.command === 'STOP'
+      ? runtimeStatus === 'idle' || fanSpeed === 0
+      : activeCommand.command === 'START'
+        ? runtimeStatus === 'running' || fanSpeed > 0
+        : true
+
+  if (!shouldComplete) return
+
+  console.info(`[Command Sensor Confirmed] device=${deviceId} id=${activeCommand._id.toString()} command=${hardwareCommand}`)
+  await markCommandExecuted(deviceId, activeCommand._id.toString(), 'executed')
+}
 
 async function checkAndCreateAlerts(deviceId: string, data: { temperature: number; humidity: number; moisture: number }): Promise<void> {
   const alerts: { deviceId: string; type: 'critical' | 'warning' | 'info'; message: string; severity: number }[] = []
@@ -207,6 +230,11 @@ export async function POST(request: NextRequest) {
     })
 
     // Update active drying session for this device
+    setImmediate(() => {
+      void reconcileCommandFromSensor(deviceId, runtimeStatus, numericFanSpeed)
+        .catch((err: unknown) => console.error('[Command Sensor Confirm]', err))
+    })
+
     setImmediate(() => {
       void updateDryingSession(deviceId, {
         moisture: Number(moisture),

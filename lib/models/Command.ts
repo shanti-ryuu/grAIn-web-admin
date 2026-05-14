@@ -12,7 +12,8 @@ export interface ICommand extends Document {
   relayAction?: 'ON' | 'OFF'
   stepperAction?: 'START' | 'STOP' | 'CW' | 'CCW'
   heaterAction?: 'ON' | 'OFF'
-  status: 'pending' | 'executed' | 'failed' | 'error'
+  status: 'pending' | 'polled' | 'executing' | 'executed' | 'failed' | 'timeout' | 'error'
+  polledAt?: Date
   acknowledgedAt?: Date
   executedAt?: Date
   createdAt: Date
@@ -69,8 +70,11 @@ const CommandSchema: Schema = new Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'executed', 'failed', 'error'],
+    enum: ['pending', 'polled', 'executing', 'executed', 'failed', 'timeout', 'error'],
     default: 'pending',
+  },
+  polledAt: {
+    type: Date,
   },
   executedAt: {
     type: Date,
@@ -84,6 +88,8 @@ const CommandSchema: Schema = new Schema({
 
 // Index for faster queries
 CommandSchema.index({ deviceId: 1, status: 1 })
+CommandSchema.index({ deviceId: 1, status: 1, createdAt: 1 })
+CommandSchema.index({ deviceId: 1, status: 1, polledAt: 1 })
 CommandSchema.index({ createdAt: -1 })
 
 export default mongoose.models.Command || mongoose.model<ICommand>('Command', CommandSchema)

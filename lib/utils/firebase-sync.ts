@@ -78,6 +78,7 @@ export async function markStaleDevicesOffline(): Promise<number> {
         'runtimeState.commandAcknowledged': true,
         'runtimeState.pendingCommand': null,
         'runtimeState.activeCommand': null,
+        'runtimeState.commandStatus': 'idle',
       },
     }
   )
@@ -90,6 +91,7 @@ export async function markStaleDevicesOffline(): Promise<number> {
         isRunning: false,
         pendingCommand: null,
         activeCommand: null,
+        commandStatus: 'idle',
         commandAcknowledged: true,
       })
     }))
@@ -154,8 +156,67 @@ export async function pushCommandToFirebase(
   await db.ref(`grain/devices/${deviceId}/runtimeState`).update({
     pendingCommand: commandId,
     activeCommand: command.commandStr ?? command.command,
+    lastCommand: command.commandStr ?? command.command,
+    commandStatus: 'pending',
     commandAcknowledged: false,
+    updatedAt: Date.now(),
   })
+}
+
+export async function markCommandPolled(deviceId: string, commandId: string): Promise<void> {
+  const db = getRealtimeDb()
+  const now = new Date()
+
+  await dbConnect()
+  const command = await Command.findOneAndUpdate(
+    { _id: commandId, deviceId, status: 'pending' },
+    { $set: { status: 'polled', polledAt: now } },
+    { new: true }
+  )
+
+  if (!command) return
+
+  await Device.findOneAndUpdate(
+    { deviceId },
+    {
+      $set: {
+        status: 'online',
+        lastActive: now,
+        'runtimeState.lastSeen': now,
+        'runtimeState.lastHeartbeat': now,
+        'runtimeState.updatedAt': now,
+        'runtimeState.pendingCommand': commandId,
+        'runtimeState.activeCommand': command.commandStr ?? command.command,
+        'runtimeState.lastCommand': command.commandStr ?? command.command,
+        'runtimeState.commandStatus': 'polled',
+        'runtimeState.commandAcknowledged': false,
+      },
+    }
+  )
+
+  if (db) {
+    const nowMs = now.getTime()
+    await Promise.all([
+      db.ref(`grain/commands/${deviceId}/pending/${commandId}`).update({
+        status: 'polled',
+        polledAt: nowMs,
+      }),
+      db.ref(`grain/devices/${deviceId}`).update({
+        status: 'online',
+        lastActive: nowMs,
+      }),
+      db.ref(`grain/devices/${deviceId}/runtimeState`).update({
+        lastSeen: nowMs,
+        lastHeartbeat: nowMs,
+        updatedAt: nowMs,
+        pendingCommand: commandId,
+        activeCommand: command.commandStr ?? command.command,
+        lastCommand: command.commandStr ?? command.command,
+        commandStatus: 'polled',
+        commandAcknowledged: false,
+      }),
+    ])
+  }
 }
 
 /**
@@ -165,7 +226,7 @@ export async function pushCommandToFirebase(
 export async function markCommandExecuted(
   deviceId: string,
   commandId: string,
-  status: 'executed' | 'failed' | 'error' = 'executed'
+  status: 'executed' | 'failed' | 'timeout' | 'error' = 'executed'
 ): Promise<void> {
   const db = getRealtimeDb()
 
@@ -176,24 +237,33 @@ export async function markCommandExecuted(
 
   // Update MongoDB Command status
   await dbConnect()
-  const command = await Command.findByIdAndUpdate(commandId, {
+  const commandUpdate: Record<string, unknown> = {
     status,
     executedAt: new Date(),
-    acknowledgedAt: new Date(),
-  }, { new: true })
+  }
+  if (status === 'executed') {
+    commandUpdate.acknowledgedAt = new Date()
+  }
+  const command = await Command.findByIdAndUpdate(commandId, commandUpdate, { new: true })
 
   if (!command) return
 
   const runtimeSet: Record<string, unknown> = {
     'runtimeState.pendingCommand': null,
     'runtimeState.activeCommand': command.commandStr ?? command.command,
+    'runtimeState.lastCommand': command.commandStr ?? command.command,
+    'runtimeState.commandStatus': status,
     'runtimeState.commandAcknowledged': status === 'executed',
+    'runtimeState.updatedAt': new Date(),
   }
   const firebaseRuntimeSet: Record<string, unknown> = {
     pendingCommand: null,
     activeCommand: command.commandStr ?? command.command,
+    lastCommand: command.commandStr ?? command.command,
+    commandStatus: status,
     commandAcknowledged: status === 'executed',
     lastSeen: Date.now(),
+    updatedAt: Date.now(),
   }
 
   if (status === 'executed') {

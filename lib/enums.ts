@@ -68,8 +68,11 @@ export enum FanAction {
  */
 export enum CommandStatus {
   Pending = 'pending',
+  Polled = 'polled',
+  Executing = 'executing',
   Executed = 'executed',
   Failed = 'failed',
+  Timeout = 'timeout',
   Error = 'error',
 }
 

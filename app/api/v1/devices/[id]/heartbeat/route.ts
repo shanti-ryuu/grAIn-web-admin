@@ -23,7 +23,13 @@ export async function POST(
 
     const device = await Device.findOneAndUpdate(
       { deviceId: id },
-      { status: 'online', lastActive: heartbeatAt },
+      {
+        status: 'online',
+        lastActive: heartbeatAt,
+        'runtimeState.lastSeen': heartbeatAt,
+        'runtimeState.lastHeartbeat': heartbeatAt,
+        'runtimeState.updatedAt': heartbeatAt,
+      },
       { new: true }
     )
 
@@ -39,6 +45,11 @@ export async function POST(
           status: 'online',
           lastActive: heartbeatAt.getTime(),
         })
+        await firebaseDb.ref(`grain/devices/${id}/runtimeState`).update({
+          lastSeen: heartbeatAt.getTime(),
+          lastHeartbeat: heartbeatAt.getTime(),
+          updatedAt: heartbeatAt.getTime(),
+        })
       }
     } catch (firebaseError) {
       console.error('Firebase heartbeat sync failed:', firebaseError)
@@ -47,7 +58,7 @@ export async function POST(
     // Return count of pending commands
     const pendingCommands = await Command.countDocuments({
       deviceId: id,
-      status: 'pending',
+      status: { $in: ['pending', 'polled', 'executing'] },
     })
 
     return successResponse({

@@ -123,6 +123,8 @@ export async function POST(request: NextRequest) {
 
     const { deviceId, temperature, humidity, moisture, fanSpeed, energy, status, solarVoltage, weight } = body
     const runtimeStatus = status && ['running', 'idle', 'paused', 'error'].includes(status) ? sanitizeString(status) : 'idle'
+    const numericFanSpeed = fanSpeed !== undefined ? Number(fanSpeed) : 0
+    const isActuallyRunning = runtimeStatus === 'running' && numericFanSpeed > 0
 
     const device = await Device.findOne({ deviceId })
     if (!device) {
@@ -137,7 +139,7 @@ export async function POST(request: NextRequest) {
         temperature: Number(temperature),
         humidity: Number(humidity),
         moisture: Number(moisture),
-        fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
+        fanSpeed: numericFanSpeed,
         energy: energy !== undefined ? Number(energy) : 0,
         status: runtimeStatus,
         solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
@@ -151,7 +153,7 @@ export async function POST(request: NextRequest) {
             status: 'online',
             lastActive: receivedAt,
             lastMoisture: Number(moisture),
-            'runtimeState.isRunning': runtimeStatus === 'running',
+            'runtimeState.isRunning': isActuallyRunning,
             'runtimeState.lastSeen': receivedAt,
             'runtimeState.currentTemperature': Number(temperature),
             'runtimeState.currentHumidity': Number(humidity),
@@ -165,7 +167,7 @@ export async function POST(request: NextRequest) {
         temperature: Number(temperature),
         humidity: Number(humidity),
         moisture: Number(moisture),
-        fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
+        fanSpeed: numericFanSpeed,
         energy: energy !== undefined ? Number(energy) : 0,
         status: runtimeStatus,
         solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,

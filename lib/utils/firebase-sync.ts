@@ -24,6 +24,7 @@ export async function syncSensorToFirebase(
 ): Promise<void> {
   const db = getRealtimeDb()
   if (!db) return
+  const isActuallyRunning = sensorData.status === 'running' && Number(sensorData.fanSpeed ?? 0) > 0
 
   await db.ref(`grain/devices/${deviceId}/sensors`).set({
     temperature: sensorData.temperature,
@@ -44,7 +45,7 @@ export async function syncSensorToFirebase(
   })
 
   await db.ref(`grain/devices/${deviceId}/runtimeState`).update({
-    isRunning: sensorData.status === 'running',
+    isRunning: isActuallyRunning,
     lastSeen: Date.now(),
     currentTemperature: sensorData.temperature,
     currentHumidity: sensorData.humidity,

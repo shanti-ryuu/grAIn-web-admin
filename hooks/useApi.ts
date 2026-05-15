@@ -598,8 +598,22 @@ export const useDryingSessions = (params?: { status?: string; deviceId?: string;
   return useQuery({
     queryKey: ['sessions', params],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any>>(`/sessions?${queryParams}`)
-      return unwrapResponse(responseData)
+      const { data: responseData } = await api.get<ApiResponse<any> & {
+        pagination?: {
+          total: number
+          count: number
+          page: number
+          limit: number
+          totalPages: number
+        }
+      }>(`/sessions?${queryParams}`)
+      if (!responseData.success || responseData.data === undefined) {
+        throw new Error(responseData.error || 'Request failed')
+      }
+      return {
+        data: responseData.data,
+        pagination: responseData.pagination,
+      }
     },
     staleTime: 15_000,
     refetchInterval: 15_000,

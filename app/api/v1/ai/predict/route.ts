@@ -22,7 +22,7 @@ interface MLPrediction {
 
 let mlServiceAvailable = true
 let lastFailureTime = 0
-const COOLDOWN_MS = 60000
+const COOLDOWN_MS = 15000
 
 async function callMLService(payload: Record<string, unknown>): Promise<MLPrediction | null> {
   const now = Date.now()
@@ -43,7 +43,7 @@ async function callMLService(payload: Record<string, unknown>): Promise<MLPredic
     if (!response.ok) {
       mlServiceAvailable = false
       lastFailureTime = now
-      console.warn(`[ML] Service returned ${response.status}, cooling down 60s`)
+      console.warn(`[ML] Service returned ${response.status}, cooling down 15s`)
       return null
     }
 
@@ -51,7 +51,7 @@ async function callMLService(payload: Record<string, unknown>): Promise<MLPredic
     return await response.json() as MLPrediction
   } catch {
     if (mlServiceAvailable) {
-      console.warn('[ML] Service unavailable, cooling down 60s')
+      console.warn('[ML] Service unavailable, cooling down 15s')
     }
     mlServiceAvailable = false
     lastFailureTime = now

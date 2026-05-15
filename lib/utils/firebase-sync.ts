@@ -123,7 +123,8 @@ export async function pushCommandToFirebase(
   const db = getRealtimeDb()
   if (!db) return
 
-  await db.ref(`grain/commands/${deviceId}/pending/${commandId}`).set({
+  const now = Date.now()
+  const commandPayload = {
     command: command.command,
     commandStr: command.commandStr ?? null,
     mode: command.mode,
@@ -134,33 +135,28 @@ export async function pushCommandToFirebase(
     relayAction: command.relayAction ?? null,
     stepperAction: command.stepperAction ?? null,
     heaterAction: command.heaterAction ?? null,
-    createdAt: Date.now(),
-  })
+  }
 
-  // Write to /latest path for ESP32 real-time listener (<500ms delivery)
-  await db.ref(`grain/commands/${deviceId}/latest`).set({
-    commandId,
-    command: command.command,
-    commandStr: command.commandStr ?? null,
-    mode: command.mode,
-    temperature: command.temperature ?? null,
-    fanSpeed: command.fanSpeed ?? null,
-    fanTarget: command.fanTarget ?? null,
-    fanAction: command.fanAction ?? null,
-    relayAction: command.relayAction ?? null,
-    stepperAction: command.stepperAction ?? null,
-    heaterAction: command.heaterAction ?? null,
-    issuedAt: Date.now(),
-  })
-
-  await db.ref(`grain/devices/${deviceId}/runtimeState`).update({
-    pendingCommand: commandId,
-    activeCommand: command.commandStr ?? command.command,
-    lastCommand: command.commandStr ?? command.command,
-    commandStatus: 'pending',
-    commandAcknowledged: false,
-    updatedAt: Date.now(),
-  })
+  await Promise.all([
+    db.ref(`grain/commands/${deviceId}/pending/${commandId}`).set({
+      ...commandPayload,
+      createdAt: now,
+    }),
+    // Write to /latest path for ESP32 real-time listener (<500ms delivery)
+    db.ref(`grain/commands/${deviceId}/latest`).set({
+      commandId,
+      ...commandPayload,
+      issuedAt: now,
+    }),
+    db.ref(`grain/devices/${deviceId}/runtimeState`).update({
+      pendingCommand: commandId,
+      activeCommand: command.commandStr ?? command.command,
+      lastCommand: command.commandStr ?? command.command,
+      commandStatus: 'pending',
+      commandAcknowledged: false,
+      updatedAt: now,
+    }),
+  ])
 }
 
 export async function markCommandPolled(deviceId: string, commandId: string): Promise<void> {

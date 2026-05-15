@@ -14,7 +14,8 @@
     "type-check": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
     "seed:dev": "tsx scripts/seed.ts",
-    "seed:reset": "tsx scripts/seed.ts --reset"
+    "seed:reset": "tsx scripts/seed.ts --reset",
+    "seed:historical": "tsx scripts/seed-historical-telemetry.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",

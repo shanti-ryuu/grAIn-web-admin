@@ -320,7 +320,7 @@ export async function POST(request: NextRequest) {
       console.warn(`[Sensor Ingest Slow] device=${deviceId} durationMs=${durationMs}`)
     }
 
-    return successResponse(sensorPayload, 201)
+    return successResponse(sensorPayload, 202)
 
   } catch (error) {
     console.error('Sensor data error:', error)

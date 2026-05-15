@@ -33,11 +33,13 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function SessionsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [page, setPage] = useState(1)
   const [showStartModal, setShowStartModal] = useState(false)
   const [newSession, setNewSession] = useState({ deviceId: '', grainType: 'rice', targetMoisture: 14 })
   const [liveSessions, setLiveSessions] = useState<Record<string, { currentMoisture: number }>>({})
+  const pageSize = 10
 
-  const { data: sessionsData, isLoading, error, refetch } = useDryingSessions({ status: statusFilter || undefined })
+  const { data: sessionsData, isLoading, error, refetch } = useDryingSessions({ status: statusFilter || undefined, page, limit: pageSize })
   const { data: activeSessionsData } = useDryingSessions({ status: 'active' })
   const { data: devices } = useDevices()
   const startSession = useStartDryingSession()
@@ -57,11 +59,32 @@ export default function SessionsPage() {
     return () => { unsub1(); unsub2() }
   }, [subscribe, refetch])
 
-  type Session = { _id: string; deviceId: string; grainType: string; status: string; startMoisture: number; currentMoisture: number; targetMoisture: number; avgTemperature?: number; totalEnergyUsed?: number; startedAt: string; duration?: number; efficiency?: number; finalMoisture?: number }
-  const sessions: Session[] = (sessionsData as { data?: Session[] } | undefined)?.data || (sessionsData as Session[]) || []
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter])
+
+  type Session = { _id: string; deviceId: string; grainType: string; status: string; startMoisture: number; currentMoisture: number; targetMoisture: number; avgTemperature?: number; totalEnergyUsed?: number; startedAt: string; duration?: number; efficiency?: number; finalMoisture?: number; isSimulated?: boolean }
+  type SessionsResult = {
+    data?: Session[]
+    pagination?: {
+      total: number
+      count: number
+      page: number
+      limit: number
+      totalPages: number
+    }
+  }
+  const sessionsResult = sessionsData as SessionsResult | Session[] | undefined
+  const sessions: Session[] = Array.isArray(sessionsResult) ? sessionsResult : sessionsResult?.data || []
+  const pagination = !Array.isArray(sessionsResult) ? sessionsResult?.pagination : undefined
+  const totalPages = Math.max(1, pagination?.totalPages ?? 1)
+  const totalSessions = pagination?.total ?? sessions.length
+  const startRow = totalSessions === 0 ? 0 : ((pagination?.page ?? page) - 1) * (pagination?.limit ?? pageSize) + 1
+  const endRow = Math.min(totalSessions, startRow + sessions.length - 1)
   const activeSessions = sessions.filter((s) => s.status === 'active')
-  const allActiveSessions: Session[] = (activeSessionsData as { data?: Session[] } | undefined)?.data || (activeSessionsData as Session[]) || activeSessions
+  const allActiveSessions: Session[] = activeSessionsData?.data || activeSessions
   const onlineDevices = (devices as Array<{ deviceId: string; status: string }> | undefined)?.filter(d => d.status === 'online') || []
+  const simulatedSessionCount = sessions.filter(session => session.isSimulated).length
 
   const handleStart = async () => {
     if (!newSession.deviceId) return
@@ -213,26 +236,34 @@ export default function SessionsPage() {
       )}
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-2 border-b border-gray-200 pb-px">
-        {['', 'active', 'completed', 'aborted'].map((status) => (
-          <button
-            key={status}
-            onClick={() => setStatusFilter(status)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-              statusFilter === status
-                ? 'text-green-800 border-b-2 border-green-800 bg-green-50/50'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            {status === '' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-          </button>
-        ))}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-gray-200 pb-px">
+        <div className="flex items-center gap-2">
+          {['', 'active', 'completed', 'aborted'].map((status) => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                statusFilter === status
+                  ? 'text-green-800 border-b-2 border-green-800 bg-green-50/50'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {status === '' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+            </button>
+          ))}
+        </div>
+        {simulatedSessionCount > 0 && (
+          <div className="pb-2 text-xs font-semibold text-green-700">
+            Showing {simulatedSessionCount} seeded historical run{simulatedSessionCount > 1 ? 's' : ''}
+          </div>
+        )}
       </div>
 
       {/* Sessions Table */}
       {Array.isArray(sessions) && sessions.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="space-y-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 font-medium text-gray-500">Device</th>
@@ -248,7 +279,16 @@ export default function SessionsPage() {
             <tbody>
               {sessions.map((session) => (
                 <tr key={session._id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-3 px-4 font-medium text-gray-900">{session.deviceId}</td>
+                  <td className="py-3 px-4 font-medium text-gray-900">
+                    <div className="flex items-center gap-2">
+                      <span>{session.deviceId}</span>
+                      {session.isSimulated && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100 text-[11px] font-semibold">
+                          Demo
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="py-3 px-4 text-gray-600 capitalize">{session.grainType}</td>
                   <td className="py-3 px-4"><StatusBadge status={session.status} /></td>
                   <td className="py-3 px-4 text-gray-600 hidden sm:table-cell">
@@ -273,7 +313,32 @@ export default function SessionsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-gray-100 pt-4">
+            <p className="text-sm text-gray-500">
+              Showing {startRow}-{endRow} of {totalSessions} sessions
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                disabled={page <= 1}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="px-3 py-2 text-sm text-gray-600">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         <Card className="p-12 text-center">

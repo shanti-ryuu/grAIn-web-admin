@@ -63,7 +63,7 @@ export default function DashboardPage() {
   const [now, setNow] = useState(() => Date.now())
 
   const { data: sessionsData } = useDryingSessions({ status: 'active' })
-  const activeSessions = (sessionsData as { data?: unknown[] } | undefined)?.data || (sessionsData as unknown[]) || []
+  const activeSessions = sessionsData?.data || []
   const { subscribe } = useEventStream()
 
   useEffect(() => {

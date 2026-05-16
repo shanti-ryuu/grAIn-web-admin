@@ -54,7 +54,7 @@ export default function LoginPage() {
       const axiosErr = err as { response?: { data?: { error?: string } } }
       const msg = axiosErr?.response?.data?.error || 'Invalid email or password. Please try again.'
       setFormError(msg)
-      toast({ title: 'Login Failed', description: msg, variant: 'destructive' })
+      toast({ title: 'Login Failed', description: msg, variant: 'error' })
     }
   }
 

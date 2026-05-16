@@ -78,10 +78,10 @@ export const useRegister = () => {
       return unwrapResponse(responseData)
     },
     onSuccess: (data) => {
-      toast({ title: 'User Created', description: `${data.user.name} created successfully` })
+      toast({ title: 'User Created', description: `${data.user.name} created successfully`, variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Registration Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Registration Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -122,10 +122,10 @@ export const useRegisterDevice = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
-      toast({ title: 'Device Registered', description: `Device ${data.deviceId} registered successfully` })
+      toast({ title: 'Device Registered', description: `Device ${data.deviceId} registered successfully`, variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Registration Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Registration Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -140,10 +140,10 @@ export const useUpdateDevice = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
-      toast({ title: 'Device Updated', description: 'Device updated successfully' })
+      toast({ title: 'Device Updated', description: 'Device updated successfully', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -158,10 +158,10 @@ export const useDeleteDevice = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
-      toast({ title: 'Device Deregistered', description: 'Device has been removed' })
+      toast({ title: 'Device Deregistered', description: 'Device has been removed', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Delete Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -190,12 +190,12 @@ export const useCreateUser = () => {
       const { data: responseData } = await api.post<ApiResponse<any>>('/users', payload)
       return unwrapResponse(responseData)
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast({ title: 'User Created', description: `User ${data.name} created successfully` })
+      toast({ title: 'User Created', description: 'User created successfully.', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Creation Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Creation Failed', description: error?.response?.data?.error || error.message || 'Failed to create user.', variant: 'error' })
     },
   })
 }
@@ -211,17 +211,20 @@ export const useUpdateUser = () => {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       if (variables.role) {
-        toast({ title: 'User Updated', description: `Role changed to ${variables.role} successfully` })
+        toast({ title: 'User Updated', description: 'User role updated successfully.', variant: 'success' })
       } else if (variables.status) {
-        toast({ title: 'User Updated', description: `User is now ${variables.status}` })
+        toast({ title: 'User Updated', description: `User is now ${variables.status}`, variant: 'success' })
       } else if (variables.password) {
-        toast({ title: 'Password Changed', description: 'Password updated successfully' })
+        toast({ title: 'Password Changed', description: 'Password updated successfully', variant: 'success' })
       } else {
-        toast({ title: 'User Updated', description: 'User updated successfully' })
+        toast({ title: 'User Updated', description: 'User updated successfully', variant: 'success' })
       }
     },
-    onError: (error: any) => {
-      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    onError: (error: any, variables) => {
+      const fallback = variables.role
+        ? 'Failed to update user role. Please try again.'
+        : 'Failed to update user. Please try again.'
+      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message || fallback, variant: 'error' })
     },
   })
 }
@@ -236,10 +239,10 @@ export const useDeleteUser = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast({ title: 'User Deleted', description: 'User has been removed' })
+      toast({ title: 'User Deleted', description: 'User deleted successfully.', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Delete Failed', description: error?.response?.data?.error || error.message || 'Failed to delete user.', variant: 'error' })
     },
   })
 }
@@ -271,10 +274,10 @@ export const useStartDryer = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
       queryClient.invalidateQueries({ queryKey: ['commands'] })
-      toast({ title: 'Dryer Started', description: 'Dryer has been started successfully' })
+      toast({ title: 'Dryer Started', description: 'Dryer has been started successfully', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Start Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Start Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -290,10 +293,10 @@ export const useStopDryer = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
       queryClient.invalidateQueries({ queryKey: ['commands'] })
-      toast({ title: 'Dryer Stopped', description: 'Dryer has been stopped successfully' })
+      toast({ title: 'Dryer Stopped', description: 'Dryer has been stopped successfully', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Stop Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Stop Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -312,10 +315,10 @@ export function useControlFan() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
       queryClient.invalidateQueries({ queryKey: ['commands'] })
-      toast({ title: 'Fan Control', description: `${variables.fanTarget} turned ${variables.fanAction.toLowerCase()}` })
+      toast({ title: 'Fan Control', description: `${variables.fan} turned ${variables.action.toLowerCase()}`, variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Fan Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Fan Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -431,10 +434,10 @@ export const useMarkAlertRead = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      toast({ title: 'Alert Read', description: 'Alert marked as read' })
+      toast({ title: 'Alert Read', description: 'Alert marked as read', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -449,10 +452,10 @@ export const useClearAllAlerts = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      toast({ title: 'Alerts Cleared', description: 'All alerts marked as read' })
+      toast({ title: 'Alerts Cleared', description: 'All alerts marked as read', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Clear Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Clear Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -466,7 +469,7 @@ export const usePredictDrying = () => {
       return unwrapResponse(responseData)
     },
     onError: (error: any) => {
-      toast({ title: 'Prediction Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Prediction Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -509,10 +512,10 @@ export const useUpdateProfile = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] })
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast({ title: 'Profile Updated', description: 'Your profile has been updated' })
+      toast({ title: 'Profile Updated', description: 'Your profile has been updated', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -527,10 +530,10 @@ export const useUpdateAvatar = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] })
-      toast({ title: 'Avatar Updated', description: 'Profile image updated' })
+      toast({ title: 'Avatar Updated', description: 'Profile image updated', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Avatar Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Avatar Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -543,12 +546,12 @@ export const useBulkDeleteUsers = () => {
       const { data: responseData } = await api.delete<ApiResponse<any>>('/users/bulk', { data: { ids } })
       return unwrapResponse(responseData)
     },
-    onSuccess: (data) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast({ title: 'Users Deleted', description: `${data.deletedCount} user(s) have been permanently deleted` })
+      toast({ title: 'Users Deleted', description: `${variables.length} users deleted successfully.`, variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message || 'Failed to delete selected users.', variant: 'error' })
     },
   })
 }
@@ -563,10 +566,10 @@ export const useBulkDeleteDevices = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
-      toast({ title: 'Devices Deleted', description: `${data.deletedCount} device(s) have been deregistered` })
+      toast({ title: 'Devices Deleted', description: `${data.deletedCount} device(s) have been deregistered`, variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -579,10 +582,10 @@ export const useChangePassword = () => {
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
-      toast({ title: 'Password Changed', description: 'Your password has been updated successfully' })
+      toast({ title: 'Password Changed', description: 'Your password has been updated successfully', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Change Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Change Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }

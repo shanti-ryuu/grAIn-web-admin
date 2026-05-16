@@ -30,7 +30,7 @@ export default function AlertsPage() {
       await markRead.mutateAsync(alertId)
       toast({ title: 'Alert Read', description: 'Alert marked as read' })
     } catch {
-      toast({ title: 'Failed', description: 'Could not mark alert as read', variant: 'destructive' })
+      toast({ title: 'Failed', description: 'Could not mark alert as read', variant: 'error' })
     }
   }
 
@@ -39,7 +39,7 @@ export default function AlertsPage() {
       await clearAll.mutateAsync()
       toast({ title: 'Alerts Cleared', description: 'All alerts have been dismissed' })
     } catch {
-      toast({ title: 'Failed', description: 'Could not clear alerts', variant: 'destructive' })
+      toast({ title: 'Failed', description: 'Could not clear alerts', variant: 'error' })
     }
   }
 

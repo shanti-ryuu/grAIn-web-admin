@@ -9,7 +9,6 @@ import DataTable from '@/components/ui/data-table'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useDevices, useBulkDeleteUsers } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
-import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
@@ -50,7 +49,6 @@ type PendingAction = {
 export default function UsersPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { toast } = useToast()
   const { isHydrated } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
@@ -110,7 +108,6 @@ export default function UsersPage() {
     if (!validateAddForm()) return
     try {
       await createUser.mutateAsync(addForm)
-      toast({ title: 'User Created', description: `User ${addForm.name} created successfully` })
       setShowAddModal(false)
       setAddForm({ name: '', email: '', password: '', role: UserRole.Farmer })
       setAddErrors({})
@@ -144,7 +141,6 @@ export default function UsersPage() {
         toast({ title: 'Account Activated', description: `${user!.name}'s account has been activated` })
       } else if (type === 'delete') {
         await deleteUser.mutateAsync(user!.id)
-        toast({ title: 'User Deleted', description: `${user!.name} has been permanently deleted` })
       } else if (type === 'bulk_delete') {
         await bulkDeleteUsers.mutateAsync(selectedRows)
         setSelectedRows([])

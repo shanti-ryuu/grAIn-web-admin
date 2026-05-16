@@ -67,11 +67,11 @@ export default function ProfilePage() {
 
     // Validate file
     if (!file.type.startsWith('image/')) {
-      toast({ title: 'Invalid File', description: 'Please select an image file', variant: 'destructive' })
+      toast({ title: 'Invalid File', description: 'Please select an image file', variant: 'error' })
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'File Too Large', description: 'Image must be less than 5MB', variant: 'destructive' })
+      toast({ title: 'File Too Large', description: 'Image must be less than 5MB', variant: 'error' })
       return
     }
 
@@ -85,7 +85,7 @@ export default function ProfilePage() {
       }
       reader.readAsDataURL(file)
     } catch {
-      toast({ title: 'Upload Failed', description: 'Failed to process image', variant: 'destructive' })
+      toast({ title: 'Upload Failed', description: 'Failed to process image', variant: 'error' })
     }
   }
 

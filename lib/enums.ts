@@ -46,6 +46,10 @@ export enum CommandType {
   Start = 'START',
   Stop = 'STOP',
   FanControl = 'FAN_CONTROL',
+  RelayControl = 'RELAY_CONTROL',
+  StepperControl = 'STEPPER_CONTROL',
+  HeaterControl = 'HEATER_CONTROL',
+  Status = 'STATUS',
 }
 
 export enum FanTarget {
@@ -64,8 +68,11 @@ export enum FanAction {
  */
 export enum CommandStatus {
   Pending = 'pending',
+  Polled = 'polled',
+  Executing = 'executing',
   Executed = 'executed',
   Failed = 'failed',
+  Timeout = 'timeout',
   Error = 'error',
 }
 

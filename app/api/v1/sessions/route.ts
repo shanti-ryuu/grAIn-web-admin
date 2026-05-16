@@ -1,10 +1,10 @@
-import { NextRequest } from 'next/server'
 import { withAuth } from '@/lib/utils/handler'
 import { successResponse, errorResponse, paginatedResponse, ErrorCodes } from '@/lib/utils/response'
 import DryingSession from '@/lib/models/DryingSession'
 import Device from '@/lib/models/Device'
 import SensorData from '@/lib/models/SensorData'
 import { sendPushNotification } from '@/lib/utils/notifications'
+import { getDeviceLiveness } from '@/lib/utils/device-liveness'
 
 export const GET = withAuth(async (req, user) => {
   const url = new URL(req.url)
@@ -45,6 +45,11 @@ export const POST = withAuth(async (req, user) => {
 
   if (user.role !== 'admin' && device.assignedUser.toString() !== user.userId) {
     return errorResponse('Not authorized for this device', ErrorCodes.FORBIDDEN, 403)
+  }
+
+  const liveness = await getDeviceLiveness(deviceId, { status: device.status, lastActive: device.lastActive })
+  if (!liveness.isOnline) {
+    return errorResponse('Cannot start drying session while device is offline. Power on the prototype and wait for live sensor data first.', ErrorCodes.CONFLICT, 409)
   }
 
   const activeSession = await DryingSession.findOne({ deviceId, status: 'active' })

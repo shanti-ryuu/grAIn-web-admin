@@ -20,6 +20,8 @@ export interface IDryingSession extends Document {
   completedAt?: Date
   duration?: number
   efficiency?: number
+  isSimulated?: boolean
+  simulationTag?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -100,6 +102,15 @@ const DryingSessionSchema: Schema = new Schema({
   efficiency: {
     type: Number,
   },
+  isSimulated: {
+    type: Boolean,
+    default: false,
+  },
+  simulationTag: {
+    type: String,
+    trim: true,
+    default: null,
+  },
 }, {
   timestamps: true,
 })
@@ -107,5 +118,6 @@ const DryingSessionSchema: Schema = new Schema({
 DryingSessionSchema.index({ deviceId: 1, status: 1 })
 DryingSessionSchema.index({ userId: 1, createdAt: -1 })
 DryingSessionSchema.index({ startedAt: -1 })
+DryingSessionSchema.index({ deviceId: 1, isSimulated: 1, simulationTag: 1 })
 
 export default mongoose.models.DryingSession || mongoose.model<IDryingSession>('DryingSession', DryingSessionSchema)

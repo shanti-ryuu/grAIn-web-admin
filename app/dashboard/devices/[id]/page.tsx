@@ -2,15 +2,44 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Play, Square, Thermometer, Droplets, Wind, Zap, Activity, Clock, Brain } from 'lucide-react'
+import { ArrowLeft, Play, Square, Thermometer, Droplets, Wind, Zap, Activity, Clock, Brain, Scale, Power, RotateCw, RotateCcw, Flame, Cog } from 'lucide-react'
 import Card from '@/components/Card'
 import Table from '@/components/Table'
-import { useDevice, useSensorData, useStartDryer, useStopDryer, useCommandHistory, usePredictions } from '@/hooks/useApi'
+import { useDevice, useSensorData, useStartDryer, useStopDryer, useCommandHistory, usePredictions, useControlFan, useControlStepper, useControlRelay, useControlHeater } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { getFirebaseApp } from '@/lib/firebase'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
+
+const DEVICE_ONLINE_TIMEOUT_MS = 2 * 60 * 1000
+
+interface LiveSensorSnapshot {
+  temperature?: number
+  humidity?: number
+  moisture?: number
+  fanSpeed?: number
+  energy?: number
+  solarVoltage?: number
+  weight?: number
+  status?: string
+  updatedAt?: number | string
+}
+
+function toTimestampMs(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value < 1_000_000_000_000 ? value * 1000 : value
+  }
+  if (typeof value === 'string') {
+    const parsed = Date.parse(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
+
+function isFresh(timestamp: number | null, currentTime: number): boolean {
+  return timestamp !== null && currentTime - timestamp <= DEVICE_ONLINE_TIMEOUT_MS
+}
 
 export default function DeviceDetailPage() {
   const params = useParams()
@@ -24,13 +53,29 @@ export default function DeviceDetailPage() {
   const { data: predictions } = usePredictions(device?.deviceId)
   const startDryer = useStartDryer()
   const stopDryer = useStopDryer()
+  const controlFan = useControlFan()
+  const controlStepper = useControlStepper()
+  const controlRelay = useControlRelay()
+  const controlHeater = useControlHeater()
 
   const [mode, setMode] = useState<'AUTO' | 'MANUAL'>('MANUAL')
   const [temperature, setTemperature] = useState(45)
   const [fanSpeed, setFanSpeed] = useState(75)
+  const [fan1Status, setFan1Status] = useState<'ON' | 'OFF'>('OFF')
+  const [fan2Status, setFan2Status] = useState<'ON' | 'OFF'>('OFF')
+  const [relayStatus, setRelayStatus] = useState<'ON' | 'OFF'>('OFF')
+  const [heaterStatus, setHeaterStatus] = useState<'ON' | 'OFF'>('OFF')
 
   // Real-time sensor data from Firebase
-  const [liveSensors, setLiveSensors] = useState<Record<string, number | string> | null>(null)
+  const [liveSensors, setLiveSensors] = useState<LiveSensorSnapshot | null>(null)
+  const [firebaseStatus, setFirebaseStatus] = useState<string | null>(null)
+  const [lastHeartbeatAt, setLastHeartbeatAt] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 5000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
     if (!device?.deviceId || typeof window === 'undefined') return
@@ -44,10 +89,15 @@ export default function DeviceDetailPage() {
 
     import('firebase/database').then(({ getDatabase, ref, onValue }) => {
       const db = getDatabase(app)
-      const sensorRef = ref(db, `grain/devices/${device.deviceId}/sensors`)
-      unsubscribe = onValue(sensorRef, (snapshot: { val: () => Record<string, number | string> | null }) => {
+      const deviceRef = ref(db, `grain/devices/${device.deviceId}`)
+      unsubscribe = onValue(deviceRef, (snapshot: { val: () => { sensors?: LiveSensorSnapshot; status?: string; lastActive?: number | string } | null }) => {
         const data = snapshot.val()
-        if (data) setLiveSensors(data)
+        setLiveSensors(data?.sensors ?? null)
+        setFirebaseStatus(data?.status ?? null)
+        const sensorUpdatedAt = toTimestampMs(data?.sensors?.updatedAt)
+        const lastActive = toTimestampMs(data?.lastActive)
+        const latestHeartbeat = Math.max(sensorUpdatedAt ?? 0, lastActive ?? 0)
+        setLastHeartbeatAt(latestHeartbeat > 0 ? latestHeartbeat : null)
       })
     })
 
@@ -56,7 +106,10 @@ export default function DeviceDetailPage() {
     }
   }, [device?.deviceId])
 
-  const latestSensor = liveSensors || (sensorData && sensorData.length > 0 ? sensorData[0] : null)
+  const isDeviceOnline = firebaseStatus === 'online' && isFresh(lastHeartbeatAt, now)
+  const latestSensor = isDeviceOnline ? liveSensors : null
+  const lastActiveDisplay = lastHeartbeatAt ? new Date(lastHeartbeatAt).toLocaleString() : device?.lastActive ? new Date(device.lastActive).toLocaleString() : 'Never'
+  const isRunning = isDeviceOnline && (latestSensor?.status === 'running' || latestSensor?.status === 'drying')
 
   const handleStart = async () => {
     try {
@@ -78,7 +131,44 @@ export default function DeviceDetailPage() {
     }
   }
 
+  const handleFanControl = async (fanTarget: 'FAN1' | 'FAN2' | 'ALL', fanAction: 'ON' | 'OFF') => {
+    try {
+      await controlFan.mutateAsync({ deviceId: device.deviceId, fanTarget, fanAction })
+      if (fanTarget === 'FAN1' || fanTarget === 'ALL') setFan1Status(fanAction)
+      if (fanTarget === 'FAN2' || fanTarget === 'ALL') setFan2Status(fanAction)
+    } catch {
+      // Toast handled by mutation
+    }
+  }
+
+  const handleStepperControl = async (stepperAction: 'START' | 'STOP' | 'CW' | 'CCW') => {
+    try {
+      await controlStepper.mutateAsync({ deviceId: device.deviceId, stepperAction })
+    } catch {
+      // Toast handled by mutation
+    }
+  }
+
+  const handleRelayControl = async (relayAction: 'ON' | 'OFF') => {
+    try {
+      await controlRelay.mutateAsync({ deviceId: device.deviceId, relayAction })
+      setRelayStatus(relayAction)
+    } catch {
+      // Toast handled by mutation
+    }
+  }
+
+  const handleHeaterControl = async (heaterAction: 'ON' | 'OFF') => {
+    try {
+      await controlHeater.mutateAsync({ deviceId: device.deviceId, heaterAction })
+      setHeaterStatus(heaterAction)
+    } catch {
+      // Toast handled by mutation
+    }
+  }
+
   const isCommandLoading = startDryer.isPending || stopDryer.isPending
+  const isAdvancedCommandLoading = controlFan.isPending || controlStepper.isPending || controlRelay.isPending || controlHeater.isPending
 
   if (deviceLoading || sensorLoading) {
     return (
@@ -123,12 +213,20 @@ export default function DeviceDetailPage() {
 
   const commandColumns = [
     { key: 'command', label: 'Command' },
+    { key: 'commandStr', label: 'Arduino', render: (v: string) => v || '—' },
+    { key: 'action', label: 'Action', render: (_v: string, row: { fanTarget?: string; fanAction?: string; relayAction?: string; stepperAction?: string; heaterAction?: string }) => {
+      if (row.fanTarget && row.fanAction) return `${row.fanTarget} ${row.fanAction}`
+      if (row.relayAction) return `Relay ${row.relayAction}`
+      if (row.stepperAction) return `Stepper ${row.stepperAction}`
+      if (row.heaterAction) return `Heater ${row.heaterAction}`
+      return '—'
+    }},
     { key: 'mode', label: 'Mode' },
     { key: 'status', label: 'Status', render: (v: string) => (
       <span className={`px-2 py-1 rounded text-xs font-semibold ${
         v === 'executed' ? 'bg-green-50 text-green-600' :
-        v === 'pending' ? 'bg-yellow-50 text-yellow-600' :
-        v === 'failed' || v === 'error' ? 'bg-red-50 text-red-600' :
+        v === 'pending' || v === 'polled' || v === 'executing' ? 'bg-yellow-50 text-yellow-600' :
+        v === 'failed' || v === 'timeout' || v === 'error' ? 'bg-red-50 text-red-600' :
         'bg-gray-50 text-gray-600'
       }`}>{v}</span>
     )},
@@ -150,7 +248,7 @@ export default function DeviceDetailPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {liveSensors && (
+            {isDeviceOnline && liveSensors && (
               <span className="flex items-center gap-1.5 px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-semibold">
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" /> LIVE
               </span>
@@ -163,28 +261,29 @@ export default function DeviceDetailPage() {
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className={`w-3 h-3 rounded-full ${device?.status === 'online' ? 'bg-green-500' : 'bg-gray-400'}`} />
+            <div className={`w-3 h-3 rounded-full ${isDeviceOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
             <div>
               <p className="text-sm font-medium text-gray-900">Device Status</p>
-              <p className="text-xs text-gray-500">{device?.status === 'online' ? 'Online and Operational' : 'Offline'}</p>
+              <p className="text-xs text-gray-500">{isDeviceOnline ? (isRunning ? 'Online and Running' : 'Online and Idle') : 'Offline'}</p>
             </div>
           </div>
           <div className="text-right">
             <p className="text-sm font-medium text-gray-900">Last Active</p>
-            <p className="text-xs text-gray-500">{device?.lastActive ? new Date(device.lastActive).toLocaleString() : 'Never'}</p>
+            <p className="text-xs text-gray-500">{lastActiveDisplay}</p>
           </div>
         </div>
       </Card>
 
       {/* Real-time Sensor Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
         {[
           { icon: Thermometer, label: 'Temperature', value: latestSensor?.temperature?.toFixed(1) ?? '--', unit: '°C', color: 'text-red-500' },
           { icon: Droplets, label: 'Humidity', value: latestSensor?.humidity?.toFixed(1) ?? '--', unit: '%', color: 'text-blue-500' },
           { icon: Droplets, label: 'Moisture', value: latestSensor?.moisture?.toFixed(1) ?? '--', unit: '%', color: 'text-green-600' },
           { icon: Wind, label: 'Fan Speed', value: latestSensor?.fanSpeed ?? '--', unit: '%', color: 'text-gray-600' },
           { icon: Zap, label: 'Energy', value: latestSensor?.energy?.toFixed(2) ?? '--', unit: 'kWh', color: 'text-yellow-600' },
-          { icon: Activity, label: 'Status', value: latestSensor?.status ?? '--', unit: '', color: 'text-green-700' },
+          { icon: Scale, label: 'Grain Weight', value: latestSensor?.weight && latestSensor.weight > 0 ? latestSensor.weight.toFixed(1) : '--', unit: 'kg', color: 'text-blue-600' },
+          { icon: Activity, label: 'Status', value: isDeviceOnline ? latestSensor?.status ?? 'online' : 'offline', unit: '', color: isDeviceOnline ? 'text-green-700' : 'text-gray-500' },
         ].map((s) => (
           <Card key={s.label} className="p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -228,6 +327,121 @@ export default function DeviceDetailPage() {
             className="flex items-center gap-2 px-6 py-2.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             {stopDryer.isPending ? <Clock className="w-4 h-4 animate-spin" /> : <Square className="w-4 h-4" />} Stop
           </button>
+        </div>
+      </Card>
+
+      {/* Advanced Hardware Controls */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Advanced Controls</h3>
+            <p className="text-sm text-gray-500">Fan groups, stepper motor, auger relay, and heater commands.</p>
+          </div>
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${isDeviceOnline ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+            {isDeviceOnline ? 'Prototype online' : 'Prototype offline'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="border border-gray-100 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Wind className="w-4 h-4 text-gray-500" />
+              <p className="text-sm font-semibold text-gray-900">Fan Controls</p>
+            </div>
+            {[
+              { label: 'Fan 1', target: 'FAN1' as const, status: fan1Status },
+              { label: 'Fan 2', target: 'FAN2' as const, status: fan2Status },
+              { label: 'All Fans', target: 'ALL' as const, status: fan1Status === 'ON' && fan2Status === 'ON' ? 'ON' : 'OFF' },
+            ].map((fanControl) => (
+              <div key={fanControl.target} className="flex items-center justify-between py-2 border-t border-gray-100 first:border-t-0">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{fanControl.label}</p>
+                  <p className={`text-xs font-semibold ${fanControl.status === 'ON' ? 'text-green-700' : 'text-gray-400'}`}>{fanControl.status}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleFanControl(fanControl.target, 'ON')}
+                    disabled={isAdvancedCommandLoading}
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold bg-green-800 text-white hover:bg-green-700 disabled:opacity-50"
+                  >
+                    ON
+                  </button>
+                  <button
+                    onClick={() => handleFanControl(fanControl.target, 'OFF')}
+                    disabled={isAdvancedCommandLoading}
+                    className="px-3 py-1.5 rounded-md text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    OFF
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="border border-gray-100 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Cog className="w-4 h-4 text-gray-500" />
+              <p className="text-sm font-semibold text-gray-900">Stepper Motor</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleStepperControl('START')}
+                disabled={isAdvancedCommandLoading}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-green-800 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50"
+              >
+                <Play className="w-4 h-4" /> START
+              </button>
+              <button
+                onClick={() => handleStepperControl('STOP')}
+                disabled={isAdvancedCommandLoading}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 disabled:opacity-50"
+              >
+                <Square className="w-4 h-4" /> STOP
+              </button>
+              <button
+                onClick={() => handleStepperControl('CW')}
+                disabled={isAdvancedCommandLoading}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 disabled:opacity-50"
+              >
+                <RotateCw className="w-4 h-4" /> CW
+              </button>
+              <button
+                onClick={() => handleStepperControl('CCW')}
+                disabled={isAdvancedCommandLoading}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" /> CCW
+              </button>
+            </div>
+          </div>
+
+          <div className="border border-gray-100 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Power className="w-4 h-4 text-gray-500" />
+              <p className="text-sm font-semibold text-gray-900">Auger / Conveyor</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className={`text-sm font-semibold ${relayStatus === 'ON' ? 'text-green-700' : 'text-gray-400'}`}>{relayStatus}</p>
+              <div className="flex gap-2">
+                <button onClick={() => handleRelayControl('ON')} disabled={isAdvancedCommandLoading} className="px-4 py-2 rounded-lg bg-green-800 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50">ON</button>
+                <button onClick={() => handleRelayControl('OFF')} disabled={isAdvancedCommandLoading} className="px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 disabled:opacity-50">OFF</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="border border-gray-100 rounded-lg p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Flame className="w-4 h-4 text-gray-500" />
+              <p className="text-sm font-semibold text-gray-900">Heater</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className={`text-sm font-semibold ${heaterStatus === 'ON' ? 'text-green-700' : 'text-gray-400'}`}>{heaterStatus}</p>
+              <div className="flex gap-2">
+                <button onClick={() => handleHeaterControl('ON')} disabled={isAdvancedCommandLoading} className="px-4 py-2 rounded-lg bg-green-800 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50">ON</button>
+                <button onClick={() => handleHeaterControl('OFF')} disabled={isAdvancedCommandLoading} className="px-4 py-2 rounded-lg bg-red-50 text-red-600 text-sm font-semibold hover:bg-red-100 disabled:opacity-50">OFF</button>
+              </div>
+            </div>
+          </div>
         </div>
       </Card>
 

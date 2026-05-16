@@ -4,10 +4,16 @@ import { API_VERSION } from '@/lib/enums'
 // Public endpoints that allow wildcard origin (ESP32, health checks)
 // These are checked against the pathname AFTER version rewrite,
 // so they use the /api/v1/ prefix.
-const PUBLIC_ENDPOINTS = [`/api/${API_VERSION}/health`, `/api/${API_VERSION}/sensors/data`, `/api/${API_VERSION}/commands/`]
+const PUBLIC_ENDPOINTS = [
+  `/api/${API_VERSION}/health`,
+  `/api/${API_VERSION}/ping`,
+  `/api/${API_VERSION}/warmup`,
+  `/api/${API_VERSION}/sensors/data`,
+  `/api/${API_VERSION}/commands/`,
+]
 
 // Unversioned public endpoints (for backward compat with ESP32/mobile)
-const LEGACY_PUBLIC_ENDPOINTS = ['/api/health', '/api/sensors/data', '/api/commands/']
+const LEGACY_PUBLIC_ENDPOINTS = ['/api/health', '/api/ping', '/api/warmup', '/api/sensors/data', '/api/commands/']
 
 function isPublicEndpoint(pathname: string): boolean {
   return PUBLIC_ENDPOINTS.some(ep => pathname.startsWith(ep)) ||

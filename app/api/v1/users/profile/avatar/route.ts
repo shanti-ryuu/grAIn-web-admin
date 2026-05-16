@@ -19,7 +19,7 @@ export const POST = withAuth(async (request, user) => {
     return errorResponse('Image too large — max 2MB', ErrorCodes.INVALID_INPUT, 400)
   }
 
-  const updatedUser = await User.findByIdAndUpdate(user.userId, { profileImage: image }, { new: true }).select('-password')
+  const updatedUser = await User.findByIdAndUpdate(user.userId, { profileImage: image }, { returnDocument: 'after' }).select('-password')
   if (!updatedUser) {
     return errorResponse('User not found', ErrorCodes.USER_NOT_FOUND, 404)
   }

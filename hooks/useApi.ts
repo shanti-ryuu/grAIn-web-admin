@@ -305,12 +305,12 @@ export function useControlFan() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   return useMutation({
-    mutationFn: ({ deviceId, fan, action }: {
+    mutationFn: ({ deviceId, fanTarget, fanAction }: {
       deviceId: string;
-      fan: 'FAN1' | 'FAN2' | 'ALL';
-      action: 'ON' | 'OFF';
+      fanTarget: 'FAN1' | 'FAN2' | 'ALL';
+      fanAction: 'ON' | 'OFF';
     }) =>
-      api.post<ApiResponse<any>>(`/dryer/${deviceId}/fan`, { fan, action })
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/fan`, { fanTarget, fanAction })
         .then(r => unwrapResponse(r.data)),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
@@ -319,6 +319,66 @@ export function useControlFan() {
     },
     onError: (error: any) => {
       toast({ title: 'Fan Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
+    },
+  })
+}
+
+export function useControlStepper() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, stepperAction }: {
+      deviceId: string;
+      stepperAction: 'START' | 'STOP' | 'CW' | 'CCW';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/stepper`, { stepperAction })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Stepper Control', description: `Stepper ${variables.stepperAction.toLowerCase()} command sent` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Stepper Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export function useControlRelay() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, relayAction }: {
+      deviceId: string;
+      relayAction: 'ON' | 'OFF';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/relay`, { relayAction })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Auger / Conveyor', description: `Relay turned ${variables.relayAction.toLowerCase()}` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Relay Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    },
+  })
+}
+
+export function useControlHeater() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, heaterAction }: {
+      deviceId: string;
+      heaterAction: 'ON' | 'OFF';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/heater`, { heaterAction })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Heater Control', description: `Heater turned ${variables.heaterAction.toLowerCase()}` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Heater Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
     },
   })
 }
@@ -541,8 +601,22 @@ export const useDryingSessions = (params?: { status?: string; deviceId?: string;
   return useQuery({
     queryKey: ['sessions', params],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any>>(`/sessions?${queryParams}`)
-      return unwrapResponse(responseData)
+      const { data: responseData } = await api.get<ApiResponse<any> & {
+        pagination?: {
+          total: number
+          count: number
+          page: number
+          limit: number
+          totalPages: number
+        }
+      }>(`/sessions?${queryParams}`)
+      if (!responseData.success || responseData.data === undefined) {
+        throw new Error(responseData.error || 'Request failed')
+      }
+      return {
+        data: responseData.data,
+        pagination: responseData.pagination,
+      }
     },
     staleTime: 15_000,
     refetchInterval: 15_000,
@@ -564,7 +638,13 @@ export const useStartDryingSession = () => {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   return useMutation({
-    mutationFn: async (payload: { deviceId: string; grainType?: string; targetMoisture?: number }) => {
+    mutationFn: async (payload: { deviceId: string; grainType?: string; targetMoisture?: number; mode?: string; temperature?: number; fanSpeed?: number }) => {
+      const startPayload = {
+        mode: payload.mode ?? 'AUTO',
+        temperature: payload.temperature ?? 45,
+        fanSpeed: payload.fanSpeed ?? 80,
+      }
+      await api.post<ApiResponse<any>>(`/dryer/${payload.deviceId}/start`, startPayload)
       const { data: responseData } = await api.post<ApiResponse<any>>('/sessions', payload)
       return unwrapResponse(responseData)
     },

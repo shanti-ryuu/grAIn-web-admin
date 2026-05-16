@@ -2,15 +2,82 @@ import { NextRequest } from 'next/server'
 import dbConnect from '@/lib/db'
 import SensorData from '@/lib/models/SensorData'
 import Device from '@/lib/models/Device'
+import Command from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
-import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { validateSensorDataRequest, sanitizeString } from '@/lib/utils/validation'
-import { syncSensorToFirebase } from '@/lib/utils/firebase-sync'
+import { markCommandExecuted, syncSensorToFirebase } from '@/lib/utils/firebase-sync'
 import { invalidateAnalyticsCache } from '@/lib/utils/analytics-cache'
 import Alert from '@/lib/models/Alert'
 import DryingSession from '@/lib/models/DryingSession'
 import { eventBroadcaster } from '@/lib/utils/event-stream'
 import { sendNotificationToDeviceOwner } from '@/lib/utils/notifications'
+
+const SENSOR_RATE_WINDOW_MS = 10_000
+const SENSOR_RATE_MAX = 20
+const sensorRateBuckets = new Map<string, { count: number; resetAt: number }>()
+
+interface NormalizedSensorReading {
+  deviceId: string
+  temperature: number
+  humidity: number
+  moisture: number
+  fanSpeed: number
+  energy: number
+  status: string
+  solarVoltage: number
+  weight: number
+  isActuallyRunning: boolean
+  receivedAt: Date
+}
+
+function getSensorClientKey(request: NextRequest, deviceId: string): string {
+  const forwardedFor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+  const realIp = request.headers.get('x-real-ip')
+  return `${deviceId}:${forwardedFor ?? realIp ?? 'unknown'}`
+}
+
+function isSensorRateLimited(request: NextRequest, deviceId: string): boolean {
+  const key = getSensorClientKey(request, deviceId)
+  const now = Date.now()
+
+  if (sensorRateBuckets.size > 500) {
+    for (const [bucketKey, bucket] of sensorRateBuckets.entries()) {
+      if (now > bucket.resetAt) sensorRateBuckets.delete(bucketKey)
+    }
+  }
+
+  const bucket = sensorRateBuckets.get(key)
+
+  if (!bucket || now > bucket.resetAt) {
+    sensorRateBuckets.set(key, { count: 1, resetAt: now + SENSOR_RATE_WINDOW_MS })
+    return false
+  }
+
+  bucket.count += 1
+  return bucket.count > SENSOR_RATE_MAX
+}
+
+async function reconcileCommandFromSensor(deviceId: string, runtimeStatus: string, fanSpeed: number): Promise<void> {
+  const activeCommand = await Command.findOne({
+    deviceId,
+    status: { $in: ['polled', 'executing'] },
+  }).sort({ createdAt: 1 }).lean()
+
+  if (!activeCommand) return
+
+  const hardwareCommand = activeCommand.commandStr ?? activeCommand.command
+  const shouldComplete =
+    activeCommand.command === 'STOP'
+      ? runtimeStatus === 'idle' || fanSpeed === 0
+      : activeCommand.command === 'START'
+        ? runtimeStatus === 'running' || fanSpeed > 0
+        : true
+
+  if (!shouldComplete) return
+
+  console.info(`[Command Sensor Confirmed] device=${deviceId} id=${activeCommand._id.toString()} command=${hardwareCommand}`)
+  await markCommandExecuted(deviceId, activeCommand._id.toString(), 'executed')
+}
 
 async function checkAndCreateAlerts(deviceId: string, data: { temperature: number; humidity: number; moisture: number }): Promise<void> {
   const alerts: { deviceId: string; type: 'critical' | 'warning' | 'info'; message: string; severity: number }[] = []
@@ -96,15 +163,94 @@ async function updateDryingSession(deviceId: string, data: { moisture: number; t
   }
 }
 
+async function persistSensorReading(reading: NormalizedSensorReading): Promise<void> {
+  await dbConnect()
+
+  const deviceUpdate = await Device.findOneAndUpdate(
+    { deviceId: reading.deviceId },
+    {
+      $set: {
+        status: 'online',
+        lastActive: reading.receivedAt,
+        lastMoisture: reading.moisture,
+        'runtimeState.isRunning': reading.isActuallyRunning,
+        'runtimeState.lastSeen': reading.receivedAt,
+        'runtimeState.currentTemperature': reading.temperature,
+        'runtimeState.currentHumidity': reading.humidity,
+        'runtimeState.currentMoisture': reading.moisture,
+        'runtimeState.currentWeight': reading.weight,
+      },
+    },
+    { returnDocument: 'after' }
+  )
+
+  if (!deviceUpdate) {
+    console.warn(`[Sensor Persist Skipped] device=${reading.deviceId} not registered`)
+    return
+  }
+
+  await SensorData.create({
+    deviceId: reading.deviceId,
+    temperature: reading.temperature,
+    humidity: reading.humidity,
+    moisture: reading.moisture,
+    fanSpeed: reading.fanSpeed,
+    energy: reading.energy,
+    status: reading.status,
+    solarVoltage: reading.solarVoltage,
+    weight: reading.weight,
+    timestamp: reading.receivedAt,
+  })
+
+  eventBroadcaster.broadcast('sensor_update', {
+    deviceId: reading.deviceId,
+    temperature: reading.temperature,
+    humidity: reading.humidity,
+    moisture: reading.moisture,
+    fanSpeed: reading.fanSpeed,
+    energy: reading.energy,
+    status: reading.status,
+    solarVoltage: reading.solarVoltage,
+    weight: reading.weight,
+    timestamp: reading.receivedAt.toISOString(),
+  })
+
+  void syncSensorToFirebase(reading.deviceId, {
+    temperature: reading.temperature,
+    humidity: reading.humidity,
+    moisture: reading.moisture,
+    fanSpeed: reading.fanSpeed,
+    energy: reading.energy,
+    status: reading.status,
+    solarVoltage: reading.solarVoltage,
+    weight: reading.weight,
+  }).catch((err: unknown) => console.error('[Firebase Sync Failed] Sensor data Firebase sync failed:', err))
+
+  void invalidateAnalyticsCache(reading.deviceId)
+    .catch((err: unknown) => console.error('[Analytics Cache Invalidate]', err))
+
+  void reconcileCommandFromSensor(reading.deviceId, reading.status, reading.fanSpeed)
+    .catch((err: unknown) => console.error('[Command Sensor Confirm]', err))
+
+  void updateDryingSession(reading.deviceId, {
+    moisture: reading.moisture,
+    temperature: reading.temperature,
+    humidity: reading.humidity,
+    fanSpeed: reading.fanSpeed,
+    energy: reading.energy,
+  }).catch((err: unknown) => console.error('[Session Update]', err))
+
+  void checkAndCreateAlerts(reading.deviceId, {
+    temperature: reading.temperature,
+    humidity: reading.humidity,
+    moisture: reading.moisture,
+  }).catch((err: unknown) => console.error('[Alert Gen]', err))
+}
+
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now()
+
   try {
-    const rateLimit = await checkRateLimit(request, RateLimits.PUBLIC_API)
-    if (!rateLimit.allowed) {
-      return errorResponse('Rate limit exceeded. Please reduce request frequency.', ErrorCodes.RATE_LIMIT, 429)
-    }
-
-    await dbConnect()
-
     const body = await request.json()
 
     if (process.env.NODE_ENV !== 'production' || process.env.DEBUG_SENSORS === 'true') {
@@ -122,110 +268,59 @@ export async function POST(request: NextRequest) {
     }
 
     const { deviceId, temperature, humidity, moisture, fanSpeed, energy, status, solarVoltage, weight } = body
-
-    const device = await Device.findOne({ deviceId })
-    if (!device) {
-      return errorResponse(`Device ${deviceId} not found`, ErrorCodes.DEVICE_NOT_FOUND, 404)
+    if (isSensorRateLimited(request, String(deviceId))) {
+      return errorResponse('Rate limit exceeded. Please reduce request frequency.', ErrorCodes.RATE_LIMIT, 429)
     }
 
-    const [mongoResult, deviceUpdateResult, firebaseResult] = await Promise.allSettled([
-      SensorData.create({
-        deviceId,
-        temperature: Number(temperature),
-        humidity: Number(humidity),
-        moisture: Number(moisture),
-        fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
-        energy: energy !== undefined ? Number(energy) : 0,
-        status: status && ['running', 'idle', 'paused', 'error'].includes(status) ? sanitizeString(status) : 'idle',
-        solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
-        weight: weight !== undefined ? Number(weight) : 0,
-        timestamp: new Date(),
-      }),
-      Device.findByIdAndUpdate(device._id, {
-        status: 'online',
-        lastActive: new Date(),
-        lastMoisture: Number(moisture),
-      }),
-      syncSensorToFirebase(deviceId, {
-        temperature: Number(temperature),
-        humidity: Number(humidity),
-        moisture: Number(moisture),
-        fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
-        energy: energy !== undefined ? Number(energy) : 0,
-        status: status && ['running', 'idle', 'paused', 'error'].includes(status) ? status : 'idle',
-        solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
-        weight: weight !== undefined ? Number(weight) : 0,
-      }),
-    ])
-
-    if (mongoResult.status === 'rejected') {
-      console.error('Sensor data MongoDB save failed:', mongoResult.reason)
-      return errorResponse('Failed to store sensor data', ErrorCodes.INTERNAL_ERROR, 500)
-    }
-
-    const sensorData = mongoResult.value
-
-    await invalidateAnalyticsCache(deviceId)
-
-    if (deviceUpdateResult.status === 'rejected') {
-      console.warn('[Device Update Error] Failed to update device status:', deviceUpdateResult.reason)
-    }
-    const firebaseFailed = firebaseResult.status === 'rejected'
-    if (firebaseFailed) {
-      console.error('[Firebase Sync Failed] Sensor data Firebase sync failed:', firebaseResult.reason)
-    }
-
-    // Broadcast real-time event via SSE
-    eventBroadcaster.broadcast('sensor_update', {
+    const numericTemperature = Number(temperature)
+    const numericHumidity = Number(humidity)
+    const numericMoisture = Number(moisture)
+    const runtimeStatus = status && ['running', 'idle', 'paused', 'error'].includes(status) ? sanitizeString(status) : 'idle'
+    const numericFanSpeed = fanSpeed !== undefined ? Number(fanSpeed) : 0
+    const numericEnergy = energy !== undefined ? Number(energy) : 0
+    const numericSolarVoltage = solarVoltage !== undefined ? Number(solarVoltage) : 0
+    const numericWeight = weight !== undefined ? Number(weight) : 0
+    const isActuallyRunning = runtimeStatus === 'running' && numericFanSpeed > 0
+    const receivedAt = new Date()
+    const reading: NormalizedSensorReading = {
       deviceId,
-      temperature: Number(temperature),
-      humidity: Number(humidity),
-      moisture: Number(moisture),
-      fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
-      energy: energy !== undefined ? Number(energy) : 0,
-      status: status || 'idle',
-      solarVoltage: solarVoltage !== undefined ? Number(solarVoltage) : 0,
-      weight: weight !== undefined ? Number(weight) : 0,
-      timestamp: new Date().toISOString(),
-    })
-
-    // Update active drying session for this device
-    setImmediate(() => {
-      void updateDryingSession(deviceId, {
-        moisture: Number(moisture),
-        temperature: Number(temperature),
-        humidity: Number(humidity),
-        fanSpeed: fanSpeed !== undefined ? Number(fanSpeed) : 0,
-        energy: energy !== undefined ? Number(energy) : 0,
-      }).catch((err: unknown) => console.error('[Session Update]', err))
-    })
+      temperature: numericTemperature,
+      humidity: numericHumidity,
+      moisture: numericMoisture,
+      fanSpeed: numericFanSpeed,
+      energy: numericEnergy,
+      status: runtimeStatus,
+      solarVoltage: numericSolarVoltage,
+      weight: numericWeight,
+      isActuallyRunning,
+      receivedAt,
+    }
 
     setImmediate(() => {
-      void checkAndCreateAlerts(deviceId, {
-        temperature: Number(temperature),
-        humidity: Number(humidity),
-        moisture: Number(moisture),
-      }).catch((err: unknown) => console.error('[Alert Gen]', err))
+      void persistSensorReading(reading)
+        .catch((err: unknown) => console.error('[Sensor Persist Failed]', err))
     })
 
     const sensorPayload = {
-      id: sensorData._id,
-      deviceId: sensorData.deviceId,
-      temperature: sensorData.temperature,
-      humidity: sensorData.humidity,
-      moisture: sensorData.moisture,
-      fanSpeed: sensorData.fanSpeed,
-      energy: sensorData.energy,
-      status: sensorData.status,
-      solarVoltage: sensorData.solarVoltage,
-      weight: sensorData.weight,
-      timestamp: sensorData.timestamp.toISOString(),
-      createdAt: sensorData.createdAt.toISOString(),
+      accepted: true,
+      deviceId,
+      temperature: numericTemperature,
+      humidity: numericHumidity,
+      moisture: numericMoisture,
+      fanSpeed: numericFanSpeed,
+      energy: numericEnergy,
+      status: runtimeStatus,
+      solarVoltage: numericSolarVoltage,
+      weight: numericWeight,
+      timestamp: receivedAt.toISOString(),
     }
 
-    return firebaseFailed
-      ? successResponse(sensorPayload, { status: 201, warning: 'Realtime sync failed' })
-      : successResponse(sensorPayload, 201)
+    const durationMs = Date.now() - startedAt
+    if (durationMs > 1500) {
+      console.warn(`[Sensor Ingest Slow] device=${deviceId} durationMs=${durationMs}`)
+    }
+
+    return successResponse(sensorPayload, 202)
 
   } catch (error) {
     console.error('Sensor data error:', error)

@@ -48,7 +48,7 @@ export const PATCH = withAuth(async (request, authUser, { params }) => {
     updateData.password = await bcrypt.hash(password, BCRYPT_ROUNDS)
   }
 
-  const updatedUser = await User.findByIdAndUpdate(id, updateData, { new: true }).select('-password')
+  const updatedUser = await User.findByIdAndUpdate(id, updateData, { returnDocument: 'after' }).select('-password')
   if (!updatedUser) {
     return errorResponse('User not found', ErrorCodes.USER_NOT_FOUND, 404)
   }

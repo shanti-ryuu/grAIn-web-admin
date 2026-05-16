@@ -5,12 +5,14 @@ const CACHE_TTL_S = 300 // same, in seconds for Redis EX
 
 // ── Upstash Redis client (singleton, shared with rateLimit) ────────────────────
 let redis: Redis | null = null
+let redisDisabled = false
 function getRedis(): Redis | null {
+  if (redisDisabled) return null
   if (redis) return redis
-  if (process.env.UPSTASH_REDIS_DISABLED === 'true') return null
+  if (process.env.UPSTASH_REDIS_DISABLED === 'true') { redisDisabled = true; return null }
   const url = process.env.UPSTASH_REDIS_REST_URL
   const token = process.env.UPSTASH_REDIS_REST_TOKEN
-  if (!url || !token) return null
+  if (!url || !token) { redisDisabled = true; return null }
   redis = new Redis({ url, token })
   return redis
 }
@@ -49,7 +51,8 @@ export async function getAnalyticsCacheEntry(key: string): Promise<unknown | und
     const raw = await r.get(`analytics:${key}`)
     return raw ?? undefined
   } catch (err) {
-    console.warn('[analytics-cache] Redis GET failed, falling back to memory:', (err as Error).message)
+    console.warn('[analytics-cache] Redis failed, permanently disabling:', (err as Error).message)
+    redis = null; redisDisabled = true
     return getMemory(key)
   }
 }
@@ -61,7 +64,8 @@ export async function setAnalyticsCacheEntry(key: string, data: unknown): Promis
   try {
     await r.set(`analytics:${key}`, JSON.stringify(data), { ex: CACHE_TTL_S })
   } catch (err) {
-    console.warn('[analytics-cache] Redis SET failed, falling back to memory:', (err as Error).message)
+    console.warn('[analytics-cache] Redis failed, permanently disabling:', (err as Error).message)
+    redis = null; redisDisabled = true
     setMemory(key, data)
   }
 }

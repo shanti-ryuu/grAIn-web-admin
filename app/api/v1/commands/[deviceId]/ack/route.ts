@@ -19,37 +19,49 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { commandId, status } = body
+    const { commandId, status, command } = body
 
-    if (!commandId) {
-      return errorResponse('commandId is required', ErrorCodes.INVALID_INPUT, 400)
-    }
+    let resolvedCommandId = typeof commandId === 'string' ? commandId : ''
 
-    const validStatuses = ['executed', 'failed', 'error']
+    const validStatuses = ['executed', 'failed', 'timeout', 'error']
     const commandStatus = validStatuses.includes(status) ? status : 'executed'
 
-    const command = await Command.findByIdAndUpdate(
-      commandId,
-      { status: commandStatus, executedAt: new Date() },
-      { new: true }
-    )
+    if (!resolvedCommandId) {
+      const hardwareCommand = typeof command === 'string' ? command.trim().toUpperCase() : ''
+      const query: Record<string, unknown> = {
+        deviceId,
+        status: { $in: ['pending', 'polled', 'executing'] },
+      }
+      if (hardwareCommand) {
+        query.$or = [
+          { commandStr: hardwareCommand },
+          { command: hardwareCommand },
+        ]
+      }
+      const activeCommand = await Command.findOne(query).sort({ createdAt: 1 }).lean()
+      resolvedCommandId = activeCommand?._id?.toString?.() ?? ''
+    }
 
-    if (!command) {
+    if (!resolvedCommandId) {
+      return errorResponse('commandId or active command match is required', ErrorCodes.INVALID_INPUT, 400)
+    }
+
+    await markCommandExecuted(deviceId, resolvedCommandId, commandStatus)
+
+    const updatedCommand = await Command.findById(resolvedCommandId)
+
+    if (!updatedCommand) {
       return errorResponse('Command not found', ErrorCodes.NOT_FOUND, 404)
     }
 
-    try {
-      await markCommandExecuted(commandId, commandStatus)
-    } catch (firebaseError) {
-      console.error('Firebase ack sync failed:', firebaseError)
-    }
+    console.info(`[Command ACK] device=${deviceId} id=${resolvedCommandId} status=${commandStatus}`)
 
     return successResponse({
-      id: command._id,
-      deviceId: command.deviceId,
-      command: command.command,
-      status: command.status,
-      executedAt: command.executedAt?.toISOString?.() || null,
+      id: updatedCommand._id,
+      deviceId: updatedCommand.deviceId,
+      command: updatedCommand.command,
+      status: updatedCommand.status,
+      executedAt: updatedCommand.executedAt?.toISOString?.() || null,
     })
 
   } catch (error) {

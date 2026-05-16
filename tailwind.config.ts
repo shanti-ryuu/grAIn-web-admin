@@ -13,6 +13,7 @@ const config: Config = {
         background: '#f9fafb',
         card: '#ffffff',
         border: '#e5e7eb',
+        destructive: '#dc2626',
         textPrimary: '#111827',
         textSecondary: '#6b7280',
         green: {

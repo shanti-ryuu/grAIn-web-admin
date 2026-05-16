@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
+import { useToast } from '@/hooks/useToast'
 
  type IdLike = string | { id?: string; _id?: string } | null | undefined
 
@@ -48,6 +49,7 @@ type PendingAction = {
 export default function UsersPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const { isHydrated } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
@@ -95,9 +97,12 @@ export default function UsersPage() {
 
   const validateAddForm = (): boolean => {
     const errors: Record<string, string> = {}
-    if (!addForm.name || addForm.name.trim().length < 2) errors.name = 'Name must be at least 2 characters'
-    if (!addForm.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addForm.email)) errors.email = 'Valid email is required'
-    if (!addForm.password || addForm.password.length < 6) errors.password = 'Password must be at least 6 characters'
+    if (!addForm.name.trim()) errors.name = 'Name is required'
+    else if (addForm.name.trim().length < 2) errors.name = 'Name must be at least 2 characters'
+    if (!addForm.email.trim()) errors.email = 'Email address is required'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addForm.email)) errors.email = 'Please enter a valid email address'
+    if (!addForm.password) errors.password = 'Password is required'
+    else if (addForm.password.length < 6) errors.password = 'Password must be at least 6 characters'
     setAddErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -112,11 +117,11 @@ export default function UsersPage() {
       setAddErrors({})
       queryClient.invalidateQueries({ queryKey: ['users'] })
     } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
+      const axiosErr = err as { response?: { status?: number; data?: { error?: string; message?: string; errorCode?: string } } }
       const msg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to create user. Please try again.'
-      toast({ title: 'Creation Failed', description: msg, variant: 'destructive' })
-      if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('already')) {
-        setAddErrors(prev => ({ ...prev, email: msg }))
+      toast({ title: 'Creation Failed', description: msg, variant: 'error' })
+      if (axiosErr.response?.status === 409 || msg.toLowerCase().includes('email') || msg.toLowerCase().includes('already')) {
+        setAddErrors(prev => ({ ...prev, email: 'An account with this email already exists' }))
       }
     }
   }
@@ -146,7 +151,7 @@ export default function UsersPage() {
       toast({
         title: 'Action Failed',
         description: axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to perform action',
-        variant: 'destructive',
+        variant: 'error',
       })
     }
     setPendingAction(null)
@@ -428,24 +433,24 @@ export default function UsersPage() {
               <h2 className="text-xl font-semibold text-gray-900">Add User</h2>
               <button onClick={() => handleAddModalClose(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
-            <form onSubmit={handleAddUser} className="space-y-4">
+            <form onSubmit={handleAddUser} noValidate className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                <input type="text" value={addForm.name} onChange={(e) => { setAddForm({ ...addForm, name: e.target.value }); setAddErrors({ ...addErrors, name: '' }) }} required
-                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 ${addErrors.name ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
-                {addErrors.name && <p className="mt-1 text-xs text-red-600">{addErrors.name}</p>}
+                <input type="text" value={addForm.name} onChange={(e) => { setAddForm({ ...addForm, name: e.target.value }); if (addErrors.name) setAddErrors(prev => ({ ...prev, name: '' })) }}
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 ${addErrors.name ? 'border-destructive focus:ring-destructive' : 'border-gray-200 focus:ring-green-800'}`} />
+                {addErrors.name && <p className="text-xs text-destructive mt-1">{addErrors.name}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                <input type="email" value={addForm.email} onChange={(e) => { setAddForm({ ...addForm, email: e.target.value }); setAddErrors({ ...addErrors, email: '' }) }} required autoComplete="off"
-                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 ${addErrors.email ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
-                {addErrors.email && <p className="mt-1 text-xs text-red-600">{addErrors.email}</p>}
+                <input type="email" value={addForm.email} onChange={(e) => { setAddForm({ ...addForm, email: e.target.value }); if (addErrors.email) setAddErrors(prev => ({ ...prev, email: '' })) }} autoComplete="off"
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 ${addErrors.email ? 'border-destructive focus:ring-destructive' : 'border-gray-200 focus:ring-green-800'}`} />
+                {addErrors.email && <p className="text-xs text-destructive mt-1">{addErrors.email}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                <input type="password" value={addForm.password} onChange={(e) => { setAddForm({ ...addForm, password: e.target.value }); setAddErrors({ ...addErrors, password: '' }) }} required minLength={6} autoComplete="new-password"
-                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 ${addErrors.password ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
-                {addErrors.password && <p className="mt-1 text-xs text-red-600">{addErrors.password}</p>}
+                <input type="password" value={addForm.password} onChange={(e) => { setAddForm({ ...addForm, password: e.target.value }); if (addErrors.password) setAddErrors(prev => ({ ...prev, password: '' })) }} autoComplete="new-password"
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 ${addErrors.password ? 'border-destructive focus:ring-destructive' : 'border-gray-200 focus:ring-green-800'}`} />
+                {addErrors.password && <p className="text-xs text-destructive mt-1">{addErrors.password}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>

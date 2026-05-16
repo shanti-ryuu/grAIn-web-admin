@@ -29,6 +29,8 @@ export default function ProfilePage() {
     location: profile.location || '',
   })
   const [isDirty, setIsDirty] = useState(false)
+  const [profileErrors, setProfileErrors] = useState<Record<string, string>>({})
+  const [avatarError, setAvatarError] = useState('')
 
   // Sync form when profile data loads
   useEffect(() => {
@@ -45,10 +47,23 @@ export default function ProfilePage() {
 
   const handleChange = (field: string, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
+    if (profileErrors[field]) setProfileErrors(prev => ({ ...prev, [field]: '' }))
     setIsDirty(true)
   }
 
+  const validateProfile = (): boolean => {
+    const errors: Record<string, string> = {}
+    if (!form.name.trim()) errors.name = 'Name is required'
+    if (form.bio.length > 200) errors.bio = `Bio must be 200 characters or less (${form.bio.length}/200)`
+    if (form.phoneNumber.trim() && !/^\+?[\d\s().-]{7,20}$/.test(form.phoneNumber.trim())) {
+      errors.phoneNumber = 'Please enter a valid phone number'
+    }
+    setProfileErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleSaveProfile = async () => {
+    if (!validateProfile()) return
     try {
       await updateProfile.mutateAsync(form)
       // FIX 6: Update Zustand auth store so navbar reflects changes immediately
@@ -57,20 +72,23 @@ export default function ProfilePage() {
       setIsDirty(false)
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
-      toast({ title: 'Update Failed', description: axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to update profile', variant: 'destructive' })
+      toast({ title: 'Update Failed', description: axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to update profile', variant: 'error' })
     }
   }
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    setAvatarError('')
 
     // Validate file
     if (!file.type.startsWith('image/')) {
+      setAvatarError('Please select an image file')
       toast({ title: 'Invalid File', description: 'Please select an image file', variant: 'error' })
       return
     }
     if (file.size > 5 * 1024 * 1024) {
+      setAvatarError('Image must be less than 5MB')
       toast({ title: 'File Too Large', description: 'Image must be less than 5MB', variant: 'error' })
       return
     }
@@ -85,6 +103,7 @@ export default function ProfilePage() {
       }
       reader.readAsDataURL(file)
     } catch {
+      setAvatarError('Failed to process image')
       toast({ title: 'Upload Failed', description: 'Failed to process image', variant: 'error' })
     }
   }
@@ -95,7 +114,7 @@ export default function ProfilePage() {
       updateStoreUser({ profileImage: null })
       toast({ title: 'Photo Removed', description: 'Profile photo has been removed' })
     } catch {
-      toast({ title: 'Failed', description: 'Could not remove photo', variant: 'destructive' })
+      toast({ title: 'Failed', description: 'Could not remove photo', variant: 'error' })
     }
   }
 
@@ -144,6 +163,7 @@ export default function ProfilePage() {
             {updateAvatar.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
             {updateAvatar.isPending ? 'Uploading...' : 'Change Photo'}
           </button>
+          {avatarError && <p className="text-xs text-destructive mt-2">{avatarError}</p>}
           {currentAvatar && (
             <button onClick={handleRemovePhoto} className="mt-2 text-xs text-red-600 hover:text-red-700 font-medium">
               Remove Photo
@@ -165,7 +185,8 @@ export default function ProfilePage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
               <input type="text" value={form.name} onChange={(e) => handleChange('name', e.target.value)} autoComplete="name"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 ${profileErrors.name ? 'border-destructive focus:ring-destructive' : 'border-gray-200 focus:ring-green-800'}`} />
+              {profileErrors.name && <p className="text-xs text-destructive mt-1">{profileErrors.name}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
@@ -175,15 +196,20 @@ export default function ProfilePage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Bio</label>
-              <textarea value={form.bio} onChange={(e) => handleChange('bio', e.target.value)} maxLength={200} rows={3}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 resize-none" />
-              <p className="mt-1 text-xs text-gray-400">{form.bio.length}/200 characters</p>
+              <textarea value={form.bio} onChange={(e) => handleChange('bio', e.target.value)} rows={3}
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 resize-none ${profileErrors.bio ? 'border-destructive focus:ring-destructive' : 'border-gray-200 focus:ring-green-800'}`} />
+              {profileErrors.bio ? (
+                <p className="text-xs text-destructive mt-1">{profileErrors.bio}</p>
+              ) : (
+                <p className="mt-1 text-xs text-gray-400">{form.bio.length}/200 characters</p>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
                 <input type="tel" value={form.phoneNumber} onChange={(e) => handleChange('phoneNumber', e.target.value)} autoComplete="tel"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 ${profileErrors.phoneNumber ? 'border-destructive focus:ring-destructive' : 'border-gray-200 focus:ring-green-800'}`} />
+                {profileErrors.phoneNumber && <p className="text-xs text-destructive mt-1">{profileErrors.phoneNumber}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>

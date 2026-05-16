@@ -63,8 +63,10 @@ export default function SettingsPage() {
     e.preventDefault()
     const errors: Record<string, string> = {}
     if (!pwForm.currentPassword) errors.currentPassword = 'Current password is required'
-    if (!pwForm.newPassword || pwForm.newPassword.length < 6) errors.newPassword = 'New password must be at least 6 characters'
-    if (pwForm.newPassword !== pwForm.confirmPassword) errors.confirmPassword = 'Passwords do not match'
+    if (!pwForm.newPassword) errors.newPassword = 'New password is required'
+    else if (pwForm.newPassword.length < 6) errors.newPassword = 'New password must be at least 6 characters'
+    else if (pwForm.newPassword === pwForm.currentPassword) errors.newPassword = 'New password must be different from your current password'
+    if (pwForm.confirmPassword !== pwForm.newPassword) errors.confirmPassword = 'Passwords do not match'
     setPwErrors(errors)
     if (Object.keys(errors).length > 0) return
 
@@ -76,9 +78,9 @@ export default function SettingsPage() {
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
       const msg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to change password. Please try again.'
-      toast({ title: 'Change Failed', description: msg, variant: 'destructive' })
+      toast({ title: 'Change Failed', description: msg, variant: 'error' })
       if (msg.toLowerCase().includes('incorrect') || msg.toLowerCase().includes('wrong') || msg.toLowerCase().includes('current')) {
-        setPwErrors(prev => ({ ...prev, currentPassword: msg }))
+        setPwErrors(prev => ({ ...prev, currentPassword: 'Your current password is incorrect' }))
       }
     }
   }
@@ -177,12 +179,12 @@ export default function SettingsPage() {
           <Lock className="w-5 h-5 text-green-800" />
           <h2 className="text-xl font-semibold text-gray-900">Change Password</h2>
         </div>
-        <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+        <form onSubmit={handleChangePassword} noValidate className="space-y-4 max-w-md">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
             <div className="relative">
-              <input type={showCurrent ? 'text' : 'password'} value={pwForm.currentPassword} onChange={(e) => { setPwForm({ ...pwForm, currentPassword: e.target.value }); setPwErrors({ ...pwErrors, currentPassword: '' }) }} required autoComplete="current-password"
-                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 pr-10 ${pwErrors.currentPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+              <input type={showCurrent ? 'text' : 'password'} value={pwForm.currentPassword} onChange={(e) => { setPwForm({ ...pwForm, currentPassword: e.target.value }); if (pwErrors.currentPassword) setPwErrors(prev => ({ ...prev, currentPassword: '' })) }} autoComplete="current-password"
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 pr-10 ${pwErrors.currentPassword ? 'border-destructive focus:ring-destructive' : 'border-gray-200 focus:ring-green-800'}`} />
               <button
                 type="button"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
@@ -191,13 +193,13 @@ export default function SettingsPage() {
                 {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            {pwErrors.currentPassword && <p className="mt-1 text-xs text-red-600">{pwErrors.currentPassword}</p>}
+            {pwErrors.currentPassword && <p className="text-xs text-destructive mt-1">{pwErrors.currentPassword}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
             <div className="relative">
-              <input type={showNew ? 'text' : 'password'} value={pwForm.newPassword} onChange={(e) => { setPwForm({ ...pwForm, newPassword: e.target.value }); setPwErrors({ ...pwErrors, newPassword: '' }) }} required minLength={6} autoComplete="new-password"
-                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 pr-10 ${pwErrors.newPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+              <input type={showNew ? 'text' : 'password'} value={pwForm.newPassword} onChange={(e) => { setPwForm({ ...pwForm, newPassword: e.target.value }); if (pwErrors.newPassword) setPwErrors(prev => ({ ...prev, newPassword: '' })); if (pwErrors.confirmPassword) setPwErrors(prev => ({ ...prev, confirmPassword: '' })) }} autoComplete="new-password"
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 pr-10 ${pwErrors.newPassword ? 'border-destructive focus:ring-destructive' : 'border-gray-200 focus:ring-green-800'}`} />
               <button
                 type="button"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
@@ -206,13 +208,13 @@ export default function SettingsPage() {
                 {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            {pwErrors.newPassword && <p className="mt-1 text-xs text-red-600">{pwErrors.newPassword}</p>}
+            {pwErrors.newPassword && <p className="text-xs text-destructive mt-1">{pwErrors.newPassword}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
             <div className="relative">
-              <input type={showConfirm ? 'text' : 'password'} value={pwForm.confirmPassword} onChange={(e) => { setPwForm({ ...pwForm, confirmPassword: e.target.value }); setPwErrors({ ...pwErrors, confirmPassword: '' }) }} required minLength={6} autoComplete="new-password"
-                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 pr-10 ${pwErrors.confirmPassword ? 'border-red-400 bg-red-50' : 'border-gray-200'}`} />
+              <input type={showConfirm ? 'text' : 'password'} value={pwForm.confirmPassword} onChange={(e) => { setPwForm({ ...pwForm, confirmPassword: e.target.value }); if (pwErrors.confirmPassword) setPwErrors(prev => ({ ...prev, confirmPassword: '' })) }} autoComplete="new-password"
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 pr-10 ${pwErrors.confirmPassword ? 'border-destructive focus:ring-destructive' : 'border-gray-200 focus:ring-green-800'}`} />
               <button
                 type="button"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
@@ -221,7 +223,7 @@ export default function SettingsPage() {
                 {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            {pwErrors.confirmPassword && <p className="mt-1 text-xs text-red-600">{pwErrors.confirmPassword}</p>}
+            {pwErrors.confirmPassword && <p className="text-xs text-destructive mt-1">{pwErrors.confirmPassword}</p>}
           </div>
           <div className="pt-4">
             <button type="submit" disabled={changePassword.isPending} className="px-6 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">

@@ -82,6 +82,7 @@ export default function DevicesPage() {
 
   // FIX 2: Edit Location state
   const [editLocationValue, setEditLocationValue] = useState('')
+  const [editLocationErrors, setEditLocationErrors] = useState<Record<string, string>>({})
   // FIX 2: Reassign User state
   const [reassignUserId, setReassignUserId] = useState('')
 
@@ -125,6 +126,11 @@ export default function DevicesPage() {
 
     try {
       if (type === 'edit_location') {
+        const nextErrors: Record<string, string> = {}
+        if (!editLocationValue.trim()) nextErrors.location = 'Location is required'
+        else if (editLocationValue.trim().length < 3) nextErrors.location = 'Location must be at least 3 characters'
+        setEditLocationErrors(nextErrors)
+        if (Object.keys(nextErrors).length > 0) return
         await updateDevice.mutateAsync({ id: device.id, location: editLocationValue })
         toast({ title: 'Location Updated', description: `Location updated for ${device.deviceId}` })
       } else if (type === 'reassign_user') {
@@ -137,10 +143,11 @@ export default function DevicesPage() {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
-      toast({ title: 'Action Failed', description: message, variant: 'destructive' })
+      toast({ title: 'Action Failed', description: message, variant: 'error' })
     }
     setPendingDeviceAction(null)
     setEditLocationValue('')
+    setEditLocationErrors({})
     setReassignUserId('')
   }
 
@@ -227,7 +234,7 @@ export default function DevicesPage() {
                 <Eye className="w-4 h-4" /> View Details
               </DropdownMenuItem>
               {/* FIX 2: Edit Location opens modal */}
-              <DropdownMenuItem onClick={() => { setEditLocationValue(device.location === '—' ? '' : device.location); setPendingDeviceAction({ type: 'edit_location', device }) }}>
+              <DropdownMenuItem onClick={() => { setEditLocationValue(device.location === '—' ? '' : device.location); setEditLocationErrors({}); setPendingDeviceAction({ type: 'edit_location', device }) }}>
                 <MapPin className="w-4 h-4" /> Edit Location
               </DropdownMenuItem>
               {/* FIX 2: Reassign User opens modal */}
@@ -377,20 +384,21 @@ export default function DevicesPage() {
 
       {/* FIX 2: Unified device action modals */}
       {pendingDeviceAction?.type === 'edit_location' && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setPendingDeviceAction(null)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setPendingDeviceAction(null); setEditLocationErrors({}) }}>
           <div className="bg-white rounded-lg border border-gray-200 p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-900">Edit Device Location</h2>
-              <button onClick={() => setPendingDeviceAction(null)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+              <button onClick={() => { setPendingDeviceAction(null); setEditLocationErrors({}) }} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
             </div>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
-                <input type="text" value={editLocationValue} onChange={(e) => setEditLocationValue(e.target.value)} placeholder="e.g., Farm A, Plot 1"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800" />
+                <input type="text" value={editLocationValue} onChange={(e) => { setEditLocationValue(e.target.value); if (editLocationErrors.location) setEditLocationErrors(prev => ({ ...prev, location: '' })) }} placeholder="e.g., Farm A, Plot 1"
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 ${editLocationErrors.location ? 'border-destructive focus:ring-destructive' : 'border-gray-200 focus:ring-green-800'}`} />
+                {editLocationErrors.location && <p className="text-xs text-destructive mt-1">{editLocationErrors.location}</p>}
               </div>
               <div className="flex gap-3 pt-4">
-                <button onClick={() => setPendingDeviceAction(null)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+                <button onClick={() => { setPendingDeviceAction(null); setEditLocationErrors({}) }} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">Cancel</button>
                 <button onClick={handleConfirmDeviceAction} disabled={updateDevice.isPending} className="flex-1 px-4 py-2.5 bg-green-800 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
                   {updateDevice.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                   Save
@@ -454,7 +462,7 @@ export default function DevicesPage() {
               queryClient.invalidateQueries({ queryKey: ['devices'] })
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err)
-              toast({ title: 'Bulk Delete Failed', description: message, variant: 'destructive' })
+              toast({ title: 'Bulk Delete Failed', description: message, variant: 'error' })
             }
             setPendingDeviceAction(null)
           }}

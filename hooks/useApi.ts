@@ -34,7 +34,7 @@ export const useLogin = () => {
     },
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : 'Login failed'
-      toast({ title: 'Login Failed', description: message, variant: 'destructive' })
+      toast({ title: 'Login Failed', description: message, variant: 'error' })
     },
   })
 }
@@ -315,7 +315,7 @@ export function useControlFan() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
       queryClient.invalidateQueries({ queryKey: ['commands'] })
-      toast({ title: 'Fan Control', description: `${variables.fan} turned ${variables.action.toLowerCase()}`, variant: 'success' })
+      toast({ title: 'Fan Control', description: `${variables.fanTarget} turned ${variables.fanAction.toLowerCase()}`, variant: 'success' })
     },
     onError: (error: any) => {
       toast({ title: 'Fan Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
@@ -338,7 +338,7 @@ export function useControlStepper() {
       toast({ title: 'Stepper Control', description: `Stepper ${variables.stepperAction.toLowerCase()} command sent` })
     },
     onError: (error: any) => {
-      toast({ title: 'Stepper Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Stepper Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -358,7 +358,7 @@ export function useControlRelay() {
       toast({ title: 'Auger / Conveyor', description: `Relay turned ${variables.relayAction.toLowerCase()}` })
     },
     onError: (error: any) => {
-      toast({ title: 'Relay Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Relay Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -378,7 +378,7 @@ export function useControlHeater() {
       toast({ title: 'Heater Control', description: `Heater turned ${variables.heaterAction.toLowerCase()}` })
     },
     onError: (error: any) => {
-      toast({ title: 'Heater Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Heater Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -653,7 +653,7 @@ export const useStartDryingSession = () => {
       toast({ title: 'Session Started', description: `Drying session started for ${data.deviceId}` })
     },
     onError: (error: any) => {
-      toast({ title: 'Start Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Start Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -672,7 +672,7 @@ export const useEndDryingSession = () => {
       toast({ title: msg, description: 'Drying session has been updated' })
     },
     onError: (error: any) => {
-      toast({ title: 'Action Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Action Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }

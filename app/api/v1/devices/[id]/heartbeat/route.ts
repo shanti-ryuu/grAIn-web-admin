@@ -1,18 +1,12 @@
-import { NextRequest } from 'next/server'
-import dbConnect from '@/lib/db'
 import Device from '@/lib/models/Device'
 import Command from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { isValidDeviceId } from '@/lib/utils/validation'
 import { getRealtimeDb } from '@/lib/firebase-admin'
+import { withAuth } from '@/lib/utils/handler'
 
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export const POST = withAuth(async (_request, _user, { params }) => {
   try {
-    await dbConnect()
-
     const { id } = await params
 
     if (!isValidDeviceId(id)) {
@@ -72,4 +66,4 @@ export async function POST(
     console.error('Heartbeat error:', error)
     return errorResponse('Heartbeat processing failed', ErrorCodes.INTERNAL_ERROR, 500)
   }
-}
+})

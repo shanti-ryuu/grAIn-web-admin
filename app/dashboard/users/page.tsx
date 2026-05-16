@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
 import { Plus, X, MoreHorizontal, Shield, UserCheck, UserX, Trash2, Eye, Loader2 } from 'lucide-react'
@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useDevices, useBulkDeleteUsers } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/lib/auth-store'
+import { useToast } from '@/hooks/useToast'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
 
@@ -48,7 +49,8 @@ type PendingAction = {
 export default function UsersPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { isHydrated } = useAuthStore()
+  const { toast } = useToast()
+  const { isHydrated, user } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: 'farmer' })
@@ -62,6 +64,12 @@ export default function UsersPage() {
   const updateUser = useUpdateUser()
   const deleteUser = useDeleteUser()
   const bulkDeleteUsers = useBulkDeleteUsers()
+
+  useEffect(() => {
+    if (isHydrated && user?.role !== 'admin') {
+      router.replace('/dashboard')
+    }
+  }, [isHydrated, router, user])
 
   const users = (usersData as { users?: Array<Record<string, unknown>> } | undefined)?.users || []
 
@@ -114,7 +122,7 @@ export default function UsersPage() {
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
       const msg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to create user. Please try again.'
-      toast({ title: 'Creation Failed', description: msg, variant: 'destructive' })
+      toast({ title: 'Creation Failed', description: msg, variant: 'error' })
       if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('already')) {
         setAddErrors(prev => ({ ...prev, email: msg }))
       }
@@ -146,7 +154,7 @@ export default function UsersPage() {
       toast({
         title: 'Action Failed',
         description: axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to perform action',
-        variant: 'destructive',
+        variant: 'error',
       })
     }
     setPendingAction(null)
@@ -354,6 +362,10 @@ export default function UsersPage() {
       enableSorting: false,
     },
   ]
+
+  if (isHydrated && user?.role !== 'admin') {
+    return null
+  }
 
   if (!isHydrated || isLoading) {
     return (

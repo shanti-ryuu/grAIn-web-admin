@@ -7,11 +7,12 @@ import { useAuthStore } from '@/lib/auth-store'
 import { useLogin } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import Image from 'next/image'
+import FullScreenLoader from '@/components/FullScreenLoader'
 
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore()
+  const { token, user, isHydrated } = useAuthStore()
   const login = useLogin()
 
   const [email, setEmail] = useState('')
@@ -32,10 +33,18 @@ export default function LoginPage() {
   [])
 
   useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      router.push('/dashboard')
+    if (isHydrated && token && user) {
+      router.replace('/dashboard')
     }
-  }, [isAuthenticated, authLoading, router])
+  }, [isHydrated, router, token, user])
+
+  if (!isHydrated) {
+    return <FullScreenLoader />
+  }
+
+  if (token && user) {
+    return null
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

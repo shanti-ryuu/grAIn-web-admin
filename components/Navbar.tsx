@@ -93,7 +93,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         await markNotificationsRead.mutateAsync({ markAll: true })
       }
     } catch {
-      toast({ title: 'Failed', description: 'Failed to mark as read', variant: 'destructive' })
+      toast({ title: 'Failed', description: 'Failed to mark as read', variant: 'error' })
     }
   }
 

@@ -1,17 +1,20 @@
 import type { Metadata } from 'next'
-import './globals.css'
+import type { ReactNode } from 'react'
 import { Providers } from '@/components/Providers'
 import { ToastContainer } from '@/components/ui/Toast'
 
 export const metadata: Metadata = {
-  title: 'grAIn Admin Dashboard',
-  description: 'AI-assisted IoT Solar-Powered Rice Grain Dryer system administration',
+  title: {
+    default: 'grAIn Admin',
+    template: '%s | grAIn Admin',
+  },
+  description: 'IoT Smart Grain Dryer Monitoring & Control Dashboard — St. Dominic College of Asia',
 }
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <html lang="en">

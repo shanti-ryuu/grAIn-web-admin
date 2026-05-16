@@ -12,8 +12,12 @@ export function Toaster() {
         <div
           key={t.id}
           className={`flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg max-w-sm animate-in slide-in-from-right backdrop-blur-md ${
-            t.variant === 'destructive'
+            t.variant === 'destructive' || t.variant === 'error'
               ? 'bg-red-50/90 border-red-200 text-red-900'
+              : t.variant === 'warning'
+                ? 'bg-amber-50/90 border-amber-200 text-amber-900'
+                : t.variant === 'success'
+                  ? 'bg-green-50/90 border-green-200 text-green-900'
               : 'bg-white/90 border-gray-200 text-gray-900'
           }`}
         >

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 
-export type ToastVariant = 'default' | 'destructive'
+export type ToastVariant = 'default' | 'destructive' | 'success' | 'error' | 'warning' | 'info'
 
 export interface Toast {
   id: string

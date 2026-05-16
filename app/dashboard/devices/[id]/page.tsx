@@ -5,9 +5,11 @@ import { useState, useEffect } from 'react'
 import { ArrowLeft, Play, Square, Thermometer, Droplets, Wind, Zap, Activity, Clock, Brain, Scale, Power, RotateCw, RotateCcw, Flame, Cog } from 'lucide-react'
 import Card from '@/components/Card'
 import Table from '@/components/Table'
+import ErrorState from '@/components/ErrorState'
 import { useDevice, useSensorData, useStartDryer, useStopDryer, useCommandHistory, usePredictions, useControlFan, useControlStepper, useControlRelay, useControlHeater } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { getFirebaseApp } from '@/lib/firebase'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
@@ -173,18 +175,18 @@ export default function DeviceDetailPage() {
   if (deviceLoading || sensorLoading) {
     return (
       <div className="space-y-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-48 mb-4" />
-          <div className="h-4 bg-gray-200 rounded w-96" />
+        <div>
+          <Skeleton className="h-8 w-48 mb-4" />
+          <Skeleton className="h-4 w-96 max-w-full" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-              <div className="h-6 bg-gray-200 rounded w-24 mb-4" />
-              <div className="h-10 bg-gray-200 rounded w-16 mb-2" />
-              <div className="h-4 bg-gray-200 rounded w-32" />
-            </div>
+        <div className="grid grid-cols-2 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-80 w-full rounded-lg" />
+          <Skeleton className="h-80 w-full rounded-lg" />
         </div>
       </div>
     )
@@ -196,10 +198,7 @@ export default function DeviceDetailPage() {
         <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to Devices
         </button>
-        <Card className="p-12 text-center">
-          <p className="text-red-600">Failed to load device details.</p>
-          <button onClick={() => refetchDevice()} className="mt-4 px-4 py-2 bg-green-800 text-white rounded-lg text-sm">Retry</button>
-        </Card>
+        <ErrorState message="Failed to load device details." onRetry={refetchDevice} />
       </div>
     )
   }

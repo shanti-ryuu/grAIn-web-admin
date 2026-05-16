@@ -8,6 +8,7 @@ import Card from '@/components/Card'
 import { useDevices, useAnalyticsOverview, useAlerts, useUsers, useDryingSessions } from '@/hooks/useApi'
 import { useEventStream } from '@/hooks/useEventStream'
 import ErrorState from '@/components/ErrorState'
+import { Skeleton } from '@/components/ui/skeleton'
 import { getFirebaseApp } from '@/lib/firebase'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -173,12 +174,23 @@ export default function DashboardPage() {
   if (devicesLoading || analyticsLoading) {
     return (
       <div className="space-y-8">
+        <div>
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-96 max-w-full" />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-              <div className="h-6 bg-gray-200 rounded w-24 mb-4" /><div className="h-10 bg-gray-200 rounded w-16 mb-2" /><div className="h-4 bg-gray-200 rounded w-32" />
-            </div>
-          ))}
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-lg" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-64 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
+        </div>
+        <Card className="p-6 space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-64 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
         </div>
       </div>
     )
@@ -193,7 +205,7 @@ export default function DashboardPage() {
     )
   }
 
-  if (totalDevices === 0) {
+  if (!devicesLoading && !analyticsLoading && !devicesError && !analyticsError && totalDevices === 0) {
     return (
       <div className="space-y-8">
         <div><h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1><p className="text-base text-gray-500">Get started by registering your first device.</p></div>

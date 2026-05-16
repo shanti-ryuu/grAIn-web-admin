@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/useToast'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
+import { DeviceStatus, UserRole, UserStatus } from '@/lib/enums'
 
 interface DeviceRow {
   id: string
@@ -92,7 +93,7 @@ export default function DevicesPage() {
   const updateDevice = useUpdateDevice()
   const bulkDeleteDevices = useBulkDeleteDevices()
 
-  const farmers = ((allUsers as { users: FarmerItem[] } | undefined)?.users || []).filter((u) => u.role === 'farmer' && u.status === 'active')
+  const farmers = ((allUsers as { users: FarmerItem[] } | undefined)?.users || []).filter((u) => u.role === UserRole.Farmer && u.status === UserStatus.Active)
 
   const allTableData: DeviceRow[] = (devices as DeviceApiItem[] || []).map((d) => ({
     id: d.id,
@@ -195,8 +196,8 @@ export default function DevicesPage() {
       cell: ({ row }) => {
         const status = row.original.status
         return (
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${status === 'online' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
-            {status === 'online' ? 'Online' : 'Offline'}
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${status === DeviceStatus.Online ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
+            {status === DeviceStatus.Online ? 'Online' : 'Offline'}
           </span>
         )
       },

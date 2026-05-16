@@ -4,10 +4,11 @@ import Device from '@/lib/models/Device'
 import { successResponse } from '@/lib/utils/response'
 import { withAuth } from '@/lib/utils/handler'
 import { getAnalyticsCacheEntry, setAnalyticsCacheEntry } from '@/lib/utils/analytics-cache'
+import { AnalyticsPeriod, CommandType, UserRole } from '@/lib/enums'
 
 export const GET = withAuth(async (request, user) => {
   const url = new URL(request.url)
-  const period = url.searchParams.get('period') || 'weekly'
+  const period = url.searchParams.get('period') || AnalyticsPeriod.Weekly
   const deviceId = url.searchParams.get('deviceId') || 'all'
 
   // Check cache
@@ -31,12 +32,12 @@ export const GET = withAuth(async (request, user) => {
       moistureFormat = '%Y-%m-%dT%H:00'
       energyFormat = '%Y-%m-%dT%H:00'
       break
-    case 'monthly':
+    case AnalyticsPeriod.Monthly:
       startTime = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
       moistureFormat = '%Y-%m-%d'
       energyFormat = '%Y-%m-%d'
       break
-    case 'weekly':
+    case AnalyticsPeriod.Weekly:
     default:
       startTime = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       moistureFormat = '%Y-%m-%dT%H:00'
@@ -48,7 +49,7 @@ export const GET = withAuth(async (request, user) => {
   let deviceFilter: Record<string, unknown> = {}
   if (deviceId !== 'all') {
     deviceFilter = { deviceId }
-  } else if (user.role !== 'admin') {
+  } else if (user.role !== UserRole.Admin) {
     const userDevices = await Device.find({ assignedUser: user.userId }).select('deviceId')
     deviceFilter = { deviceId: { $in: userDevices.map(d => d.deviceId) } }
   }
@@ -62,7 +63,7 @@ export const GET = withAuth(async (request, user) => {
   ])
 
   // 2. Drying cycles
-  const startCommands = await Command.find({ ...deviceFilter, command: 'START' })
+  const startCommands = await Command.find({ ...deviceFilter, command: CommandType.Start })
     .sort({ createdAt: -1 }).limit(10).lean()
 
   const dryingCycles = startCommands.map((cmd, i) => {
@@ -87,7 +88,7 @@ export const GET = withAuth(async (request, user) => {
   const avgHumidity = averages.length > 0 ? Math.round(averages[0].avgHumidity * 100) / 100 : 0
 
   // 5. Total cycles
-  const totalCycles = await Command.countDocuments({ ...deviceFilter, command: 'START' })
+  const totalCycles = await Command.countDocuments({ ...deviceFilter, command: CommandType.Start })
 
   // 6. Active dryers
   const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000)

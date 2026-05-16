@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { generateToken } from '@/lib/utils/auth'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
-import { BCRYPT_ROUNDS } from '@/lib/enums'
+import { BCRYPT_ROUNDS, UserRole, UserStatus } from '@/lib/enums'
 import { sanitizeString } from '@/lib/utils/validation'
 
 export async function POST(request: NextRequest) {
@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
       name: safeName,
       email,
       password: hashedPassword,
-      role: 'farmer',
-      status: 'active',
+      role: UserRole.Farmer,
+      status: UserStatus.Active,
       bio: safeBio || '',
       location: safeLocation || '',
     })

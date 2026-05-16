@@ -7,16 +7,17 @@ import { isValidDeviceId } from '@/lib/utils/validation'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { markCommandExecuted, pushCommandToFirebase } from '@/lib/utils/firebase-sync'
 import { getDeviceLiveness } from '@/lib/utils/device-liveness'
+import { CommandStatus, CommandType, DryerMode, UserRole } from '@/lib/enums'
 
 const PENDING_COMMAND_TIMEOUT_MS = 20_000
 const POLLED_COMMAND_TIMEOUT_MS = 30_000
-const ACTIVE_COMMAND_STATUSES = ['pending', 'polled', 'executing'] as const
+const ACTIVE_COMMAND_STATUSES = [CommandStatus.Pending, CommandStatus.Polled, CommandStatus.Executing] as const
 
 interface CommandSpec {
   /** The command string sent to ESP32 (e.g. 'START', 'STOP', 'FAN_CONTROL') */
-  command: string
+  command: CommandType
   /** Mode for the command (default: 'MANUAL') */
-  mode?: string
+  mode?: DryerMode
   /** Additional fields to include in the MongoDB Command doc and Firebase payload */
   extraFields?: Record<string, unknown>
 }
@@ -32,9 +33,9 @@ export async function expireStaleCommands(filter: { deviceId?: string } = {}): P
   const staleCommands = await Command.find({
     ...(filter.deviceId && { deviceId: filter.deviceId }),
     $or: [
-      { status: 'pending', createdAt: { $lt: pendingCutoff } },
-      { status: { $in: ['polled', 'executing'] }, polledAt: { $lt: polledCutoff } },
-      { status: { $in: ['polled', 'executing'] }, polledAt: { $exists: false }, updatedAt: { $lt: polledCutoff } },
+      { status: CommandStatus.Pending, createdAt: { $lt: pendingCutoff } },
+      { status: { $in: [CommandStatus.Polled, CommandStatus.Executing] }, polledAt: { $lt: polledCutoff } },
+      { status: { $in: [CommandStatus.Polled, CommandStatus.Executing] }, polledAt: { $exists: false }, updatedAt: { $lt: polledCutoff } },
     ],
   }).select('_id deviceId command commandStr status').lean()
 
@@ -42,7 +43,7 @@ export async function expireStaleCommands(filter: { deviceId?: string } = {}): P
 
   await Promise.all(staleCommands.map(async command => {
     console.warn(`[Command Timeout] ${command.deviceId} ${command._id.toString()} ${command.commandStr ?? command.command} expired from ${command.status}`)
-    await markCommandExecuted(command.deviceId, command._id.toString(), 'timeout')
+    await markCommandExecuted(command.deviceId, command._id.toString(), CommandStatus.Timeout)
   }))
 
   return staleCommands.length
@@ -96,7 +97,7 @@ export async function createDryerCommand(
   if (!device) {
     return errorResponse(`Device ${deviceId} not found`, ErrorCodes.DEVICE_NOT_FOUND, 404)
   }
-  if (user.role !== 'admin' && device.assignedUser?.toString() !== user.userId) {
+  if (user.role !== UserRole.Admin && device.assignedUser?.toString() !== user.userId) {
     return errorResponse('Forbidden: You do not have access to this device', ErrorCodes.FORBIDDEN, 403)
   }
 
@@ -117,19 +118,19 @@ export async function createDryerCommand(
   }
 
   // 4. Create command in MongoDB
-  const commandMode = spec.mode ?? 'MANUAL'
+  const commandMode = spec.mode ?? DryerMode.Manual
   const commandStr = typeof spec.extraFields?.commandStr === 'string'
     ? spec.extraFields.commandStr
-    : spec.command === 'START'
+    : spec.command === CommandType.Start
       ? `START:${commandMode}:${Number(spec.extraFields?.temperature ?? 45)}:${Number(spec.extraFields?.fanSpeed ?? 80)}`
-      : spec.command === 'STOP'
+      : spec.command === CommandType.Stop
         ? 'STOP'
         : undefined
   const command = await Command.create({
     deviceId,
     command: spec.command,
     mode: commandMode,
-    status: 'pending',
+    status: CommandStatus.Pending,
     ...(commandStr && { commandStr }),
     ...spec.extraFields,
   })
@@ -141,7 +142,7 @@ export async function createDryerCommand(
         'runtimeState.pendingCommand': command._id.toString(),
         'runtimeState.activeCommand': commandStr ?? spec.command,
         'runtimeState.lastCommand': commandStr ?? spec.command,
-        'runtimeState.commandStatus': 'pending',
+        'runtimeState.commandStatus': CommandStatus.Pending,
         'runtimeState.commandAcknowledged': false,
         'runtimeState.updatedAt': new Date(),
       },

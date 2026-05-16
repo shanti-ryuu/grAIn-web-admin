@@ -1,8 +1,9 @@
 import { withAuth } from '@/lib/utils/handler'
 import { createDryerCommand } from '@/lib/utils/dryer-command'
 import { errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { CommandType, FanAction } from '@/lib/enums'
 
-const VALID_RELAY_ACTIONS = ['ON', 'OFF'] as const
+const VALID_RELAY_ACTIONS = Object.values(FanAction)
 
 export const POST = withAuth(async (request, user, { params }) => {
   let body: { relayAction?: string }
@@ -19,9 +20,9 @@ export const POST = withAuth(async (request, user, { params }) => {
   }
 
   return createDryerCommand(request, user, params, {
-    command: 'RELAY_CONTROL',
+    command: CommandType.RelayControl,
     extraFields: {
-      commandStr: relayAction === 'ON' ? 'R1:1' : 'R1:0',
+      commandStr: relayAction === FanAction.On ? 'R1:1' : 'R1:0',
       relayAction,
     },
   })

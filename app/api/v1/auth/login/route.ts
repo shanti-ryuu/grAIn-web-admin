@@ -6,6 +6,7 @@ import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response
 import { generateAccessToken, generateRefreshToken } from '@/lib/utils/tokens'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { validateLoginRequest } from '@/lib/utils/validation'
+import { UserStatus } from '@/lib/enums'
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
       return errorResponse('Invalid email or password', ErrorCodes.INVALID_CREDENTIALS, 401)
     }
 
-    if (user.status === 'inactive') {
+    if (user.status === UserStatus.Inactive) {
       return errorResponse('Account is inactive. Contact an administrator.', ErrorCodes.ACCOUNT_INACTIVE, 403)
     }
 

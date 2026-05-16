@@ -28,7 +28,9 @@ export enum DeviceStatus {
 export enum AlertType {
   Critical = 'critical',
   Warning = 'warning',
+  Error = 'error',
   Info = 'info',
+  Success = 'success',
 }
 
 /**
@@ -63,6 +65,13 @@ export enum FanAction {
   Off = 'OFF',
 }
 
+export enum StepperAction {
+  Start = 'START',
+  Stop = 'STOP',
+  Cw = 'CW',
+  Ccw = 'CCW',
+}
+
 /**
  * Command execution status
  */
@@ -84,6 +93,12 @@ export enum DryerMode {
   Manual = 'MANUAL',
 }
 
+export enum DryingSessionStatus {
+  Active = 'active',
+  Completed = 'completed',
+  Aborted = 'aborted',
+}
+
 /**
  * Sensor data and dryer operational status
  */
@@ -98,6 +113,8 @@ export enum SensorDataStatus {
  * Time period filters for analytics
  */
 export enum AnalyticsPeriod {
+  Weekly = 'weekly',
+  Monthly = 'monthly',
   OneDay = '1d',
   SevenDays = '7d',
   ThirtyDays = '30d',

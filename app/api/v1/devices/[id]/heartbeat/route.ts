@@ -5,6 +5,7 @@ import Command from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { isValidDeviceId } from '@/lib/utils/validation'
 import { getRealtimeDb } from '@/lib/firebase-admin'
+import { CommandStatus, DeviceStatus } from '@/lib/enums'
 
 export async function POST(
   _request: NextRequest,
@@ -24,7 +25,7 @@ export async function POST(
     const device = await Device.findOneAndUpdate(
       { deviceId: id },
       {
-        status: 'online',
+        status: DeviceStatus.Online,
         lastActive: heartbeatAt,
         'runtimeState.lastSeen': heartbeatAt,
         'runtimeState.lastHeartbeat': heartbeatAt,
@@ -42,7 +43,7 @@ export async function POST(
       const firebaseDb = getRealtimeDb()
       if (firebaseDb) {
         await firebaseDb.ref(`grain/devices/${id}`).update({
-          status: 'online',
+          status: DeviceStatus.Online,
           lastActive: heartbeatAt.getTime(),
         })
         await firebaseDb.ref(`grain/devices/${id}/runtimeState`).update({
@@ -58,12 +59,12 @@ export async function POST(
     // Return count of pending commands
     const pendingCommands = await Command.countDocuments({
       deviceId: id,
-      status: { $in: ['pending', 'polled', 'executing'] },
+      status: { $in: [CommandStatus.Pending, CommandStatus.Polled, CommandStatus.Executing] },
     })
 
     return successResponse({
       deviceId: id,
-      status: 'online',
+      status: DeviceStatus.Online,
       lastActive: device.lastActive?.toISOString?.() || null,
       pendingCommands,
     })

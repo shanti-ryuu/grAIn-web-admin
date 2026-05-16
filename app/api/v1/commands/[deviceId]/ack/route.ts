@@ -4,6 +4,7 @@ import Command from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { isValidDeviceId } from '@/lib/utils/validation'
 import { markCommandExecuted } from '@/lib/utils/firebase-sync'
+import { CommandStatus } from '@/lib/enums'
 
 export async function POST(
   request: NextRequest,
@@ -23,14 +24,14 @@ export async function POST(
 
     let resolvedCommandId = typeof commandId === 'string' ? commandId : ''
 
-    const validStatuses = ['executed', 'failed', 'timeout', 'error']
-    const commandStatus = validStatuses.includes(status) ? status : 'executed'
+    const validStatuses = [CommandStatus.Executed, CommandStatus.Failed, CommandStatus.Timeout, CommandStatus.Error]
+    const commandStatus = validStatuses.includes(status) ? status : CommandStatus.Executed
 
     if (!resolvedCommandId) {
       const hardwareCommand = typeof command === 'string' ? command.trim().toUpperCase() : ''
       const query: Record<string, unknown> = {
         deviceId,
-        status: { $in: ['pending', 'polled', 'executing'] },
+        status: { $in: [CommandStatus.Pending, CommandStatus.Polled, CommandStatus.Executing] },
       }
       if (hardwareCommand) {
         query.$or = [

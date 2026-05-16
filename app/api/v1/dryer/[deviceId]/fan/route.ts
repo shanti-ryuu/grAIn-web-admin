@@ -1,9 +1,10 @@
 import { withAuth } from '@/lib/utils/handler'
 import { createDryerCommand } from '@/lib/utils/dryer-command'
 import { errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { CommandType, FanAction, FanTarget } from '@/lib/enums'
 
-const VALID_FANS = ['FAN1', 'FAN2', 'ALL'] as const
-const VALID_ACTIONS = ['ON', 'OFF'] as const
+const VALID_FANS = Object.values(FanTarget)
+const VALID_ACTIONS = Object.values(FanAction)
 
 export const POST = withAuth(async (request, user, { params }) => {
   let body: { fan?: string; action?: string; fanTarget?: string; fanAction?: string }
@@ -25,7 +26,7 @@ export const POST = withAuth(async (request, user, { params }) => {
   }
 
   return createDryerCommand(request, user, params, {
-    command: 'FAN_CONTROL',
+    command: CommandType.FanControl,
     extraFields: {
       commandStr: `FAN:${rawFan}:${rawAction}`,
       fanTarget: rawFan,

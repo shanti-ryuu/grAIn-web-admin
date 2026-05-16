@@ -13,6 +13,10 @@ const variantConfig: Record<ToastVariant, { container: string; icon: React.React
     container: 'bg-red-50 border-red-200',
     icon: <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />,
   },
+  destructive: {
+    container: 'bg-red-50 border-red-200',
+    icon: <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />,
+  },
   warning: {
     container: 'bg-yellow-50 border-yellow-200',
     icon: <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0" />,

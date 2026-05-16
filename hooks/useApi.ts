@@ -315,7 +315,7 @@ export function useControlFan() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
       queryClient.invalidateQueries({ queryKey: ['commands'] })
-      toast({ title: 'Fan Control', description: `${variables.fan} turned ${variables.action.toLowerCase()}`, variant: 'success' })
+      toast({ title: 'Fan Control', description: `${variables.fanTarget} turned ${variables.fanAction.toLowerCase()}`, variant: 'success' })
     },
     onError: (error: any) => {
       toast({ title: 'Fan Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })

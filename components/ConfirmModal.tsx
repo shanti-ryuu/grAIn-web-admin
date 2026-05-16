@@ -1,13 +1,14 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { X, Loader2 } from 'lucide-react'
 
-interface ConfirmModalProps {
+export interface ConfirmModalProps {
   isOpen: boolean
   onClose: () => void
   onConfirm: () => void
   title: string
-  message: string | React.ReactNode
+  message: string | ReactNode
   confirmText?: string
   cancelText?: string
   variant?: 'danger' | 'default' | 'warning' | 'blue' | 'green'

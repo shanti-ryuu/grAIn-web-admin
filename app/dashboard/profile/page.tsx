@@ -57,7 +57,7 @@ export default function ProfilePage() {
       setIsDirty(false)
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
-      toast({ title: 'Update Failed', description: axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to update profile', variant: 'destructive' })
+      toast({ title: 'Update Failed', description: axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to update profile', variant: 'error' })
     }
   }
 
@@ -95,7 +95,7 @@ export default function ProfilePage() {
       updateStoreUser({ profileImage: null })
       toast({ title: 'Photo Removed', description: 'Profile photo has been removed' })
     } catch {
-      toast({ title: 'Failed', description: 'Could not remove photo', variant: 'destructive' })
+      toast({ title: 'Failed', description: 'Could not remove photo', variant: 'error' })
     }
   }
 

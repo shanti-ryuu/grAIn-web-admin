@@ -19,12 +19,13 @@ const navigation = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
-interface SidebarProps {
+export interface SidebarProps {
   mobileOpen?: boolean
   onMobileClose?: () => void
+  className?: string
 }
 
-export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
+export default function Sidebar({ mobileOpen = false, onMobileClose, className = '' }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
   const { user, logout } = useAuthStore()
@@ -136,7 +137,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
   return (
     <>
       {/* ── Desktop sidebar ─────────────────────────────────────────────────── */}
-      <aside className={`hidden lg:flex lg:flex-col ${collapsed ? 'w-20' : 'w-64'} glass-sidebar h-full no-print transition-all duration-300`}>
+      <aside className={`hidden lg:flex lg:flex-col ${collapsed ? 'w-20' : 'w-64'} glass-sidebar h-full no-print transition-all duration-300 ${className}`}>
         <div className={`p-4 border-b border-gray-100 flex items-center ${collapsed ? 'justify-center' : 'justify-between'}`}>
           <div className="flex items-center gap-3">
             <Image src="/logo/grain-logo.jpg" alt="grAIn Logo" width={36} height={36} className="rounded-lg object-contain shrink-0" quality={95} priority />

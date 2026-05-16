@@ -50,11 +50,12 @@ function NotifIcon({ type }: { type: string }) {
   return <Bell className="w-4 h-4 text-blue-500 shrink-0" />
 }
 
-interface TopbarProps {
+export interface NavbarProps {
   onMenuClick?: () => void
+  className?: string
 }
 
-export default function Topbar({ onMenuClick }: TopbarProps) {
+export default function Navbar({ onMenuClick, className = '' }: NavbarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuthStore()
@@ -93,7 +94,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
         await markNotificationsRead.mutateAsync({ markAll: true })
       }
     } catch {
-      toast({ title: 'Failed', description: 'Failed to mark as read', variant: 'destructive' })
+      toast({ title: 'Failed', description: 'Failed to mark as read', variant: 'error' })
     }
   }
 
@@ -121,7 +122,7 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
   const userInitial = user?.name?.charAt(0).toUpperCase() || 'A'
 
   return (
-    <header className="h-14 lg:h-16 glass-header flex items-center justify-between px-4 lg:px-8 no-print">
+    <header className={`h-14 lg:h-16 glass-header flex items-center justify-between px-4 lg:px-8 no-print ${className}`}>
       <div className="flex items-center gap-3">
         {/* Hamburger — mobile only */}
         <button

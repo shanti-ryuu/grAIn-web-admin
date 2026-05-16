@@ -12,42 +12,17 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/useToast'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
+import type { Device, PaginatedUsers, UpdateDeviceInput, User } from '@/lib/types'
 
-interface DeviceRow {
+type DeviceRow = Pick<Device, 'deviceId' | 'location' | 'status'> & {
   id: string
-  deviceId: string
-  location: string
   assignedUser: string
   assignedUserId: string
-  status: string
   lastActive: string
   moisture: string
 }
 
-interface AssignedUser {
-  name?: string
-  id?: string
-  _id?: string
-  email?: string
-}
-
-interface DeviceApiItem {
-  id: string
-  deviceId: string
-  location?: string
-  assignedUser?: AssignedUser | string
-  status: string
-  lastActive: string
-}
-
-interface FarmerItem {
-  id: string
-  _id?: string
-  name: string
-  email: string
-  role: string
-  status: string
-}
+type FarmerItem = User
 
 function timeAgo(dateStr: string): string {
   if (!dateStr) return 'Never'
@@ -92,16 +67,19 @@ export default function DevicesPage() {
   const updateDevice = useUpdateDevice()
   const bulkDeleteDevices = useBulkDeleteDevices()
 
-  const farmers = ((allUsers as { users: FarmerItem[] } | undefined)?.users || []).filter((u) => u.role === 'farmer' && u.status === 'active')
+  const farmers = (Array.isArray(allUsers)
+    ? allUsers
+    : (allUsers as PaginatedUsers | undefined)?.users || []
+  ).filter((u): u is FarmerItem => u.role === 'farmer' && u.status === 'active')
 
-  const allTableData: DeviceRow[] = (devices as DeviceApiItem[] || []).map((d) => ({
-    id: d.id,
+  const allTableData: DeviceRow[] = ((devices || []) as Device[]).map((d) => ({
+    id: d.id || d._id,
     deviceId: d.deviceId,
     location: d.location || '—',
     assignedUser: typeof d.assignedUser === 'object' ? d.assignedUser?.name || 'Unassigned' : 'Unassigned',
     assignedUserId: typeof d.assignedUser === 'object' ? d.assignedUser?.id || d.assignedUser?._id || '' : d.assignedUser || '',
     status: d.status,
-    lastActive: d.lastActive,
+    lastActive: d.lastActive || '',
     moisture: '—',
   }))
 
@@ -125,11 +103,13 @@ export default function DevicesPage() {
 
     try {
       if (type === 'edit_location') {
-        await updateDevice.mutateAsync({ id: device.id, location: editLocationValue })
+        const update: UpdateDeviceInput = { location: editLocationValue }
+        await updateDevice.mutateAsync({ id: device.id, ...update })
         toast({ title: 'Location Updated', description: `Location updated for ${device.deviceId}` })
       } else if (type === 'reassign_user') {
         const newFarmer = farmers.find((f) => f.id === reassignUserId)
-        await updateDevice.mutateAsync({ id: device.id, assignedUser: reassignUserId })
+        const update: UpdateDeviceInput = { assignedUser: reassignUserId }
+        await updateDevice.mutateAsync({ id: device.id, ...update })
         toast({ title: 'Device Reassigned', description: `Device ${device.deviceId} reassigned to ${newFarmer?.name || 'new user'}` })
       } else if (type === 'delete') {
         await deleteDevice.mutateAsync(device.id)
@@ -137,7 +117,7 @@ export default function DevicesPage() {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
-      toast({ title: 'Action Failed', description: message, variant: 'destructive' })
+      toast({ title: 'Action Failed', description: message, variant: 'error' })
     }
     setPendingDeviceAction(null)
     setEditLocationValue('')
@@ -454,7 +434,7 @@ export default function DevicesPage() {
               queryClient.invalidateQueries({ queryKey: ['devices'] })
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err)
-              toast({ title: 'Bulk Delete Failed', description: message, variant: 'destructive' })
+              toast({ title: 'Bulk Delete Failed', description: message, variant: 'error' })
             }
             setPendingDeviceAction(null)
           }}

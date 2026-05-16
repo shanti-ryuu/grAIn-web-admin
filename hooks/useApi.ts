@@ -4,14 +4,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
-
-interface ApiResponse<T> {
-  success: boolean
-  data?: T
-  error?: string
-  errorCode?: string
-  timestamp: string
-}
+import type {
+  Alert,
+  ApiResponse,
+  Command,
+  CreateUserInput,
+  Device,
+  DryingSession,
+  PaginatedUsers,
+  RegisterDeviceInput,
+  SensorData,
+  UpdateDeviceInput,
+  UpdateProfileInput,
+  UpdateUserInput,
+  User,
+} from '@/lib/types'
 
 function unwrapResponse<T>(responseData: ApiResponse<T>): T {
   if (!responseData.success || responseData.data === undefined) {
@@ -34,7 +41,7 @@ export const useLogin = () => {
     },
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : 'Login failed'
-      toast({ title: 'Login Failed', description: message, variant: 'destructive' })
+      toast({ title: 'Login Failed', description: message, variant: 'error' })
     },
   })
 }
@@ -63,7 +70,7 @@ export const useMe = () => {
   return useQuery({
     queryKey: ['auth', 'me'],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<{ user: any }>>('/auth/me')
+      const { data: responseData } = await api.get<ApiResponse<{ user: User }>>('/auth/me')
       return unwrapResponse(responseData).user
     },
     staleTime: 5 * 60 * 1000,
@@ -73,8 +80,8 @@ export const useMe = () => {
 export const useRegister = () => {
   const { toast } = useToast()
   return useMutation({
-    mutationFn: async (payload: { name: string; email: string; password: string; role?: string }) => {
-      const { data: responseData } = await api.post<ApiResponse<{ token: string; user: any }>>('/auth/register', payload)
+    mutationFn: async (payload: CreateUserInput) => {
+      const { data: responseData } = await api.post<ApiResponse<{ token: string; user: User }>>('/auth/register', payload)
       return unwrapResponse(responseData)
     },
     onSuccess: (data) => {
@@ -91,7 +98,7 @@ export const useDevices = () => {
   return useQuery({
     queryKey: ['devices'],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any[]>>('/devices')
+      const { data: responseData } = await api.get<ApiResponse<Device[]>>('/devices')
       return unwrapResponse(responseData)
     },
     staleTime: 30_000,
@@ -104,7 +111,7 @@ export const useDevice = (id: string) => {
   return useQuery({
     queryKey: ['device', id],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any>>(`/devices/${id}`)
+      const { data: responseData } = await api.get<ApiResponse<Device>>(`/devices/${id}`)
       return unwrapResponse(responseData)
     },
     staleTime: 5 * 60 * 1000,
@@ -116,8 +123,8 @@ export const useRegisterDevice = () => {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   return useMutation({
-    mutationFn: async (payload: { deviceId: string; assignedUser: string; location?: string }) => {
-      const { data: responseData } = await api.post<ApiResponse<any>>('/devices', payload)
+    mutationFn: async (payload: RegisterDeviceInput) => {
+      const { data: responseData } = await api.post<ApiResponse<Device>>('/devices', payload)
       return unwrapResponse(responseData)
     },
     onSuccess: (data) => {
@@ -134,8 +141,8 @@ export const useUpdateDevice = () => {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
-      const { data: responseData } = await api.patch<ApiResponse<any>>(`/devices/${id}`, updates)
+    mutationFn: async ({ id, ...updates }: { id: string } & UpdateDeviceInput) => {
+      const { data: responseData } = await api.patch<ApiResponse<Device>>(`/devices/${id}`, updates)
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
@@ -153,7 +160,7 @@ export const useDeleteDevice = () => {
   const { toast } = useToast()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data: responseData } = await api.delete<ApiResponse<any>>(`/devices/${id}`)
+      const { data: responseData } = await api.delete<ApiResponse<Device>>(`/devices/${id}`)
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
@@ -174,7 +181,7 @@ export const useUsers = (page?: number, limit?: number) => {
   return useQuery({
     queryKey: ['users', page ?? 'all', limit ?? 'all'],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any>>(`/users${params}`)
+      const { data: responseData } = await api.get<ApiResponse<PaginatedUsers | User[]>>(`/users${params}`)
       return unwrapResponse(responseData)
     },
     staleTime: 30_000,
@@ -186,8 +193,8 @@ export const useCreateUser = () => {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   return useMutation({
-    mutationFn: async (payload: { name: string; email: string; password: string; role?: string }) => {
-      const { data: responseData } = await api.post<ApiResponse<any>>('/users', payload)
+    mutationFn: async (payload: CreateUserInput) => {
+      const { data: responseData } = await api.post<ApiResponse<User>>('/users', payload)
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
@@ -204,8 +211,8 @@ export const useUpdateUser = () => {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; [key: string]: any }) => {
-      const { data: responseData } = await api.patch<ApiResponse<any>>(`/users/${id}`, updates)
+    mutationFn: async ({ id, ...updates }: { id: string } & UpdateUserInput & { password?: string }) => {
+      const { data: responseData } = await api.patch<ApiResponse<User>>(`/users/${id}`, updates)
       return unwrapResponse(responseData)
     },
     onSuccess: (_data, variables) => {
@@ -234,7 +241,7 @@ export const useDeleteUser = () => {
   const { toast } = useToast()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { data: responseData } = await api.delete<ApiResponse<any>>(`/users/${id}`)
+      const { data: responseData } = await api.delete<ApiResponse<User>>(`/users/${id}`)
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
@@ -252,7 +259,7 @@ export const useSensorData = (deviceId: string, hours: number = 24) => {
   return useQuery({
     queryKey: ['sensors', deviceId, hours],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any[]>>(`/sensors/${deviceId}?hours=${hours}`)
+      const { data: responseData } = await api.get<ApiResponse<SensorData[]>>(`/sensors/${deviceId}?hours=${hours}`)
       return unwrapResponse(responseData)
     },
     staleTime: 60_000,
@@ -268,7 +275,7 @@ export const useStartDryer = () => {
   const { toast } = useToast()
   return useMutation({
     mutationFn: async ({ deviceId, ...opts }: { deviceId: string; mode?: string; temperature?: number; fanSpeed?: number }) => {
-      const { data: responseData } = await api.post<ApiResponse<any>>(`/dryer/${deviceId}/start`, opts)
+      const { data: responseData } = await api.post<ApiResponse<Command>>(`/dryer/${deviceId}/start`, opts)
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
@@ -287,7 +294,7 @@ export const useStopDryer = () => {
   const { toast } = useToast()
   return useMutation({
     mutationFn: async (deviceId: string) => {
-      const { data: responseData } = await api.post<ApiResponse<any>>(`/dryer/${deviceId}/stop`)
+      const { data: responseData } = await api.post<ApiResponse<Command>>(`/dryer/${deviceId}/stop`)
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
@@ -310,12 +317,12 @@ export function useControlFan() {
       fanTarget: 'FAN1' | 'FAN2' | 'ALL';
       fanAction: 'ON' | 'OFF';
     }) =>
-      api.post<ApiResponse<any>>(`/dryer/${deviceId}/fan`, { fanTarget, fanAction })
+      api.post<ApiResponse<Command>>(`/dryer/${deviceId}/fan`, { fanTarget, fanAction })
         .then(r => unwrapResponse(r.data)),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
       queryClient.invalidateQueries({ queryKey: ['commands'] })
-      toast({ title: 'Fan Control', description: `${variables.fan} turned ${variables.action.toLowerCase()}`, variant: 'success' })
+      toast({ title: 'Fan Control', description: `${variables.fanTarget} turned ${variables.fanAction.toLowerCase()}`, variant: 'success' })
     },
     onError: (error: any) => {
       toast({ title: 'Fan Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
@@ -331,14 +338,14 @@ export function useControlStepper() {
       deviceId: string;
       stepperAction: 'START' | 'STOP' | 'CW' | 'CCW';
     }) =>
-      api.post<ApiResponse<any>>(`/dryer/${deviceId}/stepper`, { stepperAction })
+      api.post<ApiResponse<Command>>(`/dryer/${deviceId}/stepper`, { stepperAction })
         .then(r => unwrapResponse(r.data)),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['commands'] })
       toast({ title: 'Stepper Control', description: `Stepper ${variables.stepperAction.toLowerCase()} command sent` })
     },
     onError: (error: any) => {
-      toast({ title: 'Stepper Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Stepper Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -351,14 +358,14 @@ export function useControlRelay() {
       deviceId: string;
       relayAction: 'ON' | 'OFF';
     }) =>
-      api.post<ApiResponse<any>>(`/dryer/${deviceId}/relay`, { relayAction })
+      api.post<ApiResponse<Command>>(`/dryer/${deviceId}/relay`, { relayAction })
         .then(r => unwrapResponse(r.data)),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['commands'] })
       toast({ title: 'Auger / Conveyor', description: `Relay turned ${variables.relayAction.toLowerCase()}` })
     },
     onError: (error: any) => {
-      toast({ title: 'Relay Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Relay Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -371,14 +378,14 @@ export function useControlHeater() {
       deviceId: string;
       heaterAction: 'ON' | 'OFF';
     }) =>
-      api.post<ApiResponse<any>>(`/dryer/${deviceId}/heater`, { heaterAction })
+      api.post<ApiResponse<Command>>(`/dryer/${deviceId}/heater`, { heaterAction })
         .then(r => unwrapResponse(r.data)),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['commands'] })
       toast({ title: 'Heater Control', description: `Heater turned ${variables.heaterAction.toLowerCase()}` })
     },
     onError: (error: any) => {
-      toast({ title: 'Heater Control Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Heater Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -389,7 +396,7 @@ export const useCommandHistory = (deviceId?: string, limit: number = 20) => {
     queryFn: async () => {
       const params = new URLSearchParams({ limit: String(limit) })
       if (deviceId) params.set('deviceId', deviceId)
-      const { data: responseData } = await api.get<ApiResponse<any[]>>(`/commands/history?${params}`)
+      const { data: responseData } = await api.get<ApiResponse<Command[]>>(`/commands/history?${params}`)
       return unwrapResponse(responseData)
     },
     staleTime: 2 * 60 * 1000,
@@ -415,7 +422,7 @@ export const useAlerts = (type?: string) => {
     queryKey: ['alerts', type],
     queryFn: async () => {
       const params = type ? `?type=${type}` : ''
-      const { data: responseData } = await api.get<ApiResponse<any[]>>(`/alerts${params}`)
+      const { data: responseData } = await api.get<ApiResponse<Alert[]>>(`/alerts${params}`)
       return unwrapResponse(responseData)
     },
     staleTime: 20_000,
@@ -429,7 +436,7 @@ export const useMarkAlertRead = () => {
   const { toast } = useToast()
   return useMutation({
     mutationFn: async (alertId: string) => {
-      const { data: responseData } = await api.patch<ApiResponse<any>>(`/alerts/${alertId}/read`)
+      const { data: responseData } = await api.patch<ApiResponse<Alert>>(`/alerts/${alertId}/read`)
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
@@ -494,7 +501,7 @@ export const useUserProfile = () => {
   return useQuery({
     queryKey: ['profile'],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any>>('/users/profile')
+      const { data: responseData } = await api.get<ApiResponse<User>>('/users/profile')
       return unwrapResponse(responseData)
     },
     staleTime: 5 * 60 * 1000,
@@ -505,8 +512,8 @@ export const useUpdateProfile = () => {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   return useMutation({
-    mutationFn: async (payload: { name?: string; bio?: string; phoneNumber?: string; location?: string }) => {
-      const { data: responseData } = await api.patch<ApiResponse<any>>('/users/profile', payload)
+    mutationFn: async (payload: UpdateProfileInput) => {
+      const { data: responseData } = await api.patch<ApiResponse<User>>('/users/profile', payload)
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
@@ -601,7 +608,7 @@ export const useDryingSessions = (params?: { status?: string; deviceId?: string;
   return useQuery({
     queryKey: ['sessions', params],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any> & {
+      const { data: responseData } = await api.get<ApiResponse<DryingSession[]> & {
         pagination?: {
           total: number
           count: number
@@ -627,7 +634,7 @@ export const useDryingSession = (id: string) => {
   return useQuery({
     queryKey: ['session', id],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any>>(`/sessions/${id}`)
+      const { data: responseData } = await api.get<ApiResponse<DryingSession>>(`/sessions/${id}`)
       return unwrapResponse(responseData)
     },
     enabled: !!id,
@@ -644,8 +651,8 @@ export const useStartDryingSession = () => {
         temperature: payload.temperature ?? 45,
         fanSpeed: payload.fanSpeed ?? 80,
       }
-      await api.post<ApiResponse<any>>(`/dryer/${payload.deviceId}/start`, startPayload)
-      const { data: responseData } = await api.post<ApiResponse<any>>('/sessions', payload)
+      await api.post<ApiResponse<Command>>(`/dryer/${payload.deviceId}/start`, startPayload)
+      const { data: responseData } = await api.post<ApiResponse<DryingSession>>('/sessions', payload)
       return unwrapResponse(responseData)
     },
     onSuccess: (data) => {
@@ -653,7 +660,7 @@ export const useStartDryingSession = () => {
       toast({ title: 'Session Started', description: `Drying session started for ${data.deviceId}` })
     },
     onError: (error: any) => {
-      toast({ title: 'Start Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Start Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -663,7 +670,7 @@ export const useEndDryingSession = () => {
   const { toast } = useToast()
   return useMutation({
     mutationFn: async ({ id, action }: { id: string; action: 'complete' | 'abort' }) => {
-      const { data: responseData } = await api.patch<ApiResponse<any>>(`/sessions/${id}`, { action })
+      const { data: responseData } = await api.patch<ApiResponse<DryingSession>>(`/sessions/${id}`, { action })
       return unwrapResponse(responseData)
     },
     onSuccess: (_data, variables) => {
@@ -672,7 +679,7 @@ export const useEndDryingSession = () => {
       toast({ title: msg, description: 'Drying session has been updated' })
     },
     onError: (error: any) => {
-      toast({ title: 'Action Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Action Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }

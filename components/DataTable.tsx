@@ -1,26 +1,40 @@
-interface DataTableColumn {
+import type { ReactNode } from 'react'
+
+export type DataTableColumn<T extends Record<string, unknown>> = {
   key: string
   label: string
   width?: string
   align?: 'left' | 'center' | 'right'
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  render?: (value: any, row: any) => React.ReactNode
+  render?: (value: unknown, row: T) => ReactNode
 }
 
-interface DataTableProps {
-  columns: DataTableColumn[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data: any[]
+export type DataTableProps<T extends Record<string, unknown>> = {
+  columns: DataTableColumn<T>[]
+  data: T[]
   loading?: boolean
   empty?: string
 }
 
-export default function DataTable({
+function renderCellValue(value: unknown): ReactNode {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    value === null ||
+    value === undefined
+  ) {
+    return value
+  }
+
+  return String(value)
+}
+
+export default function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
   loading = false,
   empty = 'No data available',
-}: DataTableProps) {
+}: DataTableProps<T>) {
   if (loading) {
     return (
       <div className="space-y-3">
@@ -63,7 +77,7 @@ export default function DataTable({
             >
               {columns.map((col) => (
                 <td key={col.key} className="px-6 py-4" style={{ textAlign: col.align }}>
-                  {col.render ? col.render(row[col.key], row) : row[col.key]}
+                  {col.render ? col.render(row[col.key], row) : renderCellValue(row[col.key])}
                 </td>
               ))}
             </tr>

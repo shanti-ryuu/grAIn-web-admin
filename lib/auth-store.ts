@@ -1,12 +1,9 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import type { User } from '@/lib/types'
 
-export interface AuthUser {
+export type AuthUser = Pick<User, 'email' | 'name' | 'role' | 'profileImage'> & {
   id: string
-  email: string
-  name: string
-  role: 'admin' | 'farmer'
-  profileImage?: string | null
 }
 
 export interface AuthStore {

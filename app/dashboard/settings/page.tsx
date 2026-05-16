@@ -76,7 +76,7 @@ export default function SettingsPage() {
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
       const msg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to change password. Please try again.'
-      toast({ title: 'Change Failed', description: msg, variant: 'destructive' })
+      toast({ title: 'Change Failed', description: msg, variant: 'error' })
       if (msg.toLowerCase().includes('incorrect') || msg.toLowerCase().includes('wrong') || msg.toLowerCase().includes('current')) {
         setPwErrors(prev => ({ ...prev, currentPassword: msg }))
       }
@@ -242,7 +242,7 @@ export default function SettingsPage() {
           <p className="text-sm text-gray-500">No devices currently online.</p>
         ) : (
           <div className="space-y-3">
-            {onlineDevices.map((d: { deviceId?: string; location?: string; assignedUser?: { name?: string } }) => (
+            {onlineDevices.map((d) => (
               <div key={d.deviceId} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
                 <div className="flex items-center gap-3">
                   <div className="w-2.5 h-2.5 bg-green-500 rounded-full" />
@@ -251,7 +251,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-gray-500">{d.location || 'No location'}</p>
                   </div>
                 </div>
-                <span className="text-xs text-gray-500">{d.assignedUser?.name || 'Unassigned'}</span>
+                <span className="text-xs text-gray-500">{typeof d.assignedUser === 'object' ? d.assignedUser.name : 'Unassigned'}</span>
               </div>
             ))}
           </div>

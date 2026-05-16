@@ -7,6 +7,7 @@ import ErrorState from '@/components/ErrorState'
 import { useAlerts, useMarkAlertRead, useClearAllAlerts } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { useRouter } from 'next/navigation'
+import type { Alert } from '@/lib/types'
 
 export default function AlertsPage() {
   const router = useRouter()
@@ -41,10 +42,10 @@ export default function AlertsPage() {
   }
 
   const filteredAlerts = useMemo(() => {
-    const allAlerts = alerts || []
+    const allAlerts: Alert[] = alerts || []
     if (activeTab === 'all') return allAlerts
-    if (activeTab === 'unread') return allAlerts.filter((a: { isRead?: boolean }) => !a.isRead)
-    return allAlerts.filter((a: { type?: string }) => a.type === activeTab)
+    if (activeTab === 'unread') return allAlerts.filter((a) => !a.isRead)
+    return allAlerts.filter((a) => a.type === activeTab)
   }, [alerts, activeTab])
 
   const severityConfig: Record<string, { badge: string; dot: string }> = {
@@ -105,10 +106,10 @@ export default function AlertsPage() {
       ) : (
         <Card className="p-6">
           <div className="space-y-3">
-            {filteredAlerts.map((alert: { id: string; isRead?: boolean; type: string; message?: string; createdAt?: string; deviceId?: string }) => {
+            {filteredAlerts.map((alert) => {
               const config = severityConfig[alert.type] || severityConfig.info
               return (
-                <div key={alert.id} className={`flex items-start gap-4 p-4 border rounded-lg transition-colors ${alert.isRead ? 'border-gray-100 bg-gray-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <div key={alert.id || alert._id} className={`flex items-start gap-4 p-4 border rounded-lg transition-colors ${alert.isRead ? 'border-gray-100 bg-gray-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
                   <div className={`w-2.5 h-2.5 mt-1.5 rounded-full flex-shrink-0 ${config.dot}`} />
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm break-words ${alert.isRead ? 'text-gray-400' : 'font-medium text-gray-900'}`}>{alert.message}</p>
@@ -121,7 +122,7 @@ export default function AlertsPage() {
                   </div>
                   <span className={`px-3 py-1 rounded text-xs font-semibold border capitalize whitespace-nowrap ${config.badge}`}>{alert.type}</span>
                   {!alert.isRead && (
-                    <button onClick={() => handleMarkRead(alert.id)} className="text-gray-400 hover:text-green-600 transition-colors" title="Mark as read">
+                    <button onClick={() => handleMarkRead(alert.id || alert._id)} className="text-gray-400 hover:text-green-600 transition-colors" title="Mark as read">
                       <CheckCircle className="w-4 h-4" />
                     </button>
                   )}

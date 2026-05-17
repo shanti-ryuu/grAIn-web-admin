@@ -13,7 +13,6 @@ import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
 import { useToast } from '@/hooks/useToast'
-import type { CreateUserInput, Device, PaginatedUsers, User } from '@/lib/types'
 
  type IdLike = string | User | null | undefined
 

@@ -6,6 +6,16 @@ import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response
 import { generateAccessToken, generateRefreshToken } from '@/lib/utils/tokens'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { validateLoginRequest } from '@/lib/utils/validation'
+import { setAuthCookies } from '@/lib/utils/auth-cookies'
+
+function logAuthError(code: string, error: unknown): void {
+  const message = error instanceof Error ? error.message : 'Unknown error'
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[auth.login]', { code })
+  } else {
+    console.error('[auth.login]', { code, message })
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,17 +59,18 @@ export async function POST(request: NextRequest) {
     const refreshToken = await generateRefreshToken(user._id.toString())
 
     const userData = {
-      id: user._id,
+      id: user._id.toString(),
       name: user.name,
       email: user.email,
       role: user.role,
       status: user.status,
     }
 
-    return successResponse({ user: userData, accessToken, refreshToken })
+    const response = successResponse({ user: userData })
+    return setAuthCookies(response, accessToken, refreshToken)
 
   } catch (error) {
-    console.error('Login error:', error)
+    logAuthError('LOGIN_UNHANDLED', error)
     return errorResponse('Internal server error', ErrorCodes.INTERNAL_ERROR, 500)
   }
 }

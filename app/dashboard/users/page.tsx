@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
+import { useToast } from '@/hooks/useToast'
 
  type IdLike = string | { id?: string; _id?: string } | null | undefined
 
@@ -48,6 +49,7 @@ type PendingAction = {
 export default function UsersPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const { isHydrated } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
@@ -114,7 +116,7 @@ export default function UsersPage() {
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
       const msg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to create user. Please try again.'
-      toast({ title: 'Creation Failed', description: msg, variant: 'destructive' })
+      toast({ title: 'Creation Failed', description: msg, variant: 'error' })
       if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('already')) {
         setAddErrors(prev => ({ ...prev, email: msg }))
       }
@@ -146,7 +148,7 @@ export default function UsersPage() {
       toast({
         title: 'Action Failed',
         description: axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to perform action',
-        variant: 'destructive',
+        variant: 'error',
       })
     }
     setPendingAction(null)

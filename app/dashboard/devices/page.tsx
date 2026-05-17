@@ -138,7 +138,7 @@ export default function DevicesPage() {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err)
-      toast({ title: 'Action Failed', description: message, variant: 'destructive' })
+      toast({ title: 'Action Failed', description: message, variant: 'error' })
     }
     setPendingDeviceAction(null)
     setEditLocationValue('')
@@ -455,7 +455,7 @@ export default function DevicesPage() {
               queryClient.invalidateQueries({ queryKey: ['devices'] })
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err)
-              toast({ title: 'Bulk Delete Failed', description: message, variant: 'destructive' })
+              toast({ title: 'Bulk Delete Failed', description: message, variant: 'error' })
             }
             setPendingDeviceAction(null)
           }}

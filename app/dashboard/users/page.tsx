@@ -13,6 +13,7 @@ import { useAuthStore } from '@/lib/auth-store'
 import { useToast } from '@/hooks/useToast'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
+import { useToast } from '@/hooks/useToast'
 
  type IdLike = string | { id?: string; _id?: string } | null | undefined
 
@@ -50,7 +51,7 @@ export default function UsersPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const { isHydrated, user } = useAuthStore()
+  const { isHydrated } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: 'farmer' })

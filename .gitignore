@@ -14,4 +14,8 @@ dist/
 *.swo
 *~
 .turbo/
+tsconfig.tsbuildinfo
+*.tsbuildinfo
 .env.local.example
+.env.example
+DOCUMENTATION.md

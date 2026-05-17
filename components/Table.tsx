@@ -3,11 +3,13 @@ import Card from './Card'
 interface Column {
   key: string
   label: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render?: (value: any, row: any) => React.ReactNode
 }
 
 interface TableProps {
   columns: Column[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any[]
   title?: string
 }

@@ -1,10 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { API_VERSION } from '@/lib/enums'
 
-// FIX 1.1: Public endpoints that allow wildcard origin (ESP32, health checks)
-const PUBLIC_ENDPOINTS = ['/api/health', '/api/sensors/data', '/api/commands/']
+// Public endpoints that allow wildcard origin (ESP32, health checks)
+// These are checked against the pathname AFTER version rewrite,
+// so they use the /api/v1/ prefix.
+const PUBLIC_ENDPOINTS = [
+  `/api/${API_VERSION}/health`,
+  `/api/${API_VERSION}/ping`,
+  `/api/${API_VERSION}/warmup`,
+  `/api/${API_VERSION}/sensors/data`,
+  `/api/${API_VERSION}/commands/`,
+]
+
+// Unversioned public endpoints (for backward compat with ESP32/mobile)
+const LEGACY_PUBLIC_ENDPOINTS = ['/api/health', '/api/ping', '/api/warmup', '/api/sensors/data', '/api/commands/']
 
 function isPublicEndpoint(pathname: string): boolean {
-  return PUBLIC_ENDPOINTS.some(ep => pathname.startsWith(ep))
+  return PUBLIC_ENDPOINTS.some(ep => pathname.startsWith(ep)) ||
+    LEGACY_PUBLIC_ENDPOINTS.some(ep => pathname.startsWith(ep))
 }
 
 function isAllowedOrigin(origin: string | null): boolean {
@@ -29,8 +42,7 @@ function isAllowedOrigin(origin: string | null): boolean {
 
   // Production: allow Render URL + exp:// + null origin (already handled above)
   const prodAllowed = [
-    'https://grain-web-admin.onrender.com',
-    process.env.NEXT_PUBLIC_ADMIN_URL || '',
+    process.env.NEXT_PUBLIC_ADMIN_URL || 'https://grain-web-admin.onrender.com',
     process.env.NEXT_PUBLIC_APP_URL || '',
   ].filter(Boolean)
   if (prodAllowed.includes(origin)) return true
@@ -43,6 +55,16 @@ function isAllowedOrigin(origin: string | null): boolean {
 export function middleware(request: NextRequest) {
   const origin = request.headers.get('origin')
   const pathname = request.nextUrl.pathname
+
+  // ── API Versioning Rewrite ──
+  // If the request is /api/X but NOT /api/v1/X, rewrite to /api/v1/X
+  // This keeps backward compat for ESP32 and mobile that use old URLs.
+  if (pathname.startsWith('/api/') && !pathname.startsWith(`/api/${API_VERSION}/`)) {
+    const newPath = pathname.replace(/^\/api\//, `/api/${API_VERSION}/`)
+    const url = request.nextUrl.clone()
+    url.pathname = newPath
+    return NextResponse.rewrite(url)
+  }
 
   // Handle CORS preflight (OPTIONS) first
   if (request.method === 'OPTIONS') {

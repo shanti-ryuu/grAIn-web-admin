@@ -25,9 +25,9 @@ export default function AnalyticsPage() {
   const handleExportCSV = () => {
     if (!analytics) return
     const rows: string[] = ['Type,Time/Label,Value']
-    analytics.moistureTrend?.forEach((r: any) => rows.push(`Moisture,${r.time},${r.value}`))
-    analytics.energyConsumption?.forEach((r: any) => rows.push(`Energy,${r.day},${r.value}`))
-    analytics.dryingCycles?.forEach((r: any) => rows.push(`Cycle,${r.cycle},${r.duration}`))
+    analytics.moistureTrend?.forEach((r: { time?: string; value?: number }) => rows.push(`Moisture,${r.time ?? ''},${r.value ?? 0}`))
+    analytics.energyConsumption?.forEach((r: { day?: string; value?: number }) => rows.push(`Energy,${r.day ?? ''},${r.value ?? 0}`))
+    analytics.dryingCycles?.forEach((r: { cycle?: string; duration?: number }) => rows.push(`Cycle,${r.cycle ?? ''},${r.duration ?? 0}`))
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -96,7 +96,7 @@ export default function AnalyticsPage() {
           <select value={deviceId} onChange={(e) => setDeviceId(e.target.value)}
             className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
             <option value="all">All Devices</option>
-            {(devices || []).map((d: any) => (<option key={d.deviceId} value={d.deviceId}>{d.deviceId}</option>))}
+            {(devices || []).map((d: { deviceId?: string }) => (<option key={d.deviceId} value={d.deviceId}>{d.deviceId}</option>))}
           </select>
         </div>
       </Card>
@@ -149,7 +149,7 @@ export default function AnalyticsPage() {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie data={deviceStatusDistribution.length > 0 ? deviceStatusDistribution : [{ status: 'No data', count: 1 }]} dataKey="count" nameKey="status" cx="50%" cy="50%" outerRadius={100} label>
-                {(deviceStatusDistribution.length > 0 ? deviceStatusDistribution : [{ status: 'No data', count: 1 }]).map((_: any, i: number) => (
+                {(deviceStatusDistribution.length > 0 ? deviceStatusDistribution : [{ status: 'No data', count: 1 }]).map((_: { status?: string; count?: number }, i: number) => (
                   <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                 ))}
               </Pie>

@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
+import dbConnect from '@/lib/db'
+import User from '@/lib/models/User'
 
 export interface TokenPayload {
   userId: string
@@ -10,6 +12,16 @@ export interface TokenPayload {
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key'
+
+function logAuthWarning(message: string, detail?: unknown): void {
+  if (process.env.NODE_ENV === 'development' || process.env.DEBUG_AUTH === 'true') {
+    if (detail !== undefined) {
+      console.warn(message, detail)
+    } else {
+      console.warn(message)
+    }
+  }
+}
 
 /**
  * Extract and verify JWT token from request
@@ -31,24 +43,24 @@ export function verifyToken(token: string): TokenPayload | null {
     const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload
     return decoded
   } catch (error) {
-    console.warn('[verifyToken] Token verification failed:', error instanceof Error ? error.message : error)
+    logAuthWarning('[verifyToken] Token verification failed:', error instanceof Error ? error.message : error)
     return null
   }
 }
 
 /**
- * Get user from request — with diagnostic logging
+ * Get user from request — with diagnostic logging + revoked token check
  */
-export function getUserFromRequest(request: NextRequest): TokenPayload | null {
+export async function getUserFromRequest(request: NextRequest): Promise<TokenPayload | null> {
   const authHeader = request.headers.get('Authorization')
 
   if (!authHeader) {
-    console.warn('[getUserFromRequest] No Authorization header')
+    logAuthWarning('[getUserFromRequest] No Authorization header')
     return null
   }
 
   if (!authHeader.startsWith('Bearer ')) {
-    console.warn('[getUserFromRequest] Invalid header format:', authHeader.slice(0, 20))
+    logAuthWarning('[getUserFromRequest] Invalid header format:', authHeader.slice(0, 20))
     return null
   }
 
@@ -56,9 +68,26 @@ export function getUserFromRequest(request: NextRequest): TokenPayload | null {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload
+
+    // Check if token has been revoked (direct query — avoids loading full user doc)
+    try {
+      await dbConnect()
+      const revoked = await User.exists({
+        _id: decoded.userId,
+        'revokedTokens.token': token,
+      })
+      if (revoked) {
+        logAuthWarning('[getUserFromRequest] Token has been revoked')
+        return null
+      }
+    } catch (dbError) {
+      // If DB check fails, still allow the request (fail open for for availability)
+      logAuthWarning('[getUserFromRequest] Revoked token check failed, allowing request:', dbError)
+    }
+
     return decoded
   } catch (error) {
-    console.warn('[getUserFromRequest] Token verification failed:', error instanceof Error ? error.message : error)
+    logAuthWarning('[getUserFromRequest] Token verification failed:', error instanceof Error ? error.message : error)
     return null
   }
 }
@@ -69,6 +98,6 @@ export function getUserFromRequest(request: NextRequest): TokenPayload | null {
 export function generateToken(payload: Omit<TokenPayload, 'iat' | 'exp'>, expiresIn: number | string = '7d'): string {
   const opts = typeof expiresIn === 'number'
     ? { expiresIn } as jwt.SignOptions
-    : { expiresIn: expiresIn as any }
+    : { expiresIn: expiresIn as jwt.SignOptions['expiresIn'] }
   return jwt.sign(payload, JWT_SECRET, opts)
 }

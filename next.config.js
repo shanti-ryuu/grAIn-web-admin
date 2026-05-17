@@ -5,6 +5,7 @@ const nextConfig = {
     unoptimized: true,
   },
   typescript: { ignoreBuildErrors: true },
+  serverExternalPackages: ['bcryptjs'],
   allowedDevOrigins: [
     'http://192.168.1.2',
     'http://192.168.1.2:3001',

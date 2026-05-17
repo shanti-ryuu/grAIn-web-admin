@@ -9,10 +9,26 @@ import DataTable from '@/components/ui/data-table'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useDevices, useBulkDeleteUsers } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
-import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
+
+ type IdLike = string | { id?: string; _id?: string } | null | undefined
+
+ const toIdString = (value: unknown): string | null => {
+   if (typeof value === 'string' && value.length > 0) return value
+   if (value && typeof value === 'object' && 'toString' in value && typeof (value as { toString?: unknown }).toString === 'function') {
+     const str = (value as { toString: () => string }).toString()
+     return str && str !== '[object Object]' ? str : null
+   }
+   return null
+ }
+
+ const getIdFromIdLike = (value: IdLike): string | null => {
+   if (!value) return null
+   if (typeof value === 'string') return value
+   return value.id || value._id || null
+ }
 
 interface UserRow {
   id: string
@@ -32,7 +48,6 @@ type PendingAction = {
 export default function UsersPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { toast } = useToast()
   const { isHydrated } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
@@ -41,35 +56,42 @@ export default function UsersPage() {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
 
-  const [page, setPage] = useState(1)
-  const limit = 10
-
-  const { data: usersData, isLoading, error, refetch } = useUsers(page, limit)
+  const { data: usersData, isLoading, error, refetch } = useUsers()
   const { data: devices } = useDevices()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const deleteUser = useDeleteUser()
   const bulkDeleteUsers = useBulkDeleteUsers()
 
-  const users = (usersData as any)?.users || []
-  const total = (usersData as any)?.total || 0
-  const totalPages = (usersData as any)?.totalPages || 1
+  const users = (usersData as { users?: Array<Record<string, unknown>> } | undefined)?.users || []
 
   const deviceCounts: Record<string, number> = {}
-  ;(devices || []).forEach((d: any) => {
-    const uid = d.assignedUser?.id || d.assignedUser?._id || d.assignedUser
+  ;(devices || []).forEach((d: { assignedUser?: IdLike }) => {
+    const uid = getIdFromIdLike(d.assignedUser)
     if (uid) deviceCounts[uid] = (deviceCounts[uid] || 0) + 1
   })
 
-  const tableData: UserRow[] = (users || []).map((u: any) => ({
-    id: u._id?.toString?.() || u.id,
-    name: u.name,
-    email: u.email,
-    role: u.role,
-    status: u.status,
-    createdAt: u.createdAt,
-    deviceCount: deviceCounts[u._id?.toString?.() || u.id] || 0,
-  }))
+  const tableData: UserRow[] = (users || []).flatMap((u: Record<string, unknown>) => {
+    const id = toIdString((u as { _id?: unknown })._id) ?? toIdString((u as { id?: unknown }).id)
+    if (!id) return []
+
+    const name = typeof (u as { name?: unknown }).name === 'string' ? (u as { name: string }).name : ''
+    const email = typeof (u as { email?: unknown }).email === 'string' ? (u as { email: string }).email : ''
+    const role = typeof (u as { role?: unknown }).role === 'string' ? (u as { role: string }).role : ''
+    const status = typeof (u as { status?: unknown }).status === 'string' ? (u as { status: string }).status : ''
+    const createdAtRaw = (u as { createdAt?: unknown }).createdAt
+    const createdAt = typeof createdAtRaw === 'string' ? createdAtRaw : createdAtRaw ? new Date(createdAtRaw as Date).toISOString() : ''
+
+    return [{
+      id,
+      name,
+      email,
+      role,
+      status,
+      createdAt,
+      deviceCount: deviceCounts[id] || 0,
+    }]
+  })
 
   const validateAddForm = (): boolean => {
     const errors: Record<string, string> = {}
@@ -85,13 +107,13 @@ export default function UsersPage() {
     if (!validateAddForm()) return
     try {
       await createUser.mutateAsync(addForm)
-      toast({ title: 'User Created', description: `User ${addForm.name} created successfully` })
       setShowAddModal(false)
       setAddForm({ name: '', email: '', password: '', role: 'farmer' })
       setAddErrors({})
       queryClient.invalidateQueries({ queryKey: ['users'] })
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to create user. Please try again.'
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
+      const msg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to create user. Please try again.'
       toast({ title: 'Creation Failed', description: msg, variant: 'destructive' })
       if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('already')) {
         setAddErrors(prev => ({ ...prev, email: msg }))
@@ -106,28 +128,24 @@ export default function UsersPage() {
     try {
       if (type === 'make_farmer') {
         await updateUser.mutateAsync({ id: user!.id, role: 'farmer' })
-        toast({ title: 'Role Updated', description: `${user!.name} is now a Farmer` })
       } else if (type === 'make_admin') {
         await updateUser.mutateAsync({ id: user!.id, role: 'admin' })
-        toast({ title: 'Role Updated', description: `${user!.name} is now an Admin` })
       } else if (type === 'deactivate') {
         await updateUser.mutateAsync({ id: user!.id, status: 'inactive' })
-        toast({ title: 'Account Deactivated', description: `${user!.name}'s account has been deactivated` })
       } else if (type === 'activate') {
         await updateUser.mutateAsync({ id: user!.id, status: 'active' })
-        toast({ title: 'Account Activated', description: `${user!.name}'s account has been activated` })
       } else if (type === 'delete') {
         await deleteUser.mutateAsync(user!.id)
-        toast({ title: 'User Deleted', description: `${user!.name} has been permanently deleted` })
       } else if (type === 'bulk_delete') {
         await bulkDeleteUsers.mutateAsync(selectedRows)
         setSelectedRows([])
       }
       queryClient.invalidateQueries({ queryKey: ['users'] })
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string; message?: string } } }
       toast({
         title: 'Action Failed',
-        description: err?.response?.data?.error || err?.response?.data?.message || 'Failed to perform action',
+        description: axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to perform action',
         variant: 'destructive',
       })
     }
@@ -137,12 +155,6 @@ export default function UsersPage() {
   const handleBulkDelete = () => {
     if (selectedRows.length === 0) return
     setPendingAction({ type: 'bulk_delete' })
-  }
-
-  const handlePageChange = (newPage: number) => {
-    setPage(newPage)
-    setSelectedRows([])
-    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleAddModalClose = (open: boolean) => {
@@ -361,8 +373,6 @@ export default function UsersPage() {
     )
   }
 
-  const start = (page - 1) * limit + 1
-  const end = Math.min(page * limit, total)
   const confirmConfig = getConfirmConfig()
 
   return (
@@ -396,7 +406,7 @@ export default function UsersPage() {
         </div>
       )}
 
-      {tableData.length === 0 && page === 1 ? (
+      {tableData.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
@@ -407,31 +417,6 @@ export default function UsersPage() {
       ) : (
         <>
           <DataTable columns={columns} data={tableData} searchPlaceholder="Search by name or email..." />
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-sm text-gray-500">
-              Showing {start}-{end} of {total} results
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handlePageChange(Math.max(1, page - 1))}
-                disabled={page === 1}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm"
-              >
-                Previous
-              </button>
-              <span className="text-sm text-gray-700">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
-                disabled={page >= totalPages}
-                className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm"
-              >
-                Next
-              </button>
-            </div>
-          </div>
         </>
       )}
 

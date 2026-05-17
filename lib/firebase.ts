@@ -44,7 +44,7 @@ if (getApps().length > 0) {
 
 export function getFirebaseApp() {
   if (!app) {
-    throw new Error('Firebase not initialized - check env vars')
+    throw new Error('Firebase not initialized — check env vars')
   }
   return app
 }
@@ -58,6 +58,6 @@ export function initFirebaseAnalytics() {
       }
     })
     .catch(() => {
-      // Analytics is optional and unsupported in some browsers/environments.
+      // Analytics not supported — silently ignore
     })
 }

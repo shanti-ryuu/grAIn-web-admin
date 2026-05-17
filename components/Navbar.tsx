@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/auth-store'
 import { useAlerts, useMarkAlertRead, useClearAllAlerts, useNotifications, useMarkNotificationsRead } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/useToast'
+import api from '@/lib/api'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 
@@ -112,7 +113,12 @@ export default function Topbar({ onMenuClick }: TopbarProps) {
     if (notif.deviceId) router.push(`/dashboard/devices/${notif.deviceId}`)
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // Client logout should still complete if the session is already expired.
+    }
     logout()
     queryClient.clear()
     router.push('/auth/login')

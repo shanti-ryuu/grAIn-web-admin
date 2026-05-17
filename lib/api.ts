@@ -10,23 +10,17 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1'
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
-// Attach token from Zustand auth store on every request
+// Auth is carried by httpOnly cookies set by the API.
 api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = useAuthStore.getState().token
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    // Debug log in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`,
-        token ? '✅ token attached' : '❌ NO TOKEN')
-    }
+  config.withCredentials = true
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`)
   }
   return config
 })
@@ -34,14 +28,14 @@ api.interceptors.request.use((config) => {
 // Track whether a refresh is already in-flight to avoid parallel refresh calls
 let isRefreshing = false
 let failedQueue: Array<{
-  resolve: (token: string) => void
+  resolve: () => void
   reject: (error: unknown) => void
 }> = []
 
-function processQueue(error: unknown, token: string | null = null) {
+function processQueue(error: unknown) {
   failedQueue.forEach(({ resolve, reject }) => {
     if (error) reject(error)
-    else resolve(token!)
+    else resolve()
   })
   failedQueue = []
 }
@@ -65,20 +59,11 @@ api.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    const { refreshToken } = useAuthStore.getState()
-    if (!refreshToken) {
-      // No refresh token available — force logout
-      useAuthStore.getState().clearAuth()
-      window.location.href = '/auth/login'
-      return Promise.reject(error)
-    }
-
     if (isRefreshing) {
       // Queue this request until the refresh completes
-      return new Promise<string>((resolve, reject) => {
+      return new Promise<void>((resolve, reject) => {
         failedQueue.push({ resolve, reject })
-      }).then((token) => {
-        originalRequest.headers.Authorization = `Bearer ${token}`
+      }).then(() => {
         return api(originalRequest)
       })
     }
@@ -87,19 +72,16 @@ api.interceptors.response.use(
     isRefreshing = true
 
     try {
-      const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, { refreshToken })
+      const { data } = await axios.post(`${API_BASE_URL}/auth/refresh`, undefined, { withCredentials: true })
 
-      if (data?.success && data?.data?.accessToken) {
-        const { accessToken, refreshToken: newRefreshToken } = data.data
-        const { user } = useAuthStore.getState()
+      if (data?.success) {
+        if (data.data?.user) {
+          useAuthStore.getState().setAuth(data.data.user)
+        }
 
-        // Update auth store with new tokens
-        useAuthStore.getState().setAuth(accessToken, user!, newRefreshToken)
+        processQueue(null)
 
-        processQueue(null, accessToken)
-
-        // Retry the original request with new access token
-        originalRequest.headers.Authorization = `Bearer ${accessToken}`
+        // Retry the original request; the browser sends the new access cookie.
         return api(originalRequest)
       } else {
         processQueue(error)

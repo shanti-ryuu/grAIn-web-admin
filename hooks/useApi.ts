@@ -26,11 +26,11 @@ export const useLogin = () => {
   const { login: storeLogin } = useAuthStore()
   return useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
-      const { data: responseData } = await api.post<ApiResponse<{ accessToken: string; refreshToken: string; user: { id: string; email: string; name: string; role: 'admin' | 'farmer' } }>>('/auth/login', credentials)
+      const { data: responseData } = await api.post<ApiResponse<{ user: { id: string; email: string; name: string; role: 'admin' | 'farmer' } }>>('/auth/login', credentials)
       return unwrapResponse(responseData)
     },
     onSuccess: (data) => {
-      storeLogin(data.accessToken, data.user, data.refreshToken)
+      storeLogin(data.user)
     },
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : 'Login failed'
@@ -40,12 +40,12 @@ export const useLogin = () => {
 }
 
 export const useLogout = () => {
-  const { logout: storeLogout, refreshToken } = useAuthStore()
+  const { logout: storeLogout } = useAuthStore()
   const queryClient = useQueryClient()
   const { toast } = useToast()
   return useMutation({
     mutationFn: async () => {
-      try { await api.post('/auth/logout', { refreshToken }) } catch { /* best-effort server logout */ }
+      try { await api.post('/auth/logout') } catch { /* best-effort server logout */ }
     },
     onSuccess: () => {
       localStorage.removeItem('auth_token')

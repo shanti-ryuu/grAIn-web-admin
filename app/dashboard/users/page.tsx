@@ -120,8 +120,8 @@ export default function UsersPage() {
       const axiosErr = err as { response?: { status?: number; data?: { error?: string; message?: string; errorCode?: string } } }
       const msg = axiosErr?.response?.data?.error || axiosErr?.response?.data?.message || 'Failed to create user. Please try again.'
       toast({ title: 'Creation Failed', description: msg, variant: 'error' })
-      if (axiosErr.response?.status === 409 || msg.toLowerCase().includes('email') || msg.toLowerCase().includes('already')) {
-        setAddErrors(prev => ({ ...prev, email: 'An account with this email already exists' }))
+      if (msg.toLowerCase().includes('email') || msg.toLowerCase().includes('already')) {
+        setAddErrors(prev => ({ ...prev, email: msg }))
       }
     }
   }

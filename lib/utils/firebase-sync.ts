@@ -1,6 +1,9 @@
 import { getRealtimeDb } from '@/lib/firebase-admin'
 import dbConnect from '@/lib/db'
 import Command from '@/lib/models/Command'
+import Device from '@/lib/models/Device'
+
+const STALE_DEVICE_TIMEOUT_MS = 2 * 60 * 1000
 
 /**
  * Push live sensor data to Firebase Realtime Database.
@@ -21,6 +24,7 @@ export async function syncSensorToFirebase(
 ): Promise<void> {
   const db = getRealtimeDb()
   if (!db) return
+  const isActuallyRunning = sensorData.status === 'running' && Number(sensorData.fanSpeed ?? 0) > 0
 
   await db.ref(`grain/devices/${deviceId}/sensors`).set({
     temperature: sensorData.temperature,
@@ -39,6 +43,61 @@ export async function syncSensorToFirebase(
     status: 'online',
     lastActive: Date.now(),
   })
+
+  await db.ref(`grain/devices/${deviceId}/runtimeState`).update({
+    isRunning: isActuallyRunning,
+    lastSeen: Date.now(),
+    currentTemperature: sensorData.temperature,
+    currentHumidity: sensorData.humidity,
+    currentMoisture: sensorData.moisture,
+    currentWeight: sensorData.weight ?? 0,
+  })
+}
+
+/**
+ * Lazily mark devices offline when they have not reported recently.
+ * This runs during dashboard/device list reads instead of a cron job.
+ */
+export async function markStaleDevicesOffline(): Promise<number> {
+  await dbConnect()
+
+  const cutoff = new Date(Date.now() - STALE_DEVICE_TIMEOUT_MS)
+  const staleDevices = await Device.find({
+    status: 'online',
+    lastActive: { $lt: cutoff },
+  }).select('deviceId').lean()
+
+  if (staleDevices.length === 0) return 0
+
+  await Device.updateMany(
+    { deviceId: { $in: staleDevices.map(device => device.deviceId) } },
+    {
+      $set: {
+        status: 'offline',
+        'runtimeState.isRunning': false,
+        'runtimeState.commandAcknowledged': true,
+        'runtimeState.pendingCommand': null,
+        'runtimeState.activeCommand': null,
+        'runtimeState.commandStatus': 'idle',
+      },
+    }
+  )
+
+  const db = getRealtimeDb()
+  if (db) {
+    await Promise.all(staleDevices.map(async (device) => {
+      await db.ref(`grain/devices/${device.deviceId}`).update({ status: 'offline' })
+      await db.ref(`grain/devices/${device.deviceId}/runtimeState`).update({
+        isRunning: false,
+        pendingCommand: null,
+        activeCommand: null,
+        commandStatus: 'idle',
+        commandAcknowledged: true,
+      })
+    }))
+  }
+
+  return staleDevices.length
 }
 
 /**
@@ -50,21 +109,110 @@ export async function pushCommandToFirebase(
   commandId: string,
   command: {
     command: string
+    commandStr?: string
     mode: string
     temperature?: number
     fanSpeed?: number
+    fanTarget?: string
+    fanAction?: string
+    relayAction?: string
+    stepperAction?: string
+    heaterAction?: string
   }
 ): Promise<void> {
   const db = getRealtimeDb()
   if (!db) return
 
-  await db.ref(`grain/commands/${deviceId}/pending/${commandId}`).set({
+  const now = Date.now()
+  const commandPayload = {
     command: command.command,
+    commandStr: command.commandStr ?? null,
     mode: command.mode,
     temperature: command.temperature ?? null,
     fanSpeed: command.fanSpeed ?? null,
-    createdAt: Date.now(),
-  })
+    fanTarget: command.fanTarget ?? null,
+    fanAction: command.fanAction ?? null,
+    relayAction: command.relayAction ?? null,
+    stepperAction: command.stepperAction ?? null,
+    heaterAction: command.heaterAction ?? null,
+  }
+
+  await Promise.all([
+    db.ref(`grain/commands/${deviceId}/pending/${commandId}`).set({
+      ...commandPayload,
+      createdAt: now,
+    }),
+    // Write to /latest path for ESP32 real-time listener (<500ms delivery)
+    db.ref(`grain/commands/${deviceId}/latest`).set({
+      commandId,
+      ...commandPayload,
+      issuedAt: now,
+    }),
+    db.ref(`grain/devices/${deviceId}/runtimeState`).update({
+      pendingCommand: commandId,
+      activeCommand: command.commandStr ?? command.command,
+      lastCommand: command.commandStr ?? command.command,
+      commandStatus: 'pending',
+      commandAcknowledged: false,
+      updatedAt: now,
+    }),
+  ])
+}
+
+export async function markCommandPolled(deviceId: string, commandId: string): Promise<void> {
+  const db = getRealtimeDb()
+  const now = new Date()
+
+  await dbConnect()
+  const command = await Command.findOneAndUpdate(
+    { _id: commandId, deviceId, status: 'pending' },
+    { $set: { status: 'polled', polledAt: now } },
+    { returnDocument: 'after' }
+  )
+
+  if (!command) return
+
+  await Device.findOneAndUpdate(
+    { deviceId },
+    {
+      $set: {
+        status: 'online',
+        lastActive: now,
+        'runtimeState.lastSeen': now,
+        'runtimeState.lastHeartbeat': now,
+        'runtimeState.updatedAt': now,
+        'runtimeState.pendingCommand': commandId,
+        'runtimeState.activeCommand': command.commandStr ?? command.command,
+        'runtimeState.lastCommand': command.commandStr ?? command.command,
+        'runtimeState.commandStatus': 'polled',
+        'runtimeState.commandAcknowledged': false,
+      },
+    }
+  )
+
+  if (db) {
+    const nowMs = now.getTime()
+    await Promise.all([
+      db.ref(`grain/commands/${deviceId}/pending/${commandId}`).update({
+        status: 'polled',
+        polledAt: nowMs,
+      }),
+      db.ref(`grain/devices/${deviceId}`).update({
+        status: 'online',
+        lastActive: nowMs,
+      }),
+      db.ref(`grain/devices/${deviceId}/runtimeState`).update({
+        lastSeen: nowMs,
+        lastHeartbeat: nowMs,
+        updatedAt: nowMs,
+        pendingCommand: commandId,
+        activeCommand: command.commandStr ?? command.command,
+        lastCommand: command.commandStr ?? command.command,
+        commandStatus: 'polled',
+        commandAcknowledged: false,
+      }),
+    ])
+  }
 }
 
 /**
@@ -73,7 +221,8 @@ export async function pushCommandToFirebase(
  */
 export async function markCommandExecuted(
   deviceId: string,
-  commandId: string
+  commandId: string,
+  status: 'executed' | 'failed' | 'timeout' | 'error' = 'executed'
 ): Promise<void> {
   const db = getRealtimeDb()
 
@@ -84,8 +233,79 @@ export async function markCommandExecuted(
 
   // Update MongoDB Command status
   await dbConnect()
-  await Command.findByIdAndUpdate(commandId, {
-    status: 'executed',
+  const commandUpdate: Record<string, unknown> = {
+    status,
     executedAt: new Date(),
+  }
+  if (status === 'executed') {
+    commandUpdate.acknowledgedAt = new Date()
+  }
+  const command = await Command.findByIdAndUpdate(commandId, commandUpdate, { returnDocument: 'after' })
+
+  if (!command) return
+
+  const runtimeSet: Record<string, unknown> = {
+    'runtimeState.pendingCommand': null,
+    'runtimeState.activeCommand': command.commandStr ?? command.command,
+    'runtimeState.lastCommand': command.commandStr ?? command.command,
+    'runtimeState.commandStatus': status,
+    'runtimeState.commandAcknowledged': status === 'executed',
+    'runtimeState.updatedAt': new Date(),
+  }
+  const firebaseRuntimeSet: Record<string, unknown> = {
+    pendingCommand: null,
+    activeCommand: command.commandStr ?? command.command,
+    lastCommand: command.commandStr ?? command.command,
+    commandStatus: status,
+    commandAcknowledged: status === 'executed',
+    lastSeen: Date.now(),
+    updatedAt: Date.now(),
+  }
+
+  if (status === 'executed') {
+    if (command.command === 'START') {
+      runtimeSet['runtimeState.isRunning'] = true
+      runtimeSet['runtimeState.currentMode'] = command.mode
+      runtimeSet['runtimeState.fan1State'] = 'ON'
+      runtimeSet['runtimeState.fan2State'] = 'ON'
+      runtimeSet['runtimeState.heaterState'] = 'ON'
+      runtimeSet['runtimeState.stepperState'] = 'ON'
+      Object.assign(firebaseRuntimeSet, { isRunning: true, currentMode: command.mode, fan1State: 'ON', fan2State: 'ON', heaterState: 'ON', stepperState: 'ON' })
+    } else if (command.command === 'STOP') {
+      runtimeSet['runtimeState.isRunning'] = false
+      runtimeSet['runtimeState.fan1State'] = 'OFF'
+      runtimeSet['runtimeState.fan2State'] = 'OFF'
+      runtimeSet['runtimeState.heaterState'] = 'OFF'
+      runtimeSet['runtimeState.stepperState'] = 'OFF'
+      Object.assign(firebaseRuntimeSet, { isRunning: false, fan1State: 'OFF', fan2State: 'OFF', heaterState: 'OFF', stepperState: 'OFF' })
+    } else if (command.command === 'FAN_CONTROL') {
+      if (command.fanTarget === 'FAN1' || command.fanTarget === 'ALL') {
+        runtimeSet['runtimeState.fan1State'] = command.fanAction
+        firebaseRuntimeSet.fan1State = command.fanAction
+      }
+      if (command.fanTarget === 'FAN2' || command.fanTarget === 'ALL') {
+        runtimeSet['runtimeState.fan2State'] = command.fanAction
+        firebaseRuntimeSet.fan2State = command.fanAction
+      }
+    } else if (command.command === 'HEATER_CONTROL') {
+      runtimeSet['runtimeState.heaterState'] = command.heaterAction
+      firebaseRuntimeSet.heaterState = command.heaterAction
+    } else if (command.command === 'STEPPER_CONTROL') {
+      const stepperState = command.stepperAction === 'START' ? 'ON' : command.stepperAction === 'STOP' ? 'OFF' : command.stepperAction
+      runtimeSet['runtimeState.stepperState'] = stepperState
+      firebaseRuntimeSet.stepperState = stepperState
+    } else if (command.command === 'RELAY_CONTROL') {
+      runtimeSet['runtimeState.relayState'] = command.relayAction
+      firebaseRuntimeSet.relayState = command.relayAction
+    }
+  }
+
+  await Device.findOneAndUpdate({ deviceId }, {
+    $set: runtimeSet,
+    $currentDate: { 'runtimeState.lastSeen': true },
   })
+
+  if (db) {
+    await db.ref(`grain/devices/${deviceId}/runtimeState`).update(firebaseRuntimeSet)
+  }
 }

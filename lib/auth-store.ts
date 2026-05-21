@@ -11,48 +11,46 @@ export interface AuthUser {
 
 export interface AuthStore {
   user: AuthUser | null
-  token: string | null
   isHydrated: boolean
   isAuthenticated: boolean
   isLoading: boolean
-  setAuth: (token: string, user: AuthUser) => void
+  setAuth: (user: AuthUser) => void
   clearAuth: () => void
   logout: () => void
   setHydrated: () => void
   hydrate: () => void
   setLoading: (loading: boolean) => void
   updateUser: (updates: Partial<AuthUser>) => void
-  login: (token: string, user: AuthUser) => void
+  login: (user: AuthUser) => void
 }
 
 export const useAuthStore = create<AuthStore>()(
   persist(
     (set) => ({
       user: null,
-      token: null,
       isHydrated: false,
       isAuthenticated: false,
       isLoading: true,
 
-      setAuth: (token: string, user: AuthUser) => set({
-        token, user, isAuthenticated: true, isLoading: false
+      setAuth: (user: AuthUser) => set({
+        user, isAuthenticated: true, isLoading: false
       }),
 
-      login: (token: string, user: AuthUser) => set({
-        token, user, isAuthenticated: true, isLoading: false
+      login: (user: AuthUser) => set({
+        user, isAuthenticated: true, isLoading: false
       }),
 
       clearAuth: () => set({
-        token: null, user: null, isAuthenticated: false, isLoading: false
+        user: null, isAuthenticated: false, isLoading: false
       }),
 
       logout: () => set({
-        token: null, user: null, isAuthenticated: false, isLoading: false
+        user: null, isAuthenticated: false, isLoading: false
       }),
 
       setHydrated: () => set((state) => ({
         isHydrated: true,
-        isAuthenticated: !!(state.token && state.user),
+        isAuthenticated: !!state.user,
         isLoading: false,
       })),
 
@@ -71,8 +69,13 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'grain-auth',
+      version: 2,
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ token: state.token, user: state.user }),
+      partialize: (state) => ({ user: state.user }),
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<AuthStore> | undefined
+        return { user: state?.user ?? null }
+      },
       onRehydrateStorage: () => (state) => {
         state?.setHydrated()
       },

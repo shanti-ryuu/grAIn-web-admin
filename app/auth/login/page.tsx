@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth-store'
-import { useLogin } from '@/hooks/useAuth'
+import { useLogin } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { FullScreenLoader } from '@/components/FullScreenLoader'
 import Image from 'next/image'
@@ -51,10 +51,11 @@ export default function LoginPage() {
       await login.mutateAsync({ email, password })
       toast({ title: 'Welcome back!', description: 'You have been logged in successfully.' })
       router.push('/dashboard')
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || 'Invalid email or password. Please try again.'
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } } }
+      const msg = axiosErr?.response?.data?.error || 'Invalid email or password. Please try again.'
       setFormError(msg)
-      toast({ title: 'Login Failed', description: msg, variant: 'destructive' })
+      toast({ title: 'Login Failed', description: msg, variant: 'error' })
     }
   }
 

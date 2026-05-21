@@ -3,27 +3,30 @@ import { NextResponse } from 'next/server'
 /**
  * Standardized API response format
  */
-interface ApiResponse<T = any> {
+interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   error?: string
   errorCode?: string
   message?: string
+  warning?: string
   timestamp: string
 }
 
 /**
  * Success response
  */
-export function successResponse<T>(data: T, status: number = 200): NextResponse<ApiResponse<T>> {
-  return NextResponse.json(
-    {
-      success: true,
-      data,
-      timestamp: new Date().toISOString(),
-    },
-    { status }
-  )
+export function successResponse<T>(data: T, statusOrOptions: number | { status?: number; warning?: string } = 200): NextResponse<ApiResponse<T>> {
+  const options = typeof statusOrOptions === 'number'
+    ? { status: statusOrOptions, warning: undefined }
+    : statusOrOptions
+  const body: ApiResponse<T> = {
+    success: true,
+    data,
+    timestamp: new Date().toISOString(),
+  }
+  if (options.warning) body.warning = options.warning
+  return NextResponse.json(body, { status: options.status ?? 200 })
 }
 
 /**
@@ -86,18 +89,26 @@ export function paginatedResponse<T>(
 }
 
 /**
- * Error codes for common scenarios
+ * Multi-Status response (207) — partial success.
+ * Used when MongoDB write succeeded but Firebase realtime push failed.
  */
-export const ErrorCodes = {
-  INVALID_INPUT: 'INVALID_INPUT',
-  UNAUTHORIZED: 'UNAUTHORIZED',
-  FORBIDDEN: 'FORBIDDEN',
-  NOT_FOUND: 'NOT_FOUND',
-  CONFLICT: 'CONFLICT',
-  RATE_LIMIT: 'RATE_LIMIT',
-  INTERNAL_ERROR: 'INTERNAL_ERROR',
-  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
-  ACCOUNT_INACTIVE: 'ACCOUNT_INACTIVE',
-  DEVICE_NOT_FOUND: 'DEVICE_NOT_FOUND',
-  USER_NOT_FOUND: 'USER_NOT_FOUND',
-} as const
+export function multiStatusResponse<T>(
+  data: T,
+  warning: string
+): NextResponse<ApiResponse<T>> {
+  return NextResponse.json(
+    {
+      success: true,
+      data,
+      warning,
+      timestamp: new Date().toISOString(),
+    },
+    { status: 207 }
+  )
+}
+
+/**
+ * Error codes — single source of truth is lib/enums.ts.
+ * Re-exported here for backward compatibility with existing imports.
+ */
+export { ErrorCodes } from '@/lib/enums'

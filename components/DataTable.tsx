@@ -3,11 +3,13 @@ interface DataTableColumn {
   label: string
   width?: string
   align?: 'left' | 'center' | 'right'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   render?: (value: any, row: any) => React.ReactNode
 }
 
 interface DataTableProps {
   columns: DataTableColumn[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any[]
   loading?: boolean
   empty?: string

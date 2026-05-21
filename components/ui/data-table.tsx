@@ -28,6 +28,7 @@ export default function DataTable<TData, TValue>({
   searchKey: _searchKey = 'name',
   pageSizeOptions = [10, 25, 50],
 }: DataTableProps<TData, TValue>) {
+  void _searchKey
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [rowSelection, setRowSelection] = useState({})

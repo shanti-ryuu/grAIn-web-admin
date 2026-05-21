@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/auth-store'
 import Sidebar from '@/components/Sidebar'
@@ -14,6 +14,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter()
   const { token, user, isHydrated } = useAuthStore()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   useEffect(() => {
     if (!isHydrated) return // Wait for localStorage rehydration
@@ -31,16 +32,16 @@ export default function DashboardLayout({
   return (
     <div className="flex h-screen dashboard-bg">
       {/* Sidebar */}
-      <Sidebar />
+      <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Topbar */}
-        <Topbar />
+        <Topbar onMenuClick={() => setMobileNavOpen(true)} />
 
         {/* Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto px-8 py-8">{children}</div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">{children}</div>
         </main>
       </div>
     </div>

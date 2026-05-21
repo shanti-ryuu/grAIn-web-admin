@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { useToast } from '@/hooks/useToast'
+import { useAuthStore } from '@/lib/auth-store'
 
 interface ApiResponse<T> {
   success: boolean
@@ -22,13 +23,38 @@ function unwrapResponse<T>(responseData: ApiResponse<T>): T {
 // Auth
 export const useLogin = () => {
   const { toast } = useToast()
+  const { login: storeLogin } = useAuthStore()
   return useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
-      const { data: responseData } = await api.post<ApiResponse<{ token: string; user: any; expiresIn: number }>>('/auth/login', credentials)
+      const { data: responseData } = await api.post<ApiResponse<{ user: { id: string; email: string; name: string; role: 'admin' | 'farmer' } }>>('/auth/login', credentials)
       return unwrapResponse(responseData)
     },
-    onError: (error: any) => {
-      toast({ title: 'Login Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    onSuccess: (data) => {
+      storeLogin(data.user)
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Login failed'
+      toast({ title: 'Login Failed', description: message, variant: 'error' })
+    },
+  })
+}
+
+export const useLogout = () => {
+  const { logout: storeLogout } = useAuthStore()
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: async () => {
+      try { await api.post('/auth/logout') } catch { /* best-effort server logout */ }
+    },
+    onSuccess: () => {
+      localStorage.removeItem('auth_token')
+      storeLogout()
+      queryClient.clear()
+      toast({ title: 'Logged Out', description: 'You have been logged out successfully' })
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login'
+      }
     },
   })
 }
@@ -52,10 +78,10 @@ export const useRegister = () => {
       return unwrapResponse(responseData)
     },
     onSuccess: (data) => {
-      toast({ title: 'User Created', description: `${data.user.name} created successfully` })
+      toast({ title: 'User Created', description: `${data.user.name} created successfully`, variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Registration Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Registration Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -68,7 +94,9 @@ export const useDevices = () => {
       const { data: responseData } = await api.get<ApiResponse<any[]>>('/devices')
       return unwrapResponse(responseData)
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -94,10 +122,10 @@ export const useRegisterDevice = () => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
-      toast({ title: 'Device Registered', description: `Device ${data.deviceId} registered successfully` })
+      toast({ title: 'Device Registered', description: `Device ${data.deviceId} registered successfully`, variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Registration Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Registration Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -112,10 +140,10 @@ export const useUpdateDevice = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
-      toast({ title: 'Device Updated', description: 'Device updated successfully' })
+      toast({ title: 'Device Updated', description: 'Device updated successfully', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -130,20 +158,23 @@ export const useDeleteDevice = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
-      toast({ title: 'Device Deregistered', description: 'Device has been removed' })
+      toast({ title: 'Device Deregistered', description: 'Device has been removed', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Delete Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
 
 // Users
-export const useUsers = (page: number = 1, limit: number = 10) => {
+export const useUsers = (page?: number, limit?: number) => {
+  const params = page !== undefined && limit !== undefined
+    ? `?page=${page}&limit=${limit}`
+    : '?limit=9999'
   return useQuery({
-    queryKey: ['users', page, limit],
+    queryKey: ['users', page ?? 'all', limit ?? 'all'],
     queryFn: async () => {
-      const { data: responseData } = await api.get<ApiResponse<any>>(`/users?page=${page}&limit=${limit}`)
+      const { data: responseData } = await api.get<ApiResponse<any>>(`/users${params}`)
       return unwrapResponse(responseData)
     },
     staleTime: 30_000,
@@ -159,12 +190,12 @@ export const useCreateUser = () => {
       const { data: responseData } = await api.post<ApiResponse<any>>('/users', payload)
       return unwrapResponse(responseData)
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast({ title: 'User Created', description: `User ${data.name} created successfully` })
+      toast({ title: 'User Created', description: 'User created successfully.', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Creation Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Creation Failed', description: error?.response?.data?.error || error.message || 'Failed to create user.', variant: 'error' })
     },
   })
 }
@@ -180,17 +211,20 @@ export const useUpdateUser = () => {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       if (variables.role) {
-        toast({ title: 'User Updated', description: `Role changed to ${variables.role} successfully` })
+        toast({ title: 'User Updated', description: 'User role updated successfully.', variant: 'success' })
       } else if (variables.status) {
-        toast({ title: 'User Updated', description: `User is now ${variables.status}` })
+        toast({ title: 'User Updated', description: `User is now ${variables.status}`, variant: 'success' })
       } else if (variables.password) {
-        toast({ title: 'Password Changed', description: 'Password updated successfully' })
+        toast({ title: 'Password Changed', description: 'Password updated successfully', variant: 'success' })
       } else {
-        toast({ title: 'User Updated', description: 'User updated successfully' })
+        toast({ title: 'User Updated', description: 'User updated successfully', variant: 'success' })
       }
     },
-    onError: (error: any) => {
-      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+    onError: (error: any, variables) => {
+      const fallback = variables.role
+        ? 'Failed to update user role. Please try again.'
+        : 'Failed to update user. Please try again.'
+      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message || fallback, variant: 'error' })
     },
   })
 }
@@ -205,10 +239,10 @@ export const useDeleteUser = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast({ title: 'User Deleted', description: 'User has been removed' })
+      toast({ title: 'User Deleted', description: 'User deleted successfully.', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Delete Failed', description: error?.response?.data?.error || error.message || 'Failed to delete user.', variant: 'error' })
     },
   })
 }
@@ -221,7 +255,9 @@ export const useSensorData = (deviceId: string, hours: number = 24) => {
       const { data: responseData } = await api.get<ApiResponse<any[]>>(`/sensors/${deviceId}?hours=${hours}`)
       return unwrapResponse(responseData)
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
     enabled: !!deviceId,
   })
 }
@@ -238,10 +274,10 @@ export const useStartDryer = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
       queryClient.invalidateQueries({ queryKey: ['commands'] })
-      toast({ title: 'Dryer Started', description: 'Dryer has been started successfully' })
+      toast({ title: 'Dryer Started', description: 'Dryer has been started successfully', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Start Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Start Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -257,10 +293,92 @@ export const useStopDryer = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
       queryClient.invalidateQueries({ queryKey: ['commands'] })
-      toast({ title: 'Dryer Stopped', description: 'Dryer has been stopped successfully' })
+      toast({ title: 'Dryer Stopped', description: 'Dryer has been stopped successfully', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Stop Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Stop Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
+    },
+  })
+}
+
+export function useControlFan() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, fanTarget, fanAction }: {
+      deviceId: string;
+      fanTarget: 'FAN1' | 'FAN2' | 'ALL';
+      fanAction: 'ON' | 'OFF';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/fan`, { fanTarget, fanAction })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['devices'] })
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Fan Control', description: `${variables.fanTarget} turned ${variables.fanAction.toLowerCase()}`, variant: 'success' })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Fan Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
+    },
+  })
+}
+
+export function useControlStepper() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, stepperAction }: {
+      deviceId: string;
+      stepperAction: 'START' | 'STOP' | 'CW' | 'CCW';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/stepper`, { stepperAction })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Stepper Control', description: `Stepper ${variables.stepperAction.toLowerCase()} command sent` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Stepper Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
+    },
+  })
+}
+
+export function useControlRelay() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, relayAction }: {
+      deviceId: string;
+      relayAction: 'ON' | 'OFF';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/relay`, { relayAction })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Auger / Conveyor', description: `Relay turned ${variables.relayAction.toLowerCase()}` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Relay Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
+    },
+  })
+}
+
+export function useControlHeater() {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: ({ deviceId, heaterAction }: {
+      deviceId: string;
+      heaterAction: 'ON' | 'OFF';
+    }) =>
+      api.post<ApiResponse<any>>(`/dryer/${deviceId}/heater`, { heaterAction })
+        .then(r => unwrapResponse(r.data)),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['commands'] })
+      toast({ title: 'Heater Control', description: `Heater turned ${variables.heaterAction.toLowerCase()}` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Heater Control Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -300,7 +418,9 @@ export const useAlerts = (type?: string) => {
       const { data: responseData } = await api.get<ApiResponse<any[]>>(`/alerts${params}`)
       return unwrapResponse(responseData)
     },
-    staleTime: 2 * 60 * 1000,
+    staleTime: 20_000,
+    refetchInterval: 20_000,
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -314,10 +434,10 @@ export const useMarkAlertRead = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      toast({ title: 'Alert Read', description: 'Alert marked as read' })
+      toast({ title: 'Alert Read', description: 'Alert marked as read', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -332,10 +452,10 @@ export const useClearAllAlerts = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alerts'] })
-      toast({ title: 'Alerts Cleared', description: 'All alerts marked as read' })
+      toast({ title: 'Alerts Cleared', description: 'All alerts marked as read', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Clear Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Clear Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -349,8 +469,23 @@ export const usePredictDrying = () => {
       return unwrapResponse(responseData)
     },
     onError: (error: any) => {
-      toast({ title: 'Prediction Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Prediction Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
+  })
+}
+
+// Predictions
+export const usePredictions = (deviceId?: string) => {
+  return useQuery({
+    queryKey: ['predictions', deviceId],
+    queryFn: async () => {
+      const params = deviceId ? `?deviceId=${deviceId}` : ''
+      const { data: responseData } = await api.get<ApiResponse<any[]>>(`/predictions${params}`)
+      return unwrapResponse(responseData)
+    },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    enabled: !!deviceId || deviceId === undefined,
   })
 }
 
@@ -377,10 +512,10 @@ export const useUpdateProfile = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] })
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast({ title: 'Profile Updated', description: 'Your profile has been updated' })
+      toast({ title: 'Profile Updated', description: 'Your profile has been updated', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Update Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -395,10 +530,10 @@ export const useUpdateAvatar = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['profile'] })
-      toast({ title: 'Avatar Updated', description: 'Profile image updated' })
+      toast({ title: 'Avatar Updated', description: 'Profile image updated', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Avatar Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Avatar Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -411,12 +546,12 @@ export const useBulkDeleteUsers = () => {
       const { data: responseData } = await api.delete<ApiResponse<any>>('/users/bulk', { data: { ids } })
       return unwrapResponse(responseData)
     },
-    onSuccess: (data) => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
-      toast({ title: 'Users Deleted', description: `${data.deletedCount} user(s) have been permanently deleted` })
+      toast({ title: 'Users Deleted', description: `${variables.length} users deleted successfully.`, variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message || 'Failed to delete selected users.', variant: 'error' })
     },
   })
 }
@@ -426,21 +561,15 @@ export const useBulkDeleteDevices = () => {
   const { toast } = useToast()
   return useMutation({
     mutationFn: async (ids: string[]) => {
-      const results = await Promise.allSettled(ids.map(id => api.delete<ApiResponse<any>>(`/devices/${id}`)))
-      const succeeded = results.filter(r => r.status === 'fulfilled').length
-      const failed = results.filter(r => r.status === 'rejected').length
-      return { succeeded, failed }
+      const { data: responseData } = await api.delete<ApiResponse<any>>('/devices/bulk', { data: { ids } })
+      return unwrapResponse(responseData)
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
-      if (data.failed > 0) {
-        toast({ title: 'Partial Delete', description: `${data.succeeded} device(s) deleted, ${data.failed} failed`, variant: 'destructive' })
-      } else {
-        toast({ title: 'Devices Deleted', description: `${data.succeeded} device(s) have been deregistered` })
-      }
+      toast({ title: 'Devices Deleted', description: `${data.deletedCount} device(s) have been deregistered`, variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Bulk Delete Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
     },
   })
 }
@@ -453,10 +582,133 @@ export const useChangePassword = () => {
       return unwrapResponse(responseData)
     },
     onSuccess: () => {
-      toast({ title: 'Password Changed', description: 'Your password has been updated successfully' })
+      toast({ title: 'Password Changed', description: 'Your password has been updated successfully', variant: 'success' })
     },
     onError: (error: any) => {
-      toast({ title: 'Change Failed', description: error?.response?.data?.error || error.message, variant: 'destructive' })
+      toast({ title: 'Change Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
+    },
+  })
+}
+
+// Drying Sessions
+export const useDryingSessions = (params?: { status?: string; deviceId?: string; page?: number; limit?: number }) => {
+  const queryParams = new URLSearchParams()
+  if (params?.status) queryParams.set('status', params.status)
+  if (params?.deviceId) queryParams.set('deviceId', params.deviceId)
+  if (params?.page) queryParams.set('page', String(params.page))
+  if (params?.limit) queryParams.set('limit', String(params.limit))
+
+  return useQuery({
+    queryKey: ['sessions', params],
+    queryFn: async () => {
+      const { data: responseData } = await api.get<ApiResponse<any> & {
+        pagination?: {
+          total: number
+          count: number
+          page: number
+          limit: number
+          totalPages: number
+        }
+      }>(`/sessions?${queryParams}`)
+      if (!responseData.success || responseData.data === undefined) {
+        throw new Error(responseData.error || 'Request failed')
+      }
+      return {
+        data: responseData.data,
+        pagination: responseData.pagination,
+      }
+    },
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+  })
+}
+
+export const useDryingSession = (id: string) => {
+  return useQuery({
+    queryKey: ['session', id],
+    queryFn: async () => {
+      const { data: responseData } = await api.get<ApiResponse<any>>(`/sessions/${id}`)
+      return unwrapResponse(responseData)
+    },
+    enabled: !!id,
+  })
+}
+
+export const useStartDryingSession = () => {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: async (payload: { deviceId: string; grainType?: string; targetMoisture?: number; mode?: string; temperature?: number; fanSpeed?: number }) => {
+      const startPayload = {
+        mode: payload.mode ?? 'AUTO',
+        temperature: payload.temperature ?? 45,
+        fanSpeed: payload.fanSpeed ?? 80,
+      }
+      await api.post<ApiResponse<any>>(`/dryer/${payload.deviceId}/start`, startPayload)
+      const { data: responseData } = await api.post<ApiResponse<any>>('/sessions', payload)
+      return unwrapResponse(responseData)
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      toast({ title: 'Session Started', description: `Drying session started for ${data.deviceId}` })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Start Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
+    },
+  })
+}
+
+export const useEndDryingSession = () => {
+  const queryClient = useQueryClient()
+  const { toast } = useToast()
+  return useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: 'complete' | 'abort' }) => {
+      const { data: responseData } = await api.patch<ApiResponse<any>>(`/sessions/${id}`, { action })
+      return unwrapResponse(responseData)
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      const msg = variables.action === 'complete' ? 'Session completed' : 'Session aborted'
+      toast({ title: msg, description: 'Drying session has been updated' })
+    },
+    onError: (error: any) => {
+      toast({ title: 'Action Failed', description: error?.response?.data?.error || error.message, variant: 'error' })
+    },
+  })
+}
+
+// Notifications
+export const useNotifications = (unreadOnly = false) => {
+  return useQuery({
+    queryKey: ['notifications', unreadOnly],
+    queryFn: async () => {
+      const params = unreadOnly ? '?unread=true' : ''
+      const { data: responseData } = await api.get<ApiResponse<any>>(`/notifications${params}`)
+      return unwrapResponse(responseData)
+    },
+    staleTime: 10_000,
+    refetchInterval: 15_000,
+  })
+}
+
+export const useMarkNotificationsRead = () => {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { ids?: string[]; markAll?: boolean }) => {
+      const { data: responseData } = await api.patch<ApiResponse<any>>('/notifications', payload)
+      return unwrapResponse(responseData)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    },
+  })
+}
+
+export const useRegisterFCMToken = () => {
+  return useMutation({
+    mutationFn: async (payload: { token: string; platform?: string }) => {
+      const { data: responseData } = await api.post<ApiResponse<any>>('/notifications/fcm-token', payload)
+      return unwrapResponse(responseData)
     },
   })
 }

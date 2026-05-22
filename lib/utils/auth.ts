@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
 import dbConnect from '@/lib/db'
 import User from '@/lib/models/User'
+import { ACCESS_TOKEN_COOKIE } from '@/lib/utils/auth-cookies'
 
 export interface TokenPayload {
   userId: string
@@ -28,11 +29,11 @@ function logAuthWarning(message: string, detail?: unknown): void {
  */
 export function getTokenFromRequest(request: NextRequest): string | null {
   const authHeader = request.headers.get('authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.substring(7)
   }
 
-  return authHeader.substring(7)
+  return request.cookies.get(ACCESS_TOKEN_COOKIE)?.value ?? null
 }
 
 /**
@@ -52,19 +53,11 @@ export function verifyToken(token: string): TokenPayload | null {
  * Get user from request — with diagnostic logging + revoked token check
  */
 export async function getUserFromRequest(request: NextRequest): Promise<TokenPayload | null> {
-  const authHeader = request.headers.get('Authorization')
-
-  if (!authHeader) {
-    logAuthWarning('[getUserFromRequest] No Authorization header')
+  const token = getTokenFromRequest(request)
+  if (!token) {
+    logAuthWarning('[getUserFromRequest] No access token')
     return null
   }
-
-  if (!authHeader.startsWith('Bearer ')) {
-    logAuthWarning('[getUserFromRequest] Invalid header format:', authHeader.slice(0, 20))
-    return null
-  }
-
-  const token = authHeader.slice(7)
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload

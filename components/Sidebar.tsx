@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/auth-store'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAlerts, useDevices, useDryingSessions } from '@/hooks/useApi'
 import Image from 'next/image'
+import api from '@/lib/api'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -58,7 +59,12 @@ export default function Sidebar({ mobileOpen = false, onMobileClose, className =
     Sessions: activeSessionCount,
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.post('/auth/logout')
+    } catch {
+      // Client logout should still complete if the session is already expired.
+    }
     logout()
     queryClient.clear()
     router.push('/auth/login')

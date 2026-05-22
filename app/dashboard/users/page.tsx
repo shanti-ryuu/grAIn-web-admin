@@ -9,6 +9,7 @@ import DataTable from '@/components/ui/data-table'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useDevices, useBulkDeleteUsers } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
+import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
@@ -59,7 +60,7 @@ export default function UsersPage() {
   const [selectedRows, setSelectedRows] = useState<string[]>([])
 
   const { data: usersData, isLoading, error, refetch } = useUsers()
-  const { data: devices } = useDevices()
+  const { data: devicesData } = useDevices()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const deleteUser = useDeleteUser()
@@ -67,8 +68,9 @@ export default function UsersPage() {
 
   const users = (usersData as { users?: Array<Record<string, unknown>> } | undefined)?.users || []
 
+  const devices = Array.isArray(devicesData) ? devicesData : []
   const deviceCounts: Record<string, number> = {}
-  ;(devices || []).forEach((d: { assignedUser?: IdLike }) => {
+  devices.forEach((d: { assignedUser?: IdLike }) => {
     const uid = getIdFromIdLike(d.assignedUser)
     if (uid) deviceCounts[uid] = (deviceCounts[uid] || 0) + 1
   })

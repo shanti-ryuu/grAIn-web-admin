@@ -10,7 +10,6 @@ export interface LoginCredentials {
 }
 
 export interface LoginResponse {
-  token: string
   user: {
     id: string
     email: string
@@ -48,7 +47,7 @@ export function useLogin() {
       return responseData.data
     },
     onSuccess: (data) => {
-      login(data.token, data.user)
+      login(data.user)
     },
   })
 }
@@ -58,7 +57,7 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
-      // No server-side logout endpoint; just clear local state
+      try { await api.post('/auth/logout') } catch { /* best-effort server logout */ }
     },
     onSuccess: () => {
       localStorage.removeItem('auth_token')

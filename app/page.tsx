@@ -7,12 +7,12 @@ import FullScreenLoader from '@/components/FullScreenLoader'
 
 export default function Home() {
   const router = useRouter()
-  const { token, user, isHydrated } = useAuthStore()
+  const { user, isHydrated } = useAuthStore()
 
   useEffect(() => {
     if (!isHydrated) return
-    router.replace(token && user ? '/dashboard' : '/auth/login')
-  }, [isHydrated, router, token, user])
+    router.replace(user ? '/dashboard' : '/auth/login')
+  }, [isHydrated, router, user])
 
   return <FullScreenLoader />
 }

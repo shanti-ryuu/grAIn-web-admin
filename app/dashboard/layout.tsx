@@ -13,20 +13,20 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { token, user, isHydrated } = useAuthStore()
+  const { user, isHydrated } = useAuthStore()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   useEffect(() => {
-    if (isHydrated && (!token || !user)) {
+    if (isHydrated && !user) {
       router.replace('/auth/login')
     }
-  }, [isHydrated, router, token, user])
+  }, [isHydrated, router, user])
 
   if (!isHydrated) {
     return <FullScreenLoader />
   }
 
-  if (!token || !user) {
+  if (!user) {
     return null
   }
 

@@ -12,7 +12,7 @@ import FullScreenLoader from '@/components/FullScreenLoader'
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const { token, user, isHydrated } = useAuthStore()
+  const { user, isHydrated } = useAuthStore()
   const login = useLogin()
 
   const [email, setEmail] = useState('')
@@ -33,16 +33,16 @@ export default function LoginPage() {
   [])
 
   useEffect(() => {
-    if (isHydrated && token && user) {
+    if (isHydrated && user) {
       router.replace('/dashboard')
     }
-  }, [isHydrated, router, token, user])
+  }, [isHydrated, router, user])
 
   if (!isHydrated) {
     return <FullScreenLoader />
   }
 
-  if (token && user) {
+  if (user) {
     return null
   }
 

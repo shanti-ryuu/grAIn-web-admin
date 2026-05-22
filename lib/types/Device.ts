@@ -1,4 +1,4 @@
-import type { User } from './user.types'
+import type { User } from './User'
 
 export interface Device {
   _id: string
@@ -12,15 +12,4 @@ export interface Device {
   createdAt: string
   updatedAt?: string
   isOnline?: boolean
-}
-
-export interface RegisterDeviceInput {
-  deviceId: string
-  location: string
-  assignedUser?: string
-}
-
-export interface UpdateDeviceInput {
-  location?: string
-  assignedUser?: string | null
 }

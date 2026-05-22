@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import Card from './Card'
 
-export interface ChartCardProps {
+interface ChartCardProps {
   title: string
   description?: string
   children: ReactNode
@@ -15,7 +15,7 @@ export default function ChartCard({
   description,
   isLoading = false,
   className = '',
-}: ChartCardProps) {
+}: Readonly<ChartCardProps>) {
   return (
     <Card className={`p-8 h-full glass-card ${className}`}>
       <div className="mb-8 pb-6 border-b-2 border-gray-200">

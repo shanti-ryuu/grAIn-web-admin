@@ -17,11 +17,11 @@ const queryClient = new QueryClient({
   },
 })
 
-export interface ProvidersProps {
+interface ProvidersProps {
   children: ReactNode
 }
 
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children }: Readonly<ProvidersProps>) {
   const hydrate = useAuthStore((state) => state.hydrate)
   const isHydrated = useAuthStore((state) => state.isHydrated)
 

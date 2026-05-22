@@ -51,12 +51,12 @@ function NotifIcon({ type }: { type: string }) {
   return <Bell className="w-4 h-4 text-blue-500 shrink-0" />
 }
 
-export interface NavbarProps {
+interface NavbarProps {
   onMenuClick?: () => void
   className?: string
 }
 
-export default function Navbar({ onMenuClick, className = '' }: NavbarProps) {
+export default function Navbar({ onMenuClick, className = '' }: Readonly<NavbarProps>) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuthStore()

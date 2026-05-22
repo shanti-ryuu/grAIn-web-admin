@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { X, Loader2 } from 'lucide-react'
 
-export interface ConfirmModalProps {
+interface ConfirmModalProps {
   isOpen: boolean
   onClose: () => void
   onConfirm: () => void
@@ -25,7 +25,7 @@ export default function ConfirmModal({
   cancelText = 'Cancel',
   variant = 'danger',
   loading = false,
-}: ConfirmModalProps) {
+}: Readonly<ConfirmModalProps>) {
   if (!isOpen) return null
 
   const variantClasses: Record<string, string> = {

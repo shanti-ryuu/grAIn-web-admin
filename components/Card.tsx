@@ -6,13 +6,13 @@ const paddingClasses = {
   lg: 'p-8',
 } as const
 
-export interface CardProps {
+interface CardProps {
   children: ReactNode
   className?: string
   padding?: 'sm' | 'md' | 'lg'
 }
 
-export default function Card({ children, className = '', padding }: CardProps) {
+export default function Card({ children, className = '', padding }: Readonly<CardProps>) {
   return (
     <div className={`stat-card ${padding ? paddingClasses[padding] : 'p-0'} ${className}`}>
       {children}

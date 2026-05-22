@@ -34,7 +34,7 @@ interface ToastItemProps {
   variant?: ToastVariant
 }
 
-function ToastItem({ id, title, description, variant = 'success' }: ToastItemProps) {
+function ToastItem({ id, title, description, variant = 'success' }: Readonly<ToastItemProps>) {
   const dismiss = useToastStore((state) => state.dismiss)
   const [isVisible, setIsVisible] = useState(false)
   const [isExiting, setIsExiting] = useState(false)

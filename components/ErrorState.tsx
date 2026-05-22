@@ -2,7 +2,7 @@
 
 import { RefreshCw } from 'lucide-react'
 
-export interface ErrorStateProps {
+interface ErrorStateProps {
   title?: string
   message?: string
   onRetry?: () => void
@@ -16,7 +16,7 @@ export default function ErrorState({
   onRetry,
   showRetry = true,
   className = '',
-}: ErrorStateProps) {
+}: Readonly<ErrorStateProps>) {
   return (
     <div className={`bg-[#ffffff] rounded-lg border border-[#e5e7eb] p-12 text-center ${className}`}>
       <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">

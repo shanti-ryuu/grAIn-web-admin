@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import Card from './Card'
 
-export interface StatCardProps {
+interface StatCardProps {
   icon: LucideIcon
   label: string
   value: string | number
@@ -24,7 +24,7 @@ export default function StatCard({
   className = '',
   change,
   changeType = 'neutral',
-}: StatCardProps) {
+}: Readonly<StatCardProps>) {
   const changeColor =
     changeType === 'positive'
       ? 'text-green-600'

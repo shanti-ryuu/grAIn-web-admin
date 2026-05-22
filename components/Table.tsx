@@ -8,7 +8,7 @@ export interface TableColumn<T extends Record<string, unknown>> {
   className?: string
 }
 
-export interface TableProps<T extends Record<string, unknown>> {
+interface TableProps<T extends Record<string, unknown>> {
   columns: TableColumn<T>[]
   data: T[]
   title?: string
@@ -29,7 +29,7 @@ function renderCellValue(value: unknown): ReactNode {
   return String(value)
 }
 
-export default function Table<T extends Record<string, unknown>>({ columns, data, title, className = '' }: TableProps<T>) {
+export default function Table<T extends Record<string, unknown>>({ columns, data, title, className = '' }: Readonly<TableProps<T>>) {
   return (
     <Card className={className}>
       {title && <div className="px-6 pt-6 pb-4 border-b border-gray-200">

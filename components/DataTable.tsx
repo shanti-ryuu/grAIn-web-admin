@@ -10,7 +10,7 @@ export interface ColumnDef<T extends Record<string, unknown>> {
   className?: string
 }
 
-export interface DataTableProps<T extends Record<string, unknown>> {
+interface DataTableProps<T extends Record<string, unknown>> {
   columns: ColumnDef<T>[]
   data: T[]
   isLoading?: boolean
@@ -44,7 +44,7 @@ export default function DataTable<T extends Record<string, unknown>>({
   empty = 'No data available',
   keyExtractor,
   className = '',
-}: DataTableProps<T>) {
+}: Readonly<DataTableProps<T>>) {
   if (isLoading || loading) {
     return (
       <div className={`space-y-3 ${className}`}>

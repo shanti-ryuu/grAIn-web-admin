@@ -20,13 +20,13 @@ const navigation = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
-export interface SidebarProps {
+interface SidebarProps {
   mobileOpen?: boolean
   onMobileClose?: () => void
   className?: string
 }
 
-export default function Sidebar({ mobileOpen = false, onMobileClose, className = '' }: SidebarProps) {
+export default function Sidebar({ mobileOpen = false, onMobileClose, className = '' }: Readonly<SidebarProps>) {
   const router = useRouter()
   const pathname = usePathname()
   const { user, logout } = useAuthStore()

@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       status: user.status,
     }
 
-    const response = successResponse({ user: userData })
+    const response = successResponse({ user: userData, accessToken, token: accessToken })
     return setAuthCookies(response, accessToken, refreshToken)
 
   } catch (error) {

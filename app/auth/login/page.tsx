@@ -88,6 +88,22 @@ export default function LoginPage() {
     }
   }
 
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value)
+    if (errors.email) setErrors(prev => ({ ...prev, email: '' }))
+    if (formError) setFormError('')
+  }
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value)
+    if (errors.password) setErrors(prev => ({ ...prev, password: '' }))
+    if (formError) setFormError('')
+  }
+
+  const handleTogglePasswordVisibility = () => {
+    setShowPassword(prev => !prev)
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-100 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Floating Grain Particles */}
@@ -131,11 +147,7 @@ export default function LoginPage() {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value)
-                  if (errors.email) setErrors(prev => ({ ...prev, email: '' }))
-                  if (formError) setFormError('')
-                }}
+                onChange={handleEmailChange}
                 autoComplete="email"
                 className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-white/60 backdrop-blur-sm ${
                   errors.email ? 'border-destructive focus:ring-destructive' : 'border-gray-200/60 focus:ring-green-800'
@@ -149,11 +161,7 @@ export default function LoginPage() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value)
-                  if (errors.password) setErrors(prev => ({ ...prev, password: '' }))
-                  if (formError) setFormError('')
-                }}
+                onChange={handlePasswordChange}
                 autoComplete="current-password"
                 className={`w-full px-4 py-3 pr-10 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-white/60 backdrop-blur-sm ${
                   errors.password ? 'border-destructive focus:ring-destructive' : 'border-gray-200/60 focus:ring-green-800'
@@ -162,7 +170,7 @@ export default function LoginPage() {
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={handleTogglePasswordVisibility}
                 className="absolute right-3 top-[38px] text-gray-400 hover:text-gray-600"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, notFound } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Play, Square, Thermometer, Droplets, Wind, Zap, Activity, Clock, Brain, Scale, Power, RotateCw, RotateCcw, Flame, Cog } from 'lucide-react'
 import Card from '@/components/Card'
@@ -190,6 +190,10 @@ export default function DeviceDetailPage() {
         </div>
       </div>
     )
+  }
+
+  if (!deviceLoading && !device) {
+    notFound()
   }
 
   if (deviceError) {

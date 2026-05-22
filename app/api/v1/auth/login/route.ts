@@ -7,6 +7,7 @@ import { generateAccessToken, generateRefreshToken } from '@/lib/utils/tokens'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { validateLoginRequest } from '@/lib/utils/validation'
 import { setAuthCookies } from '@/lib/utils/auth-cookies'
+import { UserStatus } from '@/lib/enums'
 
 function logAuthError(code: string, error: unknown): void {
   const message = error instanceof Error ? error.message : 'Unknown error'

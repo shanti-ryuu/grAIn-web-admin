@@ -50,7 +50,7 @@ function ToastItem({ id, title, description, variant = 'success' }: ToastItemPro
     setTimeout(() => dismiss(id), 300)
   }
 
-  const ariaLive = variant === 'error' ? 'assertive' : 'polite'
+  const ariaLive = variant === 'error' || variant === 'destructive' ? 'assertive' : 'polite'
 
   const animClass = isExiting
     ? 'translate-x-full opacity-0'

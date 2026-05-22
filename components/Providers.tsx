@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from '@/lib/auth-store'
 import { initFirebaseAnalytics } from '@/lib/firebase'
 import { Loader2 } from 'lucide-react'
+import PageTitle from '@/components/PageTitle'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +39,7 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <PageTitle />
       {children}
     </QueryClientProvider>
   )

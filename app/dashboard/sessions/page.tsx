@@ -6,6 +6,8 @@ import Card from '@/components/Card'
 import { useDryingSessions, useStartDryingSession, useEndDryingSession, useDevices } from '@/hooks/useApi'
 import { useEventStream } from '@/hooks/useEventStream'
 import ErrorState from '@/components/ErrorState'
+import { LoadingTable } from '@/components/LoadingTable'
+import { Skeleton } from '@/components/ui/skeleton'
 import { DeviceStatus, DryingSessionStatus } from '@/lib/enums'
 
 function formatDuration(seconds: number): string {
@@ -105,11 +107,17 @@ export default function SessionsPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div><div className="h-8 bg-gray-200 rounded w-48 animate-pulse" /><div className="h-4 bg-gray-200 rounded w-64 mt-2 animate-pulse" /></div>
+          <div>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-64 mt-2" />
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => <div key={i} className="h-48 bg-gray-100 rounded-lg animate-pulse" />)}
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
         </div>
+        <Card className="p-6">
+          <LoadingTable rows={5} cols={8} />
+        </Card>
       </div>
     )
   }
@@ -261,7 +269,7 @@ export default function SessionsPage() {
       </div>
 
       {/* Sessions Table */}
-      {Array.isArray(sessions) && sessions.length > 0 ? (
+      {!isLoading && !error && Array.isArray(sessions) && sessions.length > 0 ? (
         <div className="space-y-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -341,7 +349,7 @@ export default function SessionsPage() {
             </div>
           </div>
         </div>
-      ) : (
+      ) : !isLoading && !error ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <Clock className="w-8 h-8 text-green-700" />
@@ -355,7 +363,7 @@ export default function SessionsPage() {
             <Play className="w-4 h-4" /> Start Session
           </button>
         </Card>
-      )}
+      ) : null}
 
       {/* Start Session Modal */}
       {showStartModal && (

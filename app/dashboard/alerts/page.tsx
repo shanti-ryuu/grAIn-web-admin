@@ -7,6 +7,7 @@ import ErrorState from '@/components/ErrorState'
 import { useAlerts, useMarkAlertRead, useClearAllAlerts } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { useRouter } from 'next/navigation'
+import { Skeleton } from '@/components/ui/skeleton'
 import { AlertType } from '@/lib/enums'
 
 const ALERT_TABS = ['all', 'unread', AlertType.Critical, AlertType.Warning, AlertType.Info] as const
@@ -61,8 +62,21 @@ export default function AlertsPage() {
   if (isLoading) {
     return (
       <div className="space-y-8">
-        <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-32 mb-2" /><div className="h-4 bg-gray-200 rounded w-96" /></div>
-        <Card className="p-8 space-y-4">{[1, 2, 3].map((i) => (<div key={i} className="h-16 bg-gray-200 rounded animate-pulse" />))}</Card>
+        <div>
+          <Skeleton className="h-8 w-32 mb-2" />
+          <Skeleton className="h-4 w-96 max-w-full" />
+        </div>
+        <Card className="p-6 space-y-1">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-3">
+              <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          ))}
+        </Card>
       </div>
     )
   }
@@ -99,7 +113,7 @@ export default function AlertsPage() {
         ))}
       </Card>
 
-      {filteredAlerts.length === 0 ? (
+      {!isLoading && !error && filteredAlerts.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600" />

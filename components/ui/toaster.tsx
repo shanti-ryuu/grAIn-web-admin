@@ -3,13 +3,6 @@
 import { useToast } from '@/hooks/useToast'
 import { X } from 'lucide-react'
 
-const variantStyles: Record<string, string> = {
-  success: 'bg-green-50/90 border-green-200 text-green-900',
-  error: 'bg-red-50/90 border-red-200 text-red-900',
-  warning: 'bg-yellow-50/90 border-yellow-200 text-yellow-900',
-  info: 'bg-blue-50/90 border-blue-200 text-blue-900',
-}
-
 export function Toaster() {
   const { toasts, dismiss } = useToast()
 
@@ -19,7 +12,13 @@ export function Toaster() {
         <div
           key={t.id}
           className={`flex items-start gap-3 px-4 py-3 rounded-xl border shadow-lg max-w-sm animate-in slide-in-from-right backdrop-blur-md ${
-            variantStyles[t.variant ?? 'success'] || 'bg-white/90 border-gray-200 text-gray-900'
+            t.variant === 'destructive' || t.variant === 'error'
+              ? 'bg-red-50/90 border-red-200 text-red-900'
+              : t.variant === 'warning'
+                ? 'bg-amber-50/90 border-amber-200 text-amber-900'
+                : t.variant === 'success'
+                  ? 'bg-green-50/90 border-green-200 text-green-900'
+              : 'bg-white/90 border-gray-200 text-gray-900'
           }`}
         >
           <div className="flex-1">

@@ -1,13 +1,16 @@
 'use client'
 
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, notFound } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Play, Square, Thermometer, Droplets, Wind, Zap, Activity, Clock, Brain, Scale, Power, RotateCw, RotateCcw, Flame, Cog } from 'lucide-react'
 import Card from '@/components/Card'
 import Table from '@/components/Table'
+import ErrorState from '@/components/ErrorState'
 import { useDevice, useSensorData, useStartDryer, useStopDryer, useCommandHistory, usePredictions, useControlFan, useControlStepper, useControlRelay, useControlHeater } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { getFirebaseApp } from '@/lib/firebase'
+import type { User } from '@/lib/types'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
@@ -39,6 +42,10 @@ function toTimestampMs(value: unknown): number | null {
 
 function isFresh(timestamp: number | null, currentTime: number): boolean {
   return timestamp !== null && currentTime - timestamp <= DEVICE_ONLINE_TIMEOUT_MS
+}
+
+function getAssignedUserName(assignedUser: string | User | undefined): string {
+  return assignedUser && typeof assignedUser === 'object' ? assignedUser.name : 'Unassigned'
 }
 
 export default function DeviceDetailPage() {
@@ -112,6 +119,7 @@ export default function DeviceDetailPage() {
   const isRunning = isDeviceOnline && (latestSensor?.status === 'running' || latestSensor?.status === 'drying')
 
   const handleStart = async () => {
+    if (!device) return
     try {
       await startDryer.mutateAsync({ deviceId: device.deviceId, mode, temperature, fanSpeed })
       toast({ title: 'Device started', description: `${device.deviceId} started in ${mode} mode.` })
@@ -122,6 +130,7 @@ export default function DeviceDetailPage() {
   }
 
   const handleStop = async () => {
+    if (!device) return
     try {
       await stopDryer.mutateAsync(device.deviceId)
       toast({ title: 'Device stopped', description: `${device.deviceId} has been stopped.` })
@@ -132,6 +141,7 @@ export default function DeviceDetailPage() {
   }
 
   const handleFanControl = async (fanTarget: 'FAN1' | 'FAN2' | 'ALL', fanAction: 'ON' | 'OFF') => {
+    if (!device) return
     try {
       await controlFan.mutateAsync({ deviceId: device.deviceId, fanTarget, fanAction })
       if (fanTarget === 'FAN1' || fanTarget === 'ALL') setFan1Status(fanAction)
@@ -142,6 +152,7 @@ export default function DeviceDetailPage() {
   }
 
   const handleStepperControl = async (stepperAction: 'START' | 'STOP' | 'CW' | 'CCW') => {
+    if (!device) return
     try {
       await controlStepper.mutateAsync({ deviceId: device.deviceId, stepperAction })
     } catch {
@@ -150,6 +161,7 @@ export default function DeviceDetailPage() {
   }
 
   const handleRelayControl = async (relayAction: 'ON' | 'OFF') => {
+    if (!device) return
     try {
       await controlRelay.mutateAsync({ deviceId: device.deviceId, relayAction })
       setRelayStatus(relayAction)
@@ -159,6 +171,7 @@ export default function DeviceDetailPage() {
   }
 
   const handleHeaterControl = async (heaterAction: 'ON' | 'OFF') => {
+    if (!device) return
     try {
       await controlHeater.mutateAsync({ deviceId: device.deviceId, heaterAction })
       setHeaterStatus(heaterAction)
@@ -173,21 +186,25 @@ export default function DeviceDetailPage() {
   if (deviceLoading || sensorLoading) {
     return (
       <div className="space-y-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-48 mb-4" />
-          <div className="h-4 bg-gray-200 rounded w-96" />
+        <div>
+          <Skeleton className="h-8 w-48 mb-4" />
+          <Skeleton className="h-4 w-96 max-w-full" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 animate-pulse">
-              <div className="h-6 bg-gray-200 rounded w-24 mb-4" />
-              <div className="h-10 bg-gray-200 rounded w-16 mb-2" />
-              <div className="h-4 bg-gray-200 rounded w-32" />
-            </div>
+        <div className="grid grid-cols-2 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-80 w-full rounded-lg" />
+          <Skeleton className="h-80 w-full rounded-lg" />
         </div>
       </div>
     )
+  }
+
+  if (!deviceLoading && !device) {
+    notFound()
   }
 
   if (deviceError) {
@@ -196,9 +213,19 @@ export default function DeviceDetailPage() {
         <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to Devices
         </button>
+        <ErrorState message="Failed to load device details." onRetry={refetchDevice} />
+      </div>
+    )
+  }
+
+  if (!device) {
+    return (
+      <div className="space-y-8">
+        <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back to Devices
+        </button>
         <Card className="p-12 text-center">
-          <p className="text-red-600">Failed to load device details.</p>
-          <button onClick={() => refetchDevice()} className="mt-4 px-4 py-2 bg-green-800 text-white rounded-lg text-sm">Retry</button>
+          <p className="text-gray-600">Device not found.</p>
         </Card>
       </div>
     )
@@ -244,7 +271,7 @@ export default function DeviceDetailPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{device?.deviceId}</h1>
             <p className="text-base text-gray-500">
-              {device?.location || 'Unknown Location'} • Assigned to {device?.assignedUser?.name || 'Unassigned'}
+              {device.location || 'Unknown Location'} • Assigned to {getAssignedUserName(device.assignedUser)}
             </p>
           </div>
           <div className="flex items-center gap-2">

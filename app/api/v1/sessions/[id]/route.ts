@@ -2,6 +2,7 @@ import { withAuth } from '@/lib/utils/handler'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import DryingSession from '@/lib/models/DryingSession'
 import { sendPushNotification } from '@/lib/utils/notifications'
+import { DryingSessionStatus, UserRole } from '@/lib/enums'
 
 export const GET = withAuth(async (_req, user, ctx) => {
   const { id } = await ctx.params
@@ -11,7 +12,7 @@ export const GET = withAuth(async (_req, user, ctx) => {
     return errorResponse('Session not found', ErrorCodes.NOT_FOUND, 404)
   }
 
-  if (user.role !== 'admin' && session.userId.toString() !== user.userId) {
+  if (user.role !== UserRole.Admin && session.userId.toString() !== user.userId) {
     return errorResponse('Not authorized', ErrorCodes.FORBIDDEN, 403)
   }
 
@@ -28,12 +29,12 @@ export const PATCH = withAuth(async (req, user, ctx) => {
     return errorResponse('Session not found', ErrorCodes.NOT_FOUND, 404)
   }
 
-  if (user.role !== 'admin' && session.userId.toString() !== user.userId) {
+  if (user.role !== UserRole.Admin && session.userId.toString() !== user.userId) {
     return errorResponse('Not authorized', ErrorCodes.FORBIDDEN, 403)
   }
 
   if (action === 'complete' || action === 'abort') {
-    if (session.status !== 'active') {
+    if (session.status !== DryingSessionStatus.Active) {
       return errorResponse('Session is not active', ErrorCodes.INVALID_INPUT, 400)
     }
 
@@ -44,7 +45,7 @@ export const PATCH = withAuth(async (req, user, ctx) => {
       ? Math.min(100, Math.round((moistureDrop / (session.startMoisture - session.targetMoisture)) * 100))
       : 0
 
-    session.status = action === 'complete' ? 'completed' : 'aborted'
+    session.status = action === 'complete' ? DryingSessionStatus.Completed : DryingSessionStatus.Aborted
     session.completedAt = now
     session.duration = duration
     session.finalMoisture = session.currentMoisture
@@ -84,10 +85,10 @@ export const DELETE = withAuth(async (_req, user, ctx) => {
     return errorResponse('Session not found', ErrorCodes.NOT_FOUND, 404)
   }
 
-  if (user.role !== 'admin') {
+  if (user.role !== UserRole.Admin) {
     return errorResponse('Admin only', ErrorCodes.FORBIDDEN, 403)
   }
 
   await DryingSession.findByIdAndDelete(id)
   return successResponse({ deleted: true })
-}, { role: 'admin' })
+}, { role: UserRole.Admin })

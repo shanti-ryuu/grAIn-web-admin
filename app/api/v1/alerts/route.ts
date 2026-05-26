@@ -3,6 +3,9 @@ import Command from '@/lib/models/Command'
 import { successResponse, paginatedResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { withAuth } from '@/lib/utils/handler'
 import { getQueryParams, sanitizeObject, sanitizeString } from '@/lib/utils/validation'
+import { AlertType, CommandStatus } from '@/lib/enums'
+
+const ALERT_TYPES = Object.values(AlertType)
 
 export const GET = withAuth(async (request, user) => {
   void user
@@ -14,7 +17,7 @@ export const GET = withAuth(async (request, user) => {
 
   const filter: Record<string, unknown> = {}
   if (deviceId) filter.deviceId = deviceId
-  if (type && ['critical', 'warning', 'info'].includes(type)) filter.type = type
+  if (type && ALERT_TYPES.includes(type as AlertType)) filter.type = type
   if (isRead !== null && isRead !== undefined) filter.isRead = isRead === 'true'
 
   const [alerts, total] = await Promise.all([
@@ -22,7 +25,7 @@ export const GET = withAuth(async (request, user) => {
     Alert.countDocuments(filter),
   ])
 
-  const commandFilter: Record<string, unknown> = { status: { $in: ['failed', 'error'] } }
+  const commandFilter: Record<string, unknown> = { status: { $in: [CommandStatus.Failed, CommandStatus.Error] } }
   if (deviceId) commandFilter.deviceId = deviceId
   const failedCommands = await Command.find(commandFilter)
     .sort({ createdAt: -1 })
@@ -32,7 +35,7 @@ export const GET = withAuth(async (request, user) => {
   const commandAlerts = failedCommands.map((cmd) => ({
     id: cmd._id,
     deviceId: cmd.deviceId,
-    type: 'critical' as const,
+    type: AlertType.Critical,
     message: `Command ${cmd.command} failed for device ${cmd.deviceId}`,
     severity: 8,
     isRead: false,
@@ -72,8 +75,8 @@ export const POST = withAuth(async (request, user) => {
     errors.deviceId = 'Device ID is required'
   }
 
-  if (!type || !['critical', 'warning', 'info'].includes(type)) {
-    errors.type = 'Type must be critical, warning, or info'
+  if (!type || !ALERT_TYPES.includes(type as AlertType)) {
+    errors.type = 'Type must be critical, warning, error, info, or success'
   }
 
   if (!message || typeof message !== 'string' || message.trim().length === 0) {
@@ -92,7 +95,7 @@ export const POST = withAuth(async (request, user) => {
     deviceId: deviceId.trim(),
     type,
     message: sanitizeString(message.trim()),
-    severity: severity ?? (type === 'critical' ? 8 : type === 'warning' ? 5 : 2),
+    severity: severity ?? (type === AlertType.Critical ? 8 : type === AlertType.Warning ? 5 : 2),
     isRead: false,
   })
 

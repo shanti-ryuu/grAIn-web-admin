@@ -7,6 +7,7 @@ import type { IDevice } from '@/lib/models/Device'
 import { getDeviceLiveness } from '@/lib/utils/device-liveness'
 import { markStaleDevicesOffline } from '@/lib/utils/firebase-sync'
 import { expireStaleCommands } from '@/lib/utils/dryer-command'
+import { DeviceStatus, UserRole } from '@/lib/enums'
 
 export const GET = withAuth(async (request, user) => {
   await Promise.all([
@@ -19,7 +20,7 @@ export const GET = withAuth(async (request, user) => {
   const limit = Math.min(100, parseInt(searchParams.get('limit') ?? '50'))
   const skip = (page - 1) * limit
 
-  const filter = user.role === 'admin' ? {} : { assignedUser: user.userId }
+  const filter = user.role === UserRole.Admin ? {} : { assignedUser: user.userId }
 
   const [devices, total] = await Promise.all([
     Device.find(filter)
@@ -75,7 +76,7 @@ export const POST = withAuth(async (request, user) => {
     return errorResponse('Assigned user not found', ErrorCodes.USER_NOT_FOUND, 400)
   }
 
-  const newDevice = await Device.create({ deviceId, assignedUser, location: safeLocation, status: 'offline' })
+  const newDevice = await Device.create({ deviceId, assignedUser, location: safeLocation, status: DeviceStatus.Offline })
   await newDevice.populate('assignedUser', 'name email')
 
   return successResponse({
@@ -87,4 +88,4 @@ export const POST = withAuth(async (request, user) => {
     assignedUser: newDevice.assignedUser,
     createdAt: newDevice.createdAt?.toISOString?.() || newDevice.createdAt,
   }, 201)
-}, { role: 'admin' })
+}, { role: UserRole.Admin })

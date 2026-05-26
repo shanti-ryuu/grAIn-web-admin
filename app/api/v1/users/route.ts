@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import User from '@/lib/models/User'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { withAuth } from '@/lib/utils/handler'
-import { BCRYPT_ROUNDS } from '@/lib/enums'
+import { BCRYPT_ROUNDS, UserRole, UserStatus } from '@/lib/enums'
 import { sanitizeString } from '@/lib/utils/validation'
 
 export const GET = withAuth(async (request, user) => {
@@ -29,7 +29,7 @@ export const GET = withAuth(async (request, user) => {
     totalPages: Math.ceil(total / limit),
     limit,
   })
-}, { role: 'admin' })
+}, { role: UserRole.Admin })
 
 export const POST = withAuth(async (request, user) => {
   void user
@@ -51,12 +51,12 @@ export const POST = withAuth(async (request, user) => {
     name: safeName,
     email,
     password: await bcrypt.hash(password, BCRYPT_ROUNDS),
-    role: role ?? 'farmer',
-    status: 'active',
+    role: role ?? UserRole.Farmer,
+    status: UserStatus.Active,
   })
 
   const userWithoutPassword = newUser.toObject()
   delete userWithoutPassword.password
 
   return successResponse(userWithoutPassword, 201)
-}, { role: 'admin' })
+}, { role: UserRole.Admin })

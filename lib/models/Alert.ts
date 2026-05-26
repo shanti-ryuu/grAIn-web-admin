@@ -1,8 +1,9 @@
 import mongoose, { Document, Schema } from 'mongoose'
+import { AlertType } from '@/lib/enums'
 
 export interface IAlert extends Document {
   deviceId: string
-  type: 'critical' | 'warning' | 'info'
+  type: AlertType
   message: string
   severity: number
   isRead: boolean
@@ -18,7 +19,7 @@ const AlertSchema: Schema = new Schema({
   },
   type: {
     type: String,
-    enum: ['critical', 'warning', 'info'],
+    enum: Object.values(AlertType),
     required: true,
   },
   message: {

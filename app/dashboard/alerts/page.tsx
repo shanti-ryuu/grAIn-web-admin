@@ -7,6 +7,11 @@ import ErrorState from '@/components/ErrorState'
 import { useAlerts, useMarkAlertRead, useClearAllAlerts } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { useRouter } from 'next/navigation'
+import type { Alert } from '@/lib/types'
+import { Skeleton } from '@/components/ui/skeleton'
+import { AlertType } from '@/lib/enums'
+
+const ALERT_TABS = ['all', 'unread', AlertType.Critical, AlertType.Warning, AlertType.Info] as const
 
 export default function AlertsPage() {
   const router = useRouter()
@@ -41,23 +46,38 @@ export default function AlertsPage() {
   }
 
   const filteredAlerts = useMemo(() => {
-    const allAlerts = alerts || []
+    const allAlerts: Alert[] = alerts || []
     if (activeTab === 'all') return allAlerts
-    if (activeTab === 'unread') return allAlerts.filter((a: { isRead?: boolean }) => !a.isRead)
-    return allAlerts.filter((a: { type?: string }) => a.type === activeTab)
+    if (activeTab === 'unread') return allAlerts.filter((a) => !a.isRead)
+    return allAlerts.filter((a) => a.type === activeTab)
   }, [alerts, activeTab])
 
   const severityConfig: Record<string, { badge: string; dot: string }> = {
-    critical: { badge: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' },
-    warning: { badge: 'bg-yellow-50 text-yellow-600 border-yellow-200', dot: 'bg-yellow-500' },
-    info: { badge: 'bg-blue-50 text-blue-600 border-blue-200', dot: 'bg-blue-500' },
+    [AlertType.Critical]: { badge: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' },
+    [AlertType.Warning]: { badge: 'bg-yellow-50 text-yellow-600 border-yellow-200', dot: 'bg-yellow-500' },
+    [AlertType.Info]: { badge: 'bg-blue-50 text-blue-600 border-blue-200', dot: 'bg-blue-500' },
+    [AlertType.Error]: { badge: 'bg-red-50 text-red-600 border-red-200', dot: 'bg-red-500' },
+    [AlertType.Success]: { badge: 'bg-green-50 text-green-600 border-green-200', dot: 'bg-green-500' },
   }
 
   if (isLoading) {
     return (
       <div className="space-y-8">
-        <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-32 mb-2" /><div className="h-4 bg-gray-200 rounded w-96" /></div>
-        <Card className="p-8 space-y-4">{[1, 2, 3].map((i) => (<div key={i} className="h-16 bg-gray-200 rounded animate-pulse" />))}</Card>
+        <div>
+          <Skeleton className="h-8 w-32 mb-2" />
+          <Skeleton className="h-4 w-96 max-w-full" />
+        </div>
+        <Card className="p-6 space-y-1">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-3">
+              <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          ))}
+        </Card>
       </div>
     )
   }
@@ -84,7 +104,7 @@ export default function AlertsPage() {
       </div>
 
       <Card className="p-4 flex gap-3 no-print">
-        {['all', 'unread', 'critical', 'warning', 'info'].map((t) => (
+        {ALERT_TABS.map((t) => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === t ? 'bg-green-800 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
@@ -94,7 +114,7 @@ export default function AlertsPage() {
         ))}
       </Card>
 
-      {filteredAlerts.length === 0 ? (
+      {!isLoading && !error && filteredAlerts.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600" />
@@ -105,10 +125,10 @@ export default function AlertsPage() {
       ) : (
         <Card className="p-6">
           <div className="space-y-3">
-            {filteredAlerts.map((alert: { id: string; isRead?: boolean; type: string; message?: string; createdAt?: string; deviceId?: string }) => {
+            {filteredAlerts.map((alert) => {
               const config = severityConfig[alert.type] || severityConfig.info
               return (
-                <div key={alert.id} className={`flex items-start gap-4 p-4 border rounded-lg transition-colors ${alert.isRead ? 'border-gray-100 bg-gray-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                <div key={alert.id || alert._id} className={`flex items-start gap-4 p-4 border rounded-lg transition-colors ${alert.isRead ? 'border-gray-100 bg-gray-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
                   <div className={`w-2.5 h-2.5 mt-1.5 rounded-full flex-shrink-0 ${config.dot}`} />
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm break-words ${alert.isRead ? 'text-gray-400' : 'font-medium text-gray-900'}`}>{alert.message}</p>
@@ -121,7 +141,7 @@ export default function AlertsPage() {
                   </div>
                   <span className={`px-3 py-1 rounded text-xs font-semibold border capitalize whitespace-nowrap ${config.badge}`}>{alert.type}</span>
                   {!alert.isRead && (
-                    <button onClick={() => handleMarkRead(alert.id)} className="text-gray-400 hover:text-green-600 transition-colors" title="Mark as read">
+                    <button onClick={() => handleMarkRead(alert.id || alert._id)} className="text-gray-400 hover:text-green-600 transition-colors" title="Mark as read">
                       <CheckCircle className="w-4 h-4" />
                     </button>
                   )}

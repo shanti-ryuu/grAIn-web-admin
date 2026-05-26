@@ -11,6 +11,7 @@ import Alert from '@/lib/models/Alert'
 import DryingSession from '@/lib/models/DryingSession'
 import { eventBroadcaster } from '@/lib/utils/event-stream'
 import { sendNotificationToDeviceOwner } from '@/lib/utils/notifications'
+import { AlertType, CommandStatus, CommandType, DeviceStatus, DryingSessionStatus, SensorDataStatus } from '@/lib/enums'
 
 const SENSOR_RATE_WINDOW_MS = 10_000
 const SENSOR_RATE_MAX = 20
@@ -60,27 +61,27 @@ function isSensorRateLimited(request: NextRequest, deviceId: string): boolean {
 async function reconcileCommandFromSensor(deviceId: string, runtimeStatus: string, fanSpeed: number): Promise<void> {
   const activeCommand = await Command.findOne({
     deviceId,
-    status: { $in: ['polled', 'executing'] },
+    status: { $in: [CommandStatus.Polled, CommandStatus.Executing] },
   }).sort({ createdAt: 1 }).lean()
 
   if (!activeCommand) return
 
   const hardwareCommand = activeCommand.commandStr ?? activeCommand.command
   const shouldComplete =
-    activeCommand.command === 'STOP'
-      ? runtimeStatus === 'idle' || fanSpeed === 0
-      : activeCommand.command === 'START'
-        ? runtimeStatus === 'running' || fanSpeed > 0
+    activeCommand.command === CommandType.Stop
+      ? runtimeStatus === SensorDataStatus.Idle || fanSpeed === 0
+      : activeCommand.command === CommandType.Start
+        ? runtimeStatus === SensorDataStatus.Running || fanSpeed > 0
         : true
 
   if (!shouldComplete) return
 
   console.info(`[Command Sensor Confirmed] device=${deviceId} id=${activeCommand._id.toString()} command=${hardwareCommand}`)
-  await markCommandExecuted(deviceId, activeCommand._id.toString(), 'executed')
+  await markCommandExecuted(deviceId, activeCommand._id.toString(), CommandStatus.Executed)
 }
 
 async function checkAndCreateAlerts(deviceId: string, data: { temperature: number; humidity: number; moisture: number }): Promise<void> {
-  const alerts: { deviceId: string; type: 'critical' | 'warning' | 'info'; message: string; severity: number }[] = []
+  const alerts: { deviceId: string; type: AlertType; message: string; severity: number }[] = []
   const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000)
 
   const recentAlerts = await Alert.find({
@@ -92,16 +93,16 @@ async function checkAndCreateAlerts(deviceId: string, data: { temperature: numbe
     recentAlerts.some(a => a.message.toLowerCase().includes(keyword))
 
   if (data.temperature > 55 && !hasRecent('temperature')) {
-    alerts.push({ deviceId, type: 'critical', message: `Temperature critical: ${data.temperature}°C (threshold: 55°C)`, severity: 9 })
+    alerts.push({ deviceId, type: AlertType.Critical, message: `Temperature critical: ${data.temperature}°C (threshold: 55°C)`, severity: 9 })
   }
   if (data.humidity > 85 && !hasRecent('humidity')) {
-    alerts.push({ deviceId, type: 'warning', message: `High humidity: ${data.humidity}% may slow drying`, severity: 6 })
+    alerts.push({ deviceId, type: AlertType.Warning, message: `High humidity: ${data.humidity}% may slow drying`, severity: 6 })
   }
   if (data.moisture < 10 && !hasRecent('over-dried')) {
-    alerts.push({ deviceId, type: 'warning', message: `Moisture ${data.moisture}% — grain may be over-dried (min: 10%)`, severity: 7 })
+    alerts.push({ deviceId, type: AlertType.Warning, message: `Moisture ${data.moisture}% — grain may be over-dried (min: 10%)`, severity: 7 })
   }
   if (data.temperature < 0 && !hasRecent('sensor')) {
-    alerts.push({ deviceId, type: 'critical', message: `Temperature sensor error: ${data.temperature}°C — check hardware`, severity: 10 })
+    alerts.push({ deviceId, type: AlertType.Critical, message: `Temperature sensor error: ${data.temperature}°C — check hardware`, severity: 10 })
   }
 
   if (alerts.length > 0) {
@@ -110,7 +111,7 @@ async function checkAndCreateAlerts(deviceId: string, data: { temperature: numbe
 }
 
 async function updateDryingSession(deviceId: string, data: { moisture: number; temperature: number; humidity: number; fanSpeed: number; energy: number }): Promise<void> {
-  const session = await DryingSession.findOne({ deviceId, status: 'active' })
+  const session = await DryingSession.findOne({ deviceId, status: DryingSessionStatus.Active })
   if (!session) return
 
   session.dataPoints += 1
@@ -130,7 +131,7 @@ async function updateDryingSession(deviceId: string, data: { moisture: number; t
       ? Math.min(100, Math.round((moistureDrop / (session.startMoisture - session.targetMoisture)) * 100))
       : 0
 
-    session.status = 'completed'
+    session.status = DryingSessionStatus.Completed
     session.completedAt = now
     session.duration = duration
     session.finalMoisture = data.moisture
@@ -170,7 +171,7 @@ async function persistSensorReading(reading: NormalizedSensorReading): Promise<v
     { deviceId: reading.deviceId },
     {
       $set: {
-        status: 'online',
+        status: DeviceStatus.Online,
         lastActive: reading.receivedAt,
         lastMoisture: reading.moisture,
         'runtimeState.isRunning': reading.isActuallyRunning,
@@ -275,12 +276,12 @@ export async function POST(request: NextRequest) {
     const numericTemperature = Number(temperature)
     const numericHumidity = Number(humidity)
     const numericMoisture = Number(moisture)
-    const runtimeStatus = status && ['running', 'idle', 'paused', 'error'].includes(status) ? sanitizeString(status) : 'idle'
+    const runtimeStatus = status && Object.values(SensorDataStatus).includes(status) ? sanitizeString(status) : SensorDataStatus.Idle
     const numericFanSpeed = fanSpeed !== undefined ? Number(fanSpeed) : 0
     const numericEnergy = energy !== undefined ? Number(energy) : 0
     const numericSolarVoltage = solarVoltage !== undefined ? Number(solarVoltage) : 0
     const numericWeight = weight !== undefined ? Number(weight) : 0
-    const isActuallyRunning = runtimeStatus === 'running' && numericFanSpeed > 0
+    const isActuallyRunning = runtimeStatus === SensorDataStatus.Running && numericFanSpeed > 0
     const receivedAt = new Date()
     const reading: NormalizedSensorReading = {
       deviceId,

@@ -18,7 +18,7 @@ export const POST = withAuth(async (_request, _user, { params }) => {
     const device = await Device.findOneAndUpdate(
       { deviceId: id },
       {
-        status: 'online',
+        status: DeviceStatus.Online,
         lastActive: heartbeatAt,
         'runtimeState.lastSeen': heartbeatAt,
         'runtimeState.lastHeartbeat': heartbeatAt,
@@ -36,7 +36,7 @@ export const POST = withAuth(async (_request, _user, { params }) => {
       const firebaseDb = getRealtimeDb()
       if (firebaseDb) {
         await firebaseDb.ref(`grain/devices/${id}`).update({
-          status: 'online',
+          status: DeviceStatus.Online,
           lastActive: heartbeatAt.getTime(),
         })
         await firebaseDb.ref(`grain/devices/${id}/runtimeState`).update({
@@ -52,12 +52,12 @@ export const POST = withAuth(async (_request, _user, { params }) => {
     // Return count of pending commands
     const pendingCommands = await Command.countDocuments({
       deviceId: id,
-      status: { $in: ['pending', 'polled', 'executing'] },
+      status: { $in: [CommandStatus.Pending, CommandStatus.Polled, CommandStatus.Executing] },
     })
 
     return successResponse({
       deviceId: id,
-      status: 'online',
+      status: DeviceStatus.Online,
       lastActive: device.lastActive?.toISOString?.() || null,
       pendingCommands,
     })

@@ -7,33 +7,34 @@ import { isValidDeviceId } from '@/lib/utils/validation'
 import { markCommandPolled } from '@/lib/utils/firebase-sync'
 import { expireStalePendingCommands } from '@/lib/utils/dryer-command'
 import { getRealtimeDb } from '@/lib/firebase-admin'
+import { CommandStatus, CommandType, DeviceStatus, DryerMode, FanAction, FanTarget } from '@/lib/enums'
 
 function toHardwareCommand(cmd: ICommand): string {
   if (cmd.commandStr) return cmd.commandStr
 
-  if (cmd.command === 'START') {
-    return `START:${cmd.mode ?? 'AUTO'}:${Number(cmd.temperature ?? 45)}:${Number(cmd.fanSpeed ?? 80)}`
+  if (cmd.command === CommandType.Start) {
+    return `START:${cmd.mode ?? DryerMode.Auto}:${Number(cmd.temperature ?? 45)}:${Number(cmd.fanSpeed ?? 80)}`
   }
 
-  if (cmd.command === 'STOP') return 'STOP'
+  if (cmd.command === CommandType.Stop) return CommandType.Stop
 
-  if (cmd.command === 'FAN_CONTROL') {
-    return `FAN:${cmd.fanTarget ?? 'FAN1'}:${cmd.fanAction ?? 'ON'}`
+  if (cmd.command === CommandType.FanControl) {
+    return `FAN:${cmd.fanTarget ?? FanTarget.Fan1}:${cmd.fanAction ?? FanAction.On}`
   }
 
-  if (cmd.command === 'HEATER_CONTROL') {
-    return cmd.heaterAction === 'ON' ? 'H1:1' : 'H1:0'
+  if (cmd.command === CommandType.HeaterControl) {
+    return cmd.heaterAction === FanAction.On ? 'H1:1' : 'H1:0'
   }
 
-  if (cmd.command === 'RELAY_CONTROL') {
-    return cmd.relayAction === 'ON' ? 'R1:1' : 'R1:0'
+  if (cmd.command === CommandType.RelayControl) {
+    return cmd.relayAction === FanAction.On ? 'R1:1' : 'R1:0'
   }
 
-  if (cmd.command === 'STEPPER_CONTROL') {
-    return `STEP:${cmd.stepperAction ?? 'STOP'}`
+  if (cmd.command === CommandType.StepperControl) {
+    return `STEP:${cmd.stepperAction ?? CommandType.Stop}`
   }
 
-  if (cmd.command === 'STATUS') return 'STATUS'
+  if (cmd.command === CommandType.Status) return CommandType.Status
 
   return cmd.command
 }
@@ -58,7 +59,7 @@ export async function GET(
       { deviceId },
       {
         $set: {
-          status: 'online',
+          status: DeviceStatus.Online,
           lastActive: now,
           'runtimeState.lastSeen': now,
           'runtimeState.lastHeartbeat': now,
@@ -69,7 +70,7 @@ export async function GET(
     const realtimeDb = getRealtimeDb()
     if (realtimeDb) {
       await realtimeDb.ref(`grain/devices/${deviceId}`).update({
-        status: 'online',
+        status: DeviceStatus.Online,
         lastActive: now.getTime(),
       })
       await realtimeDb.ref(`grain/devices/${deviceId}/runtimeState`).update({
@@ -79,7 +80,7 @@ export async function GET(
       })
     }
 
-    const activeCommand = await Command.findOne({ deviceId, status: { $in: ['polled', 'executing'] } })
+    const activeCommand = await Command.findOne({ deviceId, status: { $in: [CommandStatus.Polled, CommandStatus.Executing] } })
       .sort({ createdAt: 1 })
       .lean()
 
@@ -96,7 +97,7 @@ export async function GET(
       })
     }
 
-    const commands = await Command.find({ deviceId, status: 'pending' })
+    const commands = await Command.find({ deviceId, status: CommandStatus.Pending })
       .sort({ createdAt: 1 })
       .limit(1)
       .lean()
@@ -117,7 +118,7 @@ export async function GET(
         ...(cmd.relayAction && { relayAction: cmd.relayAction }),
         ...(cmd.stepperAction && { stepperAction: cmd.stepperAction }),
         ...(cmd.heaterAction && { heaterAction: cmd.heaterAction }),
-        status: 'polled',
+        status: CommandStatus.Polled,
         createdAt: cmd.createdAt.toISOString(),
       }
     })

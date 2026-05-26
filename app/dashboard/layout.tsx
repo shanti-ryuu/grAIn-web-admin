@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/auth-store'
 import Sidebar from '@/components/Sidebar'
 import Topbar from '@/components/Navbar'
+import FullScreenLoader from '@/components/FullScreenLoader'
 
 export default function DashboardLayout({
   children,
@@ -12,27 +13,20 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const { isAuthenticated, isLoading } = useAuthStore()
+  const { user, isHydrated } = useAuthStore()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/auth/login')
+    if (isHydrated && !user) {
+      router.replace('/auth/login')
     }
-  }, [isAuthenticated, isLoading, router])
+  }, [isHydrated, router, user])
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-[#f9fafb]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-[#166534] border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-[#6b7280]">Loading...</p>
-        </div>
-      </div>
-    )
+  if (!isHydrated) {
+    return <FullScreenLoader />
   }
 
-  if (!isAuthenticated) {
+  if (!user) {
     return null
   }
 

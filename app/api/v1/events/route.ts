@@ -1,10 +1,11 @@
-import { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
+import { withAuth } from '@/lib/utils/handler'
 import { eventBroadcaster } from '@/lib/utils/event-stream'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET(request: NextRequest) {
+export const GET = withAuth(async (request) => {
   const encoder = new TextEncoder()
 
   const stream = new ReadableStream({
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     },
   })
 
-  return new Response(stream, {
+  return new NextResponse(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
@@ -44,4 +45,4 @@ export async function GET(request: NextRequest) {
       'X-Accel-Buffering': 'no',
     },
   })
-}
+}, { dbConnect: false })

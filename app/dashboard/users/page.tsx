@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ColumnDef } from '@tanstack/react-table'
 import { Plus, X, MoreHorizontal, Shield, UserCheck, UserX, Trash2, Eye, Loader2 } from 'lucide-react'
@@ -49,7 +49,7 @@ export default function UsersPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { toast } = useToast()
-  const { isHydrated } = useAuthStore()
+  const { isHydrated, user } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
   const [addForm, setAddForm] = useState<CreateUserInput>({ name: '', email: '', password: '', role: UserRole.Farmer })
@@ -64,13 +64,17 @@ export default function UsersPage() {
   const deleteUser = useDeleteUser()
   const bulkDeleteUsers = useBulkDeleteUsers()
 
-  const users = Array.isArray(usersData)
-    ? usersData
-    : (usersData as PaginatedUsers | undefined)?.users || []
+  useEffect(() => {
+    if (isHydrated && user?.role !== 'admin') {
+      router.replace('/dashboard')
+    }
+  }, [isHydrated, router, user])
+
+  const users = (usersData as { users?: Array<Record<string, unknown>> } | undefined)?.users || []
 
   const devices = Array.isArray(devicesData) ? devicesData : []
   const deviceCounts: Record<string, number> = {}
-  devices.forEach((d: Device) => {
+  devices.forEach((d: { assignedUser?: IdLike }) => {
     const uid = getIdFromIdLike(d.assignedUser)
     if (uid) deviceCounts[uid] = (deviceCounts[uid] || 0) + 1
   })
@@ -355,6 +359,10 @@ export default function UsersPage() {
       enableSorting: false,
     },
   ]
+
+  if (isHydrated && user?.role !== 'admin') {
+    return null
+  }
 
   if (!isHydrated || isLoading) {
     return (

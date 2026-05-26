@@ -6,6 +6,7 @@ import Card from '@/components/Card'
 import { useDryingSessions, useStartDryingSession, useEndDryingSession, useDevices } from '@/hooks/useApi'
 import { useEventStream } from '@/hooks/useEventStream'
 import ErrorState from '@/components/ErrorState'
+import type { Device, DryingSession } from '@/lib/types'
 import { LoadingTable } from '@/components/LoadingTable'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DeviceStatus, DryingSessionStatus } from '@/lib/enums'
@@ -66,7 +67,7 @@ export default function SessionsPage() {
     setPage(1)
   }, [statusFilter])
 
-  type Session = { _id: string; deviceId: string; grainType: string; status: string; startMoisture: number; currentMoisture: number; targetMoisture: number; avgTemperature?: number; totalEnergyUsed?: number; startedAt: string; duration?: number; efficiency?: number; finalMoisture?: number; isSimulated?: boolean }
+  type Session = DryingSession & { isSimulated?: boolean }
   type SessionsResult = {
     data?: Session[]
     pagination?: {
@@ -86,7 +87,7 @@ export default function SessionsPage() {
   const endRow = Math.min(totalSessions, startRow + sessions.length - 1)
   const activeSessions = sessions.filter((s) => s.status === DryingSessionStatus.Active)
   const allActiveSessions: Session[] = activeSessionsData?.data || activeSessions
-  const onlineDevices = (devices as Array<{ deviceId: string; status: string }> | undefined)?.filter(d => d.status === DeviceStatus.Online) || []
+  const onlineDevices = (devices as Device[] | undefined)?.filter(d => d.status === 'online') || []
   const simulatedSessionCount = sessions.filter(session => session.isSimulated).length
 
   const handleStart = async () => {

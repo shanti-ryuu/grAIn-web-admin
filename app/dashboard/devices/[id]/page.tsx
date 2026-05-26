@@ -9,6 +9,7 @@ import ErrorState from '@/components/ErrorState'
 import { useDevice, useSensorData, useStartDryer, useStopDryer, useCommandHistory, usePredictions, useControlFan, useControlStepper, useControlRelay, useControlHeater } from '@/hooks/useApi'
 import { useToast } from '@/hooks/useToast'
 import { getFirebaseApp } from '@/lib/firebase'
+import type { User } from '@/lib/types'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -41,6 +42,10 @@ function toTimestampMs(value: unknown): number | null {
 
 function isFresh(timestamp: number | null, currentTime: number): boolean {
   return timestamp !== null && currentTime - timestamp <= DEVICE_ONLINE_TIMEOUT_MS
+}
+
+function getAssignedUserName(assignedUser: string | User | undefined): string {
+  return assignedUser && typeof assignedUser === 'object' ? assignedUser.name : 'Unassigned'
 }
 
 export default function DeviceDetailPage() {
@@ -114,6 +119,7 @@ export default function DeviceDetailPage() {
   const isRunning = isDeviceOnline && (latestSensor?.status === 'running' || latestSensor?.status === 'drying')
 
   const handleStart = async () => {
+    if (!device) return
     try {
       await startDryer.mutateAsync({ deviceId: device.deviceId, mode, temperature, fanSpeed })
       toast({ title: 'Device started', description: `${device.deviceId} started in ${mode} mode.` })
@@ -124,6 +130,7 @@ export default function DeviceDetailPage() {
   }
 
   const handleStop = async () => {
+    if (!device) return
     try {
       await stopDryer.mutateAsync(device.deviceId)
       toast({ title: 'Device stopped', description: `${device.deviceId} has been stopped.` })
@@ -134,6 +141,7 @@ export default function DeviceDetailPage() {
   }
 
   const handleFanControl = async (fanTarget: 'FAN1' | 'FAN2' | 'ALL', fanAction: 'ON' | 'OFF') => {
+    if (!device) return
     try {
       await controlFan.mutateAsync({ deviceId: device.deviceId, fanTarget, fanAction })
       if (fanTarget === 'FAN1' || fanTarget === 'ALL') setFan1Status(fanAction)
@@ -144,6 +152,7 @@ export default function DeviceDetailPage() {
   }
 
   const handleStepperControl = async (stepperAction: 'START' | 'STOP' | 'CW' | 'CCW') => {
+    if (!device) return
     try {
       await controlStepper.mutateAsync({ deviceId: device.deviceId, stepperAction })
     } catch {
@@ -152,6 +161,7 @@ export default function DeviceDetailPage() {
   }
 
   const handleRelayControl = async (relayAction: 'ON' | 'OFF') => {
+    if (!device) return
     try {
       await controlRelay.mutateAsync({ deviceId: device.deviceId, relayAction })
       setRelayStatus(relayAction)
@@ -161,6 +171,7 @@ export default function DeviceDetailPage() {
   }
 
   const handleHeaterControl = async (heaterAction: 'ON' | 'OFF') => {
+    if (!device) return
     try {
       await controlHeater.mutateAsync({ deviceId: device.deviceId, heaterAction })
       setHeaterStatus(heaterAction)
@@ -207,6 +218,19 @@ export default function DeviceDetailPage() {
     )
   }
 
+  if (!device) {
+    return (
+      <div className="space-y-8">
+        <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back to Devices
+        </button>
+        <Card className="p-12 text-center">
+          <p className="text-gray-600">Device not found.</p>
+        </Card>
+      </div>
+    )
+  }
+
   const chartData = (sensorData || []).map((d: { timestamp: string; temperature?: number; moisture?: number; humidity?: number }) => ({
     time: new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     temperature: d.temperature,
@@ -247,7 +271,7 @@ export default function DeviceDetailPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{device?.deviceId}</h1>
             <p className="text-base text-gray-500">
-              {device?.location || 'Unknown Location'} • Assigned to {device?.assignedUser?.name || 'Unassigned'}
+              {device.location || 'Unknown Location'} • Assigned to {getAssignedUserName(device.assignedUser)}
             </p>
           </div>
           <div className="flex items-center gap-2">

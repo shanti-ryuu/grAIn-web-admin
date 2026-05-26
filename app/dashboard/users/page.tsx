@@ -15,9 +15,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
+import type { CreateUserInput, Device, PaginatedUsers, User } from '@/lib/types'
 import { UserRole, UserStatus } from '@/lib/enums'
 
- type IdLike = string | { id?: string; _id?: string } | null | undefined
+ type IdLike = string | User | null | undefined
 
  const toIdString = (value: unknown): string | null => {
    if (typeof value === 'string' && value.length > 0) return value
@@ -34,13 +35,8 @@ import { UserRole, UserStatus } from '@/lib/enums'
    return value.id || value._id || null
  }
 
-interface UserRow {
+type UserRow = Pick<User, 'name' | 'email' | 'role' | 'status' | 'createdAt'> & {
   id: string
-  name: string
-  email: string
-  role: string
-  status: string
-  createdAt: string
   deviceCount: number
 }
 
@@ -56,7 +52,7 @@ export default function UsersPage() {
   const { isHydrated } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
-  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: UserRole.Farmer })
+  const [addForm, setAddForm] = useState<CreateUserInput>({ name: '', email: '', password: '', role: UserRole.Farmer })
   const [addErrors, setAddErrors] = useState<Record<string, string>>({})
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
@@ -68,33 +64,28 @@ export default function UsersPage() {
   const deleteUser = useDeleteUser()
   const bulkDeleteUsers = useBulkDeleteUsers()
 
-  const users = (usersData as { users?: Array<Record<string, unknown>> } | undefined)?.users || []
+  const users = Array.isArray(usersData)
+    ? usersData
+    : (usersData as PaginatedUsers | undefined)?.users || []
 
   const devices = Array.isArray(devicesData) ? devicesData : []
   const deviceCounts: Record<string, number> = {}
-  devices.forEach((d: { assignedUser?: IdLike }) => {
+  devices.forEach((d: Device) => {
     const uid = getIdFromIdLike(d.assignedUser)
     if (uid) deviceCounts[uid] = (deviceCounts[uid] || 0) + 1
   })
 
-  const tableData: UserRow[] = (users || []).flatMap((u: Record<string, unknown>) => {
-    const id = toIdString((u as { _id?: unknown })._id) ?? toIdString((u as { id?: unknown }).id)
+  const tableData: UserRow[] = (users || []).flatMap((u) => {
+    const id = toIdString(u._id) ?? toIdString(u.id)
     if (!id) return []
-
-    const name = typeof (u as { name?: unknown }).name === 'string' ? (u as { name: string }).name : ''
-    const email = typeof (u as { email?: unknown }).email === 'string' ? (u as { email: string }).email : ''
-    const role = typeof (u as { role?: unknown }).role === 'string' ? (u as { role: string }).role : ''
-    const status = typeof (u as { status?: unknown }).status === 'string' ? (u as { status: string }).status : ''
-    const createdAtRaw = (u as { createdAt?: unknown }).createdAt
-    const createdAt = typeof createdAtRaw === 'string' ? createdAtRaw : createdAtRaw ? new Date(createdAtRaw as Date).toISOString() : ''
 
     return [{
       id,
-      name,
-      email,
-      role,
-      status,
-      createdAt,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      status: u.status,
+      createdAt: u.createdAt,
       deviceCount: deviceCounts[id] || 0,
     }]
   })
@@ -464,7 +455,7 @@ export default function UsersPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                <select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value as UserRole })}
+                <select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value as CreateUserInput['role'] })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
                   <option value={UserRole.Farmer}>Farmer</option>
                   <option value={UserRole.Admin}>Admin</option>

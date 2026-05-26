@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Bell, AlertTriangle, XCircle, Info, BellOff, User, Settings, LogOut, ChevronRight, Droplets, Cpu, Wheat, Menu } from 'lucide-react'
+import { Bell, AlertTriangle, XCircle, Info, BellOff, User as UserIcon, Settings, LogOut, ChevronRight, Droplets, Cpu, Wheat, Menu } from 'lucide-react'
 import { useAuthStore } from '@/lib/auth-store'
 import { useAlerts, useMarkAlertRead, useClearAllAlerts, useNotifications, useMarkNotificationsRead } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/useToast'
 import api from '@/lib/api'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import type { Alert, User } from '@/lib/types'
 
 const pageNames: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -60,6 +61,7 @@ export default function Navbar({ onMenuClick, className = '' }: Readonly<NavbarP
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuthStore()
+  const currentUser: Partial<User> | null = user
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const pageTitle = pageNames[pathname] || 'Dashboard'
@@ -75,8 +77,7 @@ export default function Navbar({ onMenuClick, className = '' }: Readonly<NavbarP
   const { data: notificationsData } = useNotifications()
   const markNotificationsRead = useMarkNotificationsRead()
 
-  type AlertItem = { id: string; _id?: string; deviceId?: string; type?: string; message?: string; createdAt?: string; isRead?: boolean }
-  const alerts = (alertsData as { data?: AlertItem[] } | undefined)?.data || (alertsData as AlertItem[] | undefined) || []
+  const alerts = (alertsData as { data?: Alert[] } | undefined)?.data || (alertsData as Alert[] | undefined) || []
   const unreadAlertCount = alerts.filter((a) => !a.isRead).length
 
   type NotifItem = { _id: string; type: string; title: string; body: string; deviceId?: string; isRead: boolean; createdAt: string }
@@ -125,7 +126,7 @@ export default function Navbar({ onMenuClick, className = '' }: Readonly<NavbarP
     router.push('/auth/login')
   }
 
-  const userInitial = user?.name?.charAt(0).toUpperCase() || 'A'
+  const userInitial = currentUser?.name?.charAt(0).toUpperCase() || 'A'
 
   return (
     <header className={`h-14 lg:h-16 glass-header flex items-center justify-between px-4 lg:px-8 no-print ${className}`}>
@@ -238,12 +239,12 @@ export default function Navbar({ onMenuClick, className = '' }: Readonly<NavbarP
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-3 hover:bg-gray-50 rounded-lg px-2 py-1 transition-colors">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-[#111827]">{user?.name || 'Admin'}</p>
-                <p className="text-xs text-[#6b7280]">{user?.role === 'admin' ? 'Administrator' : 'Farmer'}</p>
+                <p className="text-sm font-medium text-[#111827]">{currentUser?.name || 'Admin'}</p>
+                <p className="text-xs text-[#6b7280]">{currentUser?.role === 'admin' ? 'Administrator' : 'Farmer'}</p>
               </div>
-              {user?.profileImage ? (
+              {currentUser?.profileImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={user.profileImage} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
+                <img src={currentUser.profileImage} alt="Avatar" className="w-8 h-8 rounded-full object-cover" />
               ) : (
                 <div className="w-8 h-8 bg-[#166534] rounded-full flex items-center justify-center text-white text-xs font-bold">
                   {userInitial}
@@ -254,7 +255,7 @@ export default function Navbar({ onMenuClick, className = '' }: Readonly<NavbarP
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="bottom" collisionPadding={8}>
             <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>
-              <User className="w-4 h-4" /> View Profile
+              <UserIcon className="w-4 h-4" /> View Profile
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
               <Settings className="w-4 h-4" /> Settings

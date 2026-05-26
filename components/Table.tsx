@@ -1,22 +1,37 @@
+import type { ReactNode } from 'react'
 import Card from './Card'
 
-interface Column {
+export interface TableColumn<T extends Record<string, unknown>> {
   key: string
   label: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  render?: (value: any, row: any) => React.ReactNode
+  render?(value: unknown, row: T): ReactNode
+  className?: string
 }
 
-interface TableProps {
-  columns: Column[]
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data: any[]
+interface TableProps<T extends Record<string, unknown>> {
+  columns: TableColumn<T>[]
+  data: T[]
   title?: string
+  className?: string
 }
 
-export default function Table({ columns, data, title }: TableProps) {
+function renderCellValue(value: unknown): ReactNode {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    value === null ||
+    value === undefined
+  ) {
+    return value
+  }
+
+  return String(value)
+}
+
+export default function Table<T extends Record<string, unknown>>({ columns, data, title, className = '' }: Readonly<TableProps<T>>) {
   return (
-    <Card>
+    <Card className={className}>
       {title && <div className="px-6 pt-6 pb-4 border-b border-gray-200">
         <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
       </div>}
@@ -44,9 +59,9 @@ export default function Table({ columns, data, title }: TableProps) {
                   {columns.map((col) => (
                     <td 
                       key={col.key} 
-                      className="px-6 py-4 text-sm text-gray-900"
+                    className={`px-6 py-4 text-sm text-gray-900 ${col.className ?? ''}`}
                     >
-                      {col.render ? col.render(row[col.key], row) : row[col.key]}
+                      {col.render ? col.render(row[col.key], row) : renderCellValue(row[col.key])}
                     </td>
                   ))}
                 </tr>

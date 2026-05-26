@@ -7,6 +7,9 @@ import { useDryingSessions, useStartDryingSession, useEndDryingSession, useDevic
 import { useEventStream } from '@/hooks/useEventStream'
 import ErrorState from '@/components/ErrorState'
 import type { Device, DryingSession } from '@/lib/types'
+import { LoadingTable } from '@/components/LoadingTable'
+import { Skeleton } from '@/components/ui/skeleton'
+import { DeviceStatus, DryingSessionStatus } from '@/lib/enums'
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`
@@ -18,15 +21,15 @@ function formatDuration(seconds: number): string {
 
 function StatusBadge({ status }: { status: string }) {
   const styles = {
-    active: 'bg-green-50 text-green-700 border-green-200',
-    completed: 'bg-blue-50 text-blue-700 border-blue-200',
-    aborted: 'bg-red-50 text-red-700 border-red-200',
+    [DryingSessionStatus.Active]: 'bg-green-50 text-green-700 border-green-200',
+    [DryingSessionStatus.Completed]: 'bg-blue-50 text-blue-700 border-blue-200',
+    [DryingSessionStatus.Aborted]: 'bg-red-50 text-red-700 border-red-200',
   }
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${styles[status as keyof typeof styles] || 'bg-gray-50 text-gray-700 border-gray-200'}`}>
-      {status === 'active' && <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />}
-      {status === 'completed' && <CheckCircle2 className="w-3 h-3" />}
-      {status === 'aborted' && <XCircle className="w-3 h-3" />}
+      {status === DryingSessionStatus.Active && <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />}
+      {status === DryingSessionStatus.Completed && <CheckCircle2 className="w-3 h-3" />}
+      {status === DryingSessionStatus.Aborted && <XCircle className="w-3 h-3" />}
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   )
@@ -41,7 +44,7 @@ export default function SessionsPage() {
   const pageSize = 10
 
   const { data: sessionsData, isLoading, error, refetch } = useDryingSessions({ status: statusFilter || undefined, page, limit: pageSize })
-  const { data: activeSessionsData } = useDryingSessions({ status: 'active' })
+  const { data: activeSessionsData } = useDryingSessions({ status: DryingSessionStatus.Active })
   const { data: devices } = useDevices()
   const startSession = useStartDryingSession()
   const endSession = useEndDryingSession()
@@ -82,7 +85,7 @@ export default function SessionsPage() {
   const totalSessions = pagination?.total ?? sessions.length
   const startRow = totalSessions === 0 ? 0 : ((pagination?.page ?? page) - 1) * (pagination?.limit ?? pageSize) + 1
   const endRow = Math.min(totalSessions, startRow + sessions.length - 1)
-  const activeSessions = sessions.filter((s) => s.status === 'active')
+  const activeSessions = sessions.filter((s) => s.status === DryingSessionStatus.Active)
   const allActiveSessions: Session[] = activeSessionsData?.data || activeSessions
   const onlineDevices = (devices as Device[] | undefined)?.filter(d => d.status === 'online') || []
   const simulatedSessionCount = sessions.filter(session => session.isSimulated).length
@@ -105,11 +108,17 @@ export default function SessionsPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div><div className="h-8 bg-gray-200 rounded w-48 animate-pulse" /><div className="h-4 bg-gray-200 rounded w-64 mt-2 animate-pulse" /></div>
+          <div>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-64 mt-2" />
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => <div key={i} className="h-48 bg-gray-100 rounded-lg animate-pulse" />)}
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-lg" />)}
         </div>
+        <Card className="p-6">
+          <LoadingTable rows={5} cols={8} />
+        </Card>
       </div>
     )
   }
@@ -161,7 +170,7 @@ export default function SessionsPage() {
                       <Wheat className="w-4 h-4 text-green-700" />
                       <span className="font-semibold text-gray-900 text-sm">{session.deviceId}</span>
                     </div>
-                    <StatusBadge status="active" />
+                    <StatusBadge status={DryingSessionStatus.Active} />
                   </div>
 
                   {/* Progress bar */}
@@ -239,7 +248,7 @@ export default function SessionsPage() {
       {/* Filter tabs */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 border-b border-gray-200 pb-px">
         <div className="flex items-center gap-2">
-          {['', 'active', 'completed', 'aborted'].map((status) => (
+          {['', DryingSessionStatus.Active, DryingSessionStatus.Completed, DryingSessionStatus.Aborted].map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
@@ -261,7 +270,7 @@ export default function SessionsPage() {
       </div>
 
       {/* Sessions Table */}
-      {Array.isArray(sessions) && sessions.length > 0 ? (
+      {!isLoading && !error && Array.isArray(sessions) && sessions.length > 0 ? (
         <div className="space-y-4">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -341,7 +350,7 @@ export default function SessionsPage() {
             </div>
           </div>
         </div>
-      ) : (
+      ) : !isLoading && !error ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <Clock className="w-8 h-8 text-green-700" />
@@ -355,7 +364,7 @@ export default function SessionsPage() {
             <Play className="w-4 h-4" /> Start Session
           </button>
         </Card>
-      )}
+      ) : null}
 
       {/* Start Session Modal */}
       {showStartModal && (
@@ -376,9 +385,9 @@ export default function SessionsPage() {
                     <option
                       key={d.deviceId}
                       value={d.deviceId}
-                      disabled={d.status !== 'online' || allActiveSessions.some(session => session.deviceId === d.deviceId)}
+                      disabled={d.status !== DeviceStatus.Online || allActiveSessions.some(session => session.deviceId === d.deviceId)}
                     >
-                      {d.deviceId} {d.status === 'online' ? '(Online)' : '(Offline)'}
+                      {d.deviceId} {d.status === DeviceStatus.Online ? '(Online)' : '(Offline)'}
                       {allActiveSessions.some(session => session.deviceId === d.deviceId) ? ' · Active session' : ''}
                     </option>
                   ))}

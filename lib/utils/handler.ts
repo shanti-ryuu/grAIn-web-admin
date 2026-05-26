@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import dbConnect from '@/lib/db'
 import { getUserFromRequest, TokenPayload } from '@/lib/utils/auth'
 import { errorResponse } from '@/lib/utils/response'
-import { ErrorCodes } from '@/lib/enums'
+import { ErrorCodes, UserRole } from '@/lib/enums'
 
-type RoleCheck = 'admin' | 'any' | ((user: TokenPayload) => boolean)
+type RoleCheck = UserRole.Admin | 'any' | ((user: TokenPayload) => boolean)
 
 interface HandlerOptions {
   /** Role requirement: 'admin' = admin-only, 'any' = any authenticated user, or a custom predicate */
@@ -33,7 +33,7 @@ type AuthenticatedHandler = (
  * @example
  * export const POST = withAuth(
  *   async (req, user) => { ... },
- *   { role: 'admin' }
+ *   { role: UserRole.Admin }
  * )
  */
 export function withAuth(
@@ -54,7 +54,7 @@ export function withAuth(
       }
 
       // 3. Role check
-      if (role === 'admin' && user.role !== 'admin') {
+      if (role === UserRole.Admin && user.role !== UserRole.Admin) {
         return errorResponse('Forbidden: Admin access required', ErrorCodes.FORBIDDEN, 403)
       } else if (typeof role === 'function' && !role(user)) {
         return errorResponse('Forbidden', ErrorCodes.FORBIDDEN, 403)

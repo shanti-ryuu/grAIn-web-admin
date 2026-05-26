@@ -13,6 +13,9 @@ import { useToast } from '@/hooks/useToast'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
 import type { Device, PaginatedUsers, UpdateDeviceInput, User } from '@/lib/types'
+import { LoadingTable } from '@/components/LoadingTable'
+import { Skeleton } from '@/components/ui/skeleton'
+import { DeviceStatus } from '@/lib/enums'
 
 type DeviceRow = Pick<Device, 'deviceId' | 'location' | 'status'> & {
   id: string
@@ -175,8 +178,8 @@ export default function DevicesPage() {
       cell: ({ row }) => {
         const status = row.original.status
         return (
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${status === 'online' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
-            {status === 'online' ? 'Online' : 'Offline'}
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${status === DeviceStatus.Online ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
+            {status === DeviceStatus.Online ? 'Online' : 'Offline'}
           </span>
         )
       },
@@ -232,9 +235,13 @@ export default function DevicesPage() {
   if (isLoading) {
     return (
       <div className="space-y-8">
-        <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-48 mb-2" /><div className="h-4 bg-gray-200 rounded w-96" /></div>
-        <Card className="p-4 animate-pulse"><div className="h-10 bg-gray-200 rounded" /></Card>
-        <Card className="p-6 animate-pulse"><div className="h-64 bg-gray-200 rounded" /></Card>
+        <div>
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-96 max-w-full" />
+        </div>
+        <Card className="p-6">
+          <LoadingTable rows={5} cols={7} />
+        </Card>
       </div>
     )
   }
@@ -301,7 +308,7 @@ export default function DevicesPage() {
         </div>
       )}
 
-      {tableData.length === 0 ? (
+      {!isLoading && !error && tableData.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>

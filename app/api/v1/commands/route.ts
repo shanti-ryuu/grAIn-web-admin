@@ -1,23 +1,26 @@
 import { withAuth } from '@/lib/utils/handler'
 import { createDryerCommand } from '@/lib/utils/dryer-command'
 import { errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { CommandType, DryerMode, FanAction, FanTarget, StepperAction } from '@/lib/enums'
 
 type CommandSpecInput = {
-  command: string
-  mode?: string
+  command: CommandType
+  mode?: DryerMode
   extraFields?: Record<string, unknown>
 }
+
+const STEPPER_ACTIONS = Object.values(StepperAction)
 
 function parseRawCommand(rawCommand: string): CommandSpecInput | null {
   const commandStr = rawCommand.trim().toUpperCase()
   const parts = commandStr.split(':')
 
-  if (parts[0] === 'START') {
-    const mode = parts[1] === 'AUTO' || parts[1] === 'MANUAL' ? parts[1] : 'MANUAL'
+  if (parts[0] === CommandType.Start) {
+    const mode = Object.values(DryerMode).includes(parts[1] as DryerMode) ? parts[1] as DryerMode : DryerMode.Manual
     const temperature = Number(parts[2] ?? 45)
     const fanSpeed = Number(parts[3] ?? 80)
     return {
-      command: 'START',
+      command: CommandType.Start,
       mode,
       extraFields: {
         commandStr: `START:${mode}:${Number.isFinite(temperature) ? temperature : 45}:${Number.isFinite(fanSpeed) ? fanSpeed : 80}`,
@@ -27,17 +30,17 @@ function parseRawCommand(rawCommand: string): CommandSpecInput | null {
     }
   }
 
-  if (commandStr === 'STOP') {
-    return { command: 'STOP', extraFields: { commandStr: 'STOP' } }
+  if (commandStr === CommandType.Stop) {
+    return { command: CommandType.Stop, extraFields: { commandStr: CommandType.Stop } }
   }
 
-  if (commandStr === 'STATUS') {
-    return { command: 'STATUS', extraFields: { commandStr: 'STATUS' } }
+  if (commandStr === CommandType.Status) {
+    return { command: CommandType.Status, extraFields: { commandStr: CommandType.Status } }
   }
 
-  if (parts[0] === 'FAN' && ['FAN1', 'FAN2', 'ALL'].includes(parts[1]) && ['ON', 'OFF'].includes(parts[2])) {
+  if (parts[0] === 'FAN' && Object.values(FanTarget).includes(parts[1] as FanTarget) && Object.values(FanAction).includes(parts[2] as FanAction)) {
     return {
-      command: 'FAN_CONTROL',
+      command: CommandType.FanControl,
       extraFields: {
         commandStr,
         fanTarget: parts[1],
@@ -46,9 +49,9 @@ function parseRawCommand(rawCommand: string): CommandSpecInput | null {
     }
   }
 
-  if (parts[0] === 'STEP' && ['START', 'STOP', 'CW', 'CCW'].includes(parts[1])) {
+  if (parts[0] === 'STEP' && (STEPPER_ACTIONS as readonly string[]).includes(parts[1])) {
     return {
-      command: 'STEPPER_CONTROL',
+      command: CommandType.StepperControl,
       extraFields: {
         commandStr,
         stepperAction: parts[1],
@@ -58,20 +61,20 @@ function parseRawCommand(rawCommand: string): CommandSpecInput | null {
 
   if (parts[0] === 'H1' && ['1', '0'].includes(parts[1])) {
     return {
-      command: 'HEATER_CONTROL',
+      command: CommandType.HeaterControl,
       extraFields: {
         commandStr,
-        heaterAction: parts[1] === '1' ? 'ON' : 'OFF',
+        heaterAction: parts[1] === '1' ? FanAction.On : FanAction.Off,
       },
     }
   }
 
   if (parts[0] === 'R1' && ['1', '0'].includes(parts[1])) {
     return {
-      command: 'RELAY_CONTROL',
+      command: CommandType.RelayControl,
       extraFields: {
         commandStr,
-        relayAction: parts[1] === '1' ? 'ON' : 'OFF',
+        relayAction: parts[1] === '1' ? FanAction.On : FanAction.Off,
       },
     }
   }

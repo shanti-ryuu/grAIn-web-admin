@@ -5,15 +5,19 @@ import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react'
 import { useToastStore, type ToastVariant } from '@/hooks/useToast'
 
 const variantConfig: Record<ToastVariant, { container: string; icon: React.ReactNode }> = {
+  default: {
+    container: 'bg-white border-gray-200',
+    icon: <Info className="w-5 h-5 text-blue-600 flex-shrink-0" />,
+  },
+  destructive: {
+    container: 'bg-red-50 border-red-200',
+    icon: <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />,
+  },
   success: {
     container: 'bg-green-50 border-green-200',
     icon: <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />,
   },
   error: {
-    container: 'bg-red-50 border-red-200',
-    icon: <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />,
-  },
-  destructive: {
     container: 'bg-red-50 border-red-200',
     icon: <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />,
   },
@@ -34,7 +38,7 @@ interface ToastItemProps {
   variant?: ToastVariant
 }
 
-function ToastItem({ id, title, description, variant = 'success' }: ToastItemProps) {
+function ToastItem({ id, title, description, variant = 'success' }: Readonly<ToastItemProps>) {
   const dismiss = useToastStore((state) => state.dismiss)
   const [isVisible, setIsVisible] = useState(false)
   const [isExiting, setIsExiting] = useState(false)

@@ -1,18 +1,19 @@
 import mongoose, { Document, Schema } from 'mongoose'
+import { CommandStatus, CommandType, DryerMode, FanAction, FanTarget, StepperAction } from '@/lib/enums'
 
 export interface ICommand extends Document {
   deviceId: string
-  command: 'START' | 'STOP' | 'FAN_CONTROL' | 'RELAY_CONTROL' | 'STEPPER_CONTROL' | 'HEATER_CONTROL' | 'STATUS'
+  command: CommandType
   commandStr?: string
-  mode: 'AUTO' | 'MANUAL'
+  mode: DryerMode
   temperature?: number
   fanSpeed?: number
-  fanTarget?: 'FAN1' | 'FAN2' | 'ALL'
-  fanAction?: 'ON' | 'OFF'
-  relayAction?: 'ON' | 'OFF'
-  stepperAction?: 'START' | 'STOP' | 'CW' | 'CCW'
-  heaterAction?: 'ON' | 'OFF'
-  status: 'pending' | 'polled' | 'executing' | 'executed' | 'failed' | 'timeout' | 'error'
+  fanTarget?: FanTarget
+  fanAction?: FanAction
+  relayAction?: FanAction
+  stepperAction?: StepperAction
+  heaterAction?: FanAction
+  status: CommandStatus
   polledAt?: Date
   acknowledgedAt?: Date
   executedAt?: Date
@@ -28,7 +29,7 @@ const CommandSchema: Schema = new Schema({
   },
   command: {
     type: String,
-    enum: ['START', 'STOP', 'FAN_CONTROL', 'RELAY_CONTROL', 'STEPPER_CONTROL', 'HEATER_CONTROL', 'STATUS'],
+    enum: Object.values(CommandType),
     required: true,
   },
   commandStr: {
@@ -37,8 +38,8 @@ const CommandSchema: Schema = new Schema({
   },
   mode: {
     type: String,
-    enum: ['AUTO', 'MANUAL'],
-    default: 'MANUAL',
+    enum: Object.values(DryerMode),
+    default: DryerMode.Manual,
   },
   temperature: {
     type: Number,
@@ -50,28 +51,28 @@ const CommandSchema: Schema = new Schema({
   },
   fanTarget: {
     type: String,
-    enum: ['FAN1', 'FAN2', 'ALL'],
+    enum: Object.values(FanTarget),
   },
   fanAction: {
     type: String,
-    enum: ['ON', 'OFF'],
+    enum: Object.values(FanAction),
   },
   relayAction: {
     type: String,
-    enum: ['ON', 'OFF'],
+    enum: Object.values(FanAction),
   },
   stepperAction: {
     type: String,
-    enum: ['START', 'STOP', 'CW', 'CCW'],
+    enum: Object.values(StepperAction),
   },
   heaterAction: {
     type: String,
-    enum: ['ON', 'OFF'],
+    enum: Object.values(FanAction),
   },
   status: {
     type: String,
-    enum: ['pending', 'polled', 'executing', 'executed', 'failed', 'timeout', 'error'],
-    default: 'pending',
+    enum: Object.values(CommandStatus),
+    default: CommandStatus.Pending,
   },
   polledAt: {
     type: Date,

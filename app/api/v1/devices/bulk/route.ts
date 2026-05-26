@@ -4,6 +4,7 @@ import Command from '@/lib/models/Command'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { withAuth } from '@/lib/utils/handler'
 import { IDevice } from '@/lib/models/Device'
+import { UserRole } from '@/lib/enums'
 
 export const DELETE = withAuth(async (request, user) => {
   void user
@@ -26,4 +27,4 @@ export const DELETE = withAuth(async (request, user) => {
   const result = await Device.deleteMany({ _id: { $in: ids } })
 
   return successResponse({ deletedCount: result.deletedCount })
-}, { role: 'admin' })
+}, { role: UserRole.Admin })

@@ -4,6 +4,7 @@ import { paginatedResponse, errorResponse, ErrorCodes } from '@/lib/utils/respon
 import { withAuth } from '@/lib/utils/handler'
 import { getQueryParams, isValidDeviceId } from '@/lib/utils/validation'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
+import { UserRole } from '@/lib/enums'
 
 type LeanSensorDoc = {
   _id: string
@@ -28,7 +29,7 @@ export const GET = withAuth(async (request, user, { params }) => {
     return errorResponse(`Device ${deviceId} not found`, ErrorCodes.DEVICE_NOT_FOUND, 404)
   }
 
-  if (user.role !== 'admin' && device.assignedUser?.toString() !== user.userId) {
+  if (user.role !== UserRole.Admin && device.assignedUser?.toString() !== user.userId) {
     return errorResponse('Forbidden: You do not have access to this device', ErrorCodes.FORBIDDEN, 403)
   }
 

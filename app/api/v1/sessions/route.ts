@@ -5,6 +5,7 @@ import Device from '@/lib/models/Device'
 import SensorData from '@/lib/models/SensorData'
 import { sendPushNotification } from '@/lib/utils/notifications'
 import { getDeviceLiveness } from '@/lib/utils/device-liveness'
+import { DryingSessionStatus, UserRole } from '@/lib/enums'
 
 export const GET = withAuth(async (req, user) => {
   const url = new URL(req.url)
@@ -14,7 +15,7 @@ export const GET = withAuth(async (req, user) => {
   const deviceId = url.searchParams.get('deviceId')
 
   const filter: Record<string, unknown> = {}
-  if (user.role !== 'admin') filter.userId = user.userId
+  if (user.role !== UserRole.Admin) filter.userId = user.userId
   if (status) filter.status = status
   if (deviceId) filter.deviceId = deviceId
 
@@ -43,7 +44,7 @@ export const POST = withAuth(async (req, user) => {
     return errorResponse('Device not found', ErrorCodes.DEVICE_NOT_FOUND, 404)
   }
 
-  if (user.role !== 'admin' && device.assignedUser.toString() !== user.userId) {
+  if (user.role !== UserRole.Admin && device.assignedUser.toString() !== user.userId) {
     return errorResponse('Not authorized for this device', ErrorCodes.FORBIDDEN, 403)
   }
 
@@ -52,7 +53,7 @@ export const POST = withAuth(async (req, user) => {
     return errorResponse('Cannot start drying session while device is offline. Power on the prototype and wait for live sensor data first.', ErrorCodes.CONFLICT, 409)
   }
 
-  const activeSession = await DryingSession.findOne({ deviceId, status: 'active' })
+  const activeSession = await DryingSession.findOne({ deviceId, status: DryingSessionStatus.Active })
   if (activeSession) {
     return errorResponse('Device already has an active drying session', ErrorCodes.CONFLICT, 409)
   }

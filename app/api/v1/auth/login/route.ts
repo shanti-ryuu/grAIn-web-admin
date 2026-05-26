@@ -7,6 +7,7 @@ import { generateAccessToken, generateRefreshToken } from '@/lib/utils/tokens'
 import { checkRateLimit, RateLimits } from '@/lib/utils/rateLimit'
 import { validateLoginRequest } from '@/lib/utils/validation'
 import { setAuthCookies } from '@/lib/utils/auth-cookies'
+import { UserStatus } from '@/lib/enums'
 
 function logAuthError(code: string, error: unknown): void {
   const message = error instanceof Error ? error.message : 'Unknown error'
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       return errorResponse('Invalid email or password', ErrorCodes.INVALID_CREDENTIALS, 401)
     }
 
-    if (user.status === 'inactive') {
+    if (user.status === UserStatus.Inactive) {
       return errorResponse('Account is inactive. Contact an administrator.', ErrorCodes.ACCOUNT_INACTIVE, 403)
     }
 

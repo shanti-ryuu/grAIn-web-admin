@@ -1,22 +1,23 @@
 import mongoose, { Document, Schema } from 'mongoose'
+import { CommandStatus, DeviceStatus, DryerMode, FanAction } from '@/lib/enums'
 
 export interface IDevice extends Document {
   deviceId: string
   assignedUser: mongoose.Types.ObjectId
-  status: 'online' | 'offline'
+  status: DeviceStatus
   runtimeState?: {
     isRunning?: boolean
-    currentMode?: 'AUTO' | 'MANUAL'
-    heaterState?: 'ON' | 'OFF'
-    fan1State?: 'ON' | 'OFF'
-    fan2State?: 'ON' | 'OFF'
-    relayState?: 'ON' | 'OFF'
+    currentMode?: DryerMode
+    heaterState?: FanAction
+    fan1State?: FanAction
+    fan2State?: FanAction
+    relayState?: FanAction
     stepperState?: 'ON' | 'OFF' | 'CW' | 'CCW'
     lastSeen?: Date
     activeCommand?: string | null
     pendingCommand?: string | null
     lastCommand?: string | null
-    commandStatus?: 'idle' | 'pending' | 'polled' | 'executing' | 'executed' | 'failed' | 'timeout' | 'error'
+    commandStatus?: 'idle' | CommandStatus
     commandAcknowledged?: boolean
     lastHeartbeat?: Date
     updatedAt?: Date
@@ -46,16 +47,16 @@ const DeviceSchema: Schema = new Schema({
   },
   status: {
     type: String,
-    enum: ['online', 'offline'],
-    default: 'offline',
+    enum: Object.values(DeviceStatus),
+    default: DeviceStatus.Offline,
   },
   runtimeState: {
     isRunning: { type: Boolean, default: false },
-    currentMode: { type: String, enum: ['AUTO', 'MANUAL'], default: 'MANUAL' },
-    heaterState: { type: String, enum: ['ON', 'OFF'], default: 'OFF' },
-    fan1State: { type: String, enum: ['ON', 'OFF'], default: 'OFF' },
-    fan2State: { type: String, enum: ['ON', 'OFF'], default: 'OFF' },
-    relayState: { type: String, enum: ['ON', 'OFF'], default: 'OFF' },
+    currentMode: { type: String, enum: Object.values(DryerMode), default: DryerMode.Manual },
+    heaterState: { type: String, enum: Object.values(FanAction), default: FanAction.Off },
+    fan1State: { type: String, enum: Object.values(FanAction), default: FanAction.Off },
+    fan2State: { type: String, enum: Object.values(FanAction), default: FanAction.Off },
+    relayState: { type: String, enum: Object.values(FanAction), default: FanAction.Off },
     stepperState: { type: String, enum: ['ON', 'OFF', 'CW', 'CCW'], default: 'OFF' },
     lastSeen: { type: Date, default: Date.now },
     activeCommand: { type: String, default: null },
@@ -63,7 +64,7 @@ const DeviceSchema: Schema = new Schema({
     lastCommand: { type: String, default: null },
     commandStatus: {
       type: String,
-      enum: ['idle', 'pending', 'polled', 'executing', 'executed', 'failed', 'timeout', 'error'],
+      enum: ['idle', ...Object.values(CommandStatus)],
       default: 'idle',
     },
     commandAcknowledged: { type: Boolean, default: true },

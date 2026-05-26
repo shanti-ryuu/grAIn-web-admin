@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/useToast'
 import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
+import { UserRole, UserStatus } from '@/lib/enums'
 
  type IdLike = string | { id?: string; _id?: string } | null | undefined
 
@@ -53,7 +54,7 @@ export default function UsersPage() {
   const { isHydrated } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
-  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: 'farmer' })
+  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: UserRole.Farmer })
   const [addErrors, setAddErrors] = useState<Record<string, string>>({})
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
@@ -111,7 +112,7 @@ export default function UsersPage() {
     try {
       await createUser.mutateAsync(addForm)
       setShowAddModal(false)
-      setAddForm({ name: '', email: '', password: '', role: 'farmer' })
+      setAddForm({ name: '', email: '', password: '', role: UserRole.Farmer })
       setAddErrors({})
       queryClient.invalidateQueries({ queryKey: ['users'] })
     } catch (err: unknown) {
@@ -130,13 +131,17 @@ export default function UsersPage() {
 
     try {
       if (type === 'make_farmer') {
-        await updateUser.mutateAsync({ id: user!.id, role: 'farmer' })
+        await updateUser.mutateAsync({ id: user!.id, role: UserRole.Farmer })
+        toast({ title: 'Role Updated', description: `${user!.name} is now a Farmer` })
       } else if (type === 'make_admin') {
-        await updateUser.mutateAsync({ id: user!.id, role: 'admin' })
+        await updateUser.mutateAsync({ id: user!.id, role: UserRole.Admin })
+        toast({ title: 'Role Updated', description: `${user!.name} is now an Admin` })
       } else if (type === 'deactivate') {
-        await updateUser.mutateAsync({ id: user!.id, status: 'inactive' })
+        await updateUser.mutateAsync({ id: user!.id, status: UserStatus.Inactive })
+        toast({ title: 'Account Deactivated', description: `${user!.name}'s account has been deactivated` })
       } else if (type === 'activate') {
-        await updateUser.mutateAsync({ id: user!.id, status: 'active' })
+        await updateUser.mutateAsync({ id: user!.id, status: UserStatus.Active })
+        toast({ title: 'Account Activated', description: `${user!.name}'s account has been activated` })
       } else if (type === 'delete') {
         await deleteUser.mutateAsync(user!.id)
       } else if (type === 'bulk_delete') {
@@ -162,7 +167,7 @@ export default function UsersPage() {
 
   const handleAddModalClose = (open: boolean) => {
     if (!open) {
-      setAddForm({ name: '', email: '', password: '', role: 'farmer' })
+      setAddForm({ name: '', email: '', password: '', role: UserRole.Farmer })
       setAddErrors({})
     }
     setShowAddModal(open)
@@ -275,8 +280,8 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const role = row.original.role
         return (
-          <span className={role === 'admin' ? 'badge-admin' : 'badge-farmer'}>
-            {role === 'admin' ? 'Admin' : 'Farmer'}
+          <span className={role === UserRole.Admin ? 'badge-admin' : 'badge-farmer'}>
+            {role === UserRole.Admin ? 'Admin' : 'Farmer'}
           </span>
         )
       },
@@ -287,8 +292,8 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const status = row.original.status
         return (
-          <span className={status === 'active' ? 'badge-online' : 'badge-offline'}>
-            {status === 'active' ? 'Active' : 'Inactive'}
+          <span className={status === UserStatus.Active ? 'badge-online' : 'badge-offline'}>
+            {status === UserStatus.Active ? 'Active' : 'Inactive'}
           </span>
         )
       },
@@ -325,18 +330,18 @@ export default function UsersPage() {
               collisionPadding={16}
             >
               <DropdownMenuItem onClick={() => setPendingAction({
-                type: user.role === 'admin' ? 'make_farmer' : 'make_admin',
+                type: user.role === UserRole.Admin ? 'make_farmer' : 'make_admin',
                 user,
               })}>
                 <Shield className="w-4 h-4" />
-                {user.role === 'admin' ? 'Make Farmer' : 'Make Admin'}
+                {user.role === UserRole.Admin ? 'Make Farmer' : 'Make Admin'}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setPendingAction({
-                type: user.status === 'active' ? 'deactivate' : 'activate',
+                type: user.status === UserStatus.Active ? 'deactivate' : 'activate',
                 user,
               })}>
-                {user.status === 'active' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                {user.status === UserStatus.Active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                {user.status === UserStatus.Active ? 'Deactivate' : 'Activate'}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push(`/dashboard/devices?userId=${user.id}&userName=${encodeURIComponent(user.name)}`)}>
                 <Eye className="w-4 h-4" />
@@ -452,10 +457,10 @@ export default function UsersPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                <select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
+                <select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value as UserRole })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
-                  <option value="farmer">Farmer</option>
-                  <option value="admin">Admin</option>
+                  <option value={UserRole.Farmer}>Farmer</option>
+                  <option value={UserRole.Admin}>Admin</option>
                 </select>
               </div>
               <div className="flex gap-3 pt-4">

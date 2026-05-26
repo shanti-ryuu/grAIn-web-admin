@@ -1,9 +1,10 @@
 import mongoose, { Document, Schema } from 'mongoose'
+import { DryingSessionStatus } from '@/lib/enums'
 
 export interface IDryingSession extends Document {
   deviceId: string
   userId: mongoose.Types.ObjectId
-  status: 'active' | 'completed' | 'aborted'
+  status: DryingSessionStatus
   grainType: string
   startMoisture: number
   targetMoisture: number
@@ -39,8 +40,8 @@ const DryingSessionSchema: Schema = new Schema({
   },
   status: {
     type: String,
-    enum: ['active', 'completed', 'aborted'],
-    default: 'active',
+    enum: Object.values(DryingSessionStatus),
+    default: DryingSessionStatus.Active,
   },
   grainType: {
     type: String,

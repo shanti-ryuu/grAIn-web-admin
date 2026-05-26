@@ -8,6 +8,7 @@ import { getRealtimeDb } from '@/lib/firebase-admin'
 import { getDeviceLiveness } from '@/lib/utils/device-liveness'
 import { markStaleDevicesOffline } from '@/lib/utils/firebase-sync'
 import { expireStaleCommands } from '@/lib/utils/dryer-command'
+import { UserRole } from '@/lib/enums'
 
 export const GET = withAuth(async (_request, user, { params }) => {
   await Promise.all([
@@ -29,7 +30,7 @@ export const GET = withAuth(async (_request, user, { params }) => {
     return errorResponse('Device not found', ErrorCodes.DEVICE_NOT_FOUND, 404)
   }
 
-  if (user.role !== 'admin' && device.assignedUser?._id?.toString() !== user.userId) {
+  if (user.role !== UserRole.Admin && device.assignedUser?._id?.toString() !== user.userId) {
     return errorResponse('Forbidden', ErrorCodes.FORBIDDEN, 403)
   }
 
@@ -63,7 +64,7 @@ export const DELETE = withAuth(async (_request, user, { params }) => {
   }
 
   // Ownership check: farmers can only delete their own devices
-  if (user.role !== 'admin' && device.assignedUser?.toString() !== user.userId) {
+  if (user.role !== UserRole.Admin && device.assignedUser?.toString() !== user.userId) {
     return errorResponse('Forbidden: you can only delete your own devices', ErrorCodes.FORBIDDEN, 403)
   }
 

@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 interface MetricCardProps {
   title: string
   value: string | number
@@ -5,8 +7,11 @@ interface MetricCardProps {
   trend?: {
     value: number
     isPositive: boolean
+    direction?: 'up' | 'down' | 'neutral'
+    label?: string
   }
-  icon?: React.ReactNode
+  icon?: ReactNode
+  className?: string
 }
 
 export default function MetricCard({
@@ -15,9 +20,10 @@ export default function MetricCard({
   subtitle,
   trend,
   icon,
-}: MetricCardProps) {
+  className = '',
+}: Readonly<MetricCardProps>) {
   return (
-    <div className="stat-card p-6">
+    <div className={`stat-card p-6 ${className}`}>
       <div className="flex justify-between items-start mb-4">
         <div>
           <p className="text-sm text-[#6b7280] font-medium">{title}</p>

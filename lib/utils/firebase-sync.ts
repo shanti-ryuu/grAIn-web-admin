@@ -2,6 +2,7 @@ import { getRealtimeDb } from '@/lib/firebase-admin'
 import dbConnect from '@/lib/db'
 import Command from '@/lib/models/Command'
 import Device from '@/lib/models/Device'
+import { CommandStatus, CommandType, DeviceStatus, FanAction, FanTarget, SensorDataStatus, StepperAction } from '@/lib/enums'
 
 const STALE_DEVICE_TIMEOUT_MS = 2 * 60 * 1000
 
@@ -24,7 +25,7 @@ export async function syncSensorToFirebase(
 ): Promise<void> {
   const db = getRealtimeDb()
   if (!db) return
-  const isActuallyRunning = sensorData.status === 'running' && Number(sensorData.fanSpeed ?? 0) > 0
+  const isActuallyRunning = sensorData.status === SensorDataStatus.Running && Number(sensorData.fanSpeed ?? 0) > 0
 
   await db.ref(`grain/devices/${deviceId}/sensors`).set({
     temperature: sensorData.temperature,
@@ -32,7 +33,7 @@ export async function syncSensorToFirebase(
     moisture: sensorData.moisture,
     fanSpeed: sensorData.fanSpeed ?? 0,
     energy: sensorData.energy ?? 0,
-    status: sensorData.status ?? 'idle',
+    status: sensorData.status ?? SensorDataStatus.Idle,
     solarVoltage: sensorData.solarVoltage ?? 0,
     weight: sensorData.weight ?? 0,
     updatedAt: Date.now(),
@@ -40,7 +41,7 @@ export async function syncSensorToFirebase(
 
   // Update device status and lastActive
   await db.ref(`grain/devices/${deviceId}`).update({
-    status: 'online',
+    status: DeviceStatus.Online,
     lastActive: Date.now(),
   })
 
@@ -63,7 +64,7 @@ export async function markStaleDevicesOffline(): Promise<number> {
 
   const cutoff = new Date(Date.now() - STALE_DEVICE_TIMEOUT_MS)
   const staleDevices = await Device.find({
-    status: 'online',
+    status: DeviceStatus.Online,
     lastActive: { $lt: cutoff },
   }).select('deviceId').lean()
 
@@ -73,7 +74,7 @@ export async function markStaleDevicesOffline(): Promise<number> {
     { deviceId: { $in: staleDevices.map(device => device.deviceId) } },
     {
       $set: {
-        status: 'offline',
+        status: DeviceStatus.Offline,
         'runtimeState.isRunning': false,
         'runtimeState.commandAcknowledged': true,
         'runtimeState.pendingCommand': null,
@@ -86,7 +87,7 @@ export async function markStaleDevicesOffline(): Promise<number> {
   const db = getRealtimeDb()
   if (db) {
     await Promise.all(staleDevices.map(async (device) => {
-      await db.ref(`grain/devices/${device.deviceId}`).update({ status: 'offline' })
+      await db.ref(`grain/devices/${device.deviceId}`).update({ status: DeviceStatus.Offline })
       await db.ref(`grain/devices/${device.deviceId}/runtimeState`).update({
         isRunning: false,
         pendingCommand: null,
@@ -152,7 +153,7 @@ export async function pushCommandToFirebase(
       pendingCommand: commandId,
       activeCommand: command.commandStr ?? command.command,
       lastCommand: command.commandStr ?? command.command,
-      commandStatus: 'pending',
+      commandStatus: CommandStatus.Pending,
       commandAcknowledged: false,
       updatedAt: now,
     }),
@@ -165,8 +166,8 @@ export async function markCommandPolled(deviceId: string, commandId: string): Pr
 
   await dbConnect()
   const command = await Command.findOneAndUpdate(
-    { _id: commandId, deviceId, status: 'pending' },
-    { $set: { status: 'polled', polledAt: now } },
+    { _id: commandId, deviceId, status: CommandStatus.Pending },
+    { $set: { status: CommandStatus.Polled, polledAt: now } },
     { returnDocument: 'after' }
   )
 
@@ -176,7 +177,7 @@ export async function markCommandPolled(deviceId: string, commandId: string): Pr
     { deviceId },
     {
       $set: {
-        status: 'online',
+        status: DeviceStatus.Online,
         lastActive: now,
         'runtimeState.lastSeen': now,
         'runtimeState.lastHeartbeat': now,
@@ -184,7 +185,7 @@ export async function markCommandPolled(deviceId: string, commandId: string): Pr
         'runtimeState.pendingCommand': commandId,
         'runtimeState.activeCommand': command.commandStr ?? command.command,
         'runtimeState.lastCommand': command.commandStr ?? command.command,
-        'runtimeState.commandStatus': 'polled',
+        'runtimeState.commandStatus': CommandStatus.Polled,
         'runtimeState.commandAcknowledged': false,
       },
     }
@@ -194,11 +195,11 @@ export async function markCommandPolled(deviceId: string, commandId: string): Pr
     const nowMs = now.getTime()
     await Promise.all([
       db.ref(`grain/commands/${deviceId}/pending/${commandId}`).update({
-        status: 'polled',
+        status: CommandStatus.Polled,
         polledAt: nowMs,
       }),
       db.ref(`grain/devices/${deviceId}`).update({
-        status: 'online',
+        status: DeviceStatus.Online,
         lastActive: nowMs,
       }),
       db.ref(`grain/devices/${deviceId}/runtimeState`).update({
@@ -208,7 +209,7 @@ export async function markCommandPolled(deviceId: string, commandId: string): Pr
         pendingCommand: commandId,
         activeCommand: command.commandStr ?? command.command,
         lastCommand: command.commandStr ?? command.command,
-        commandStatus: 'polled',
+        commandStatus: CommandStatus.Polled,
         commandAcknowledged: false,
       }),
     ])
@@ -222,7 +223,7 @@ export async function markCommandPolled(deviceId: string, commandId: string): Pr
 export async function markCommandExecuted(
   deviceId: string,
   commandId: string,
-  status: 'executed' | 'failed' | 'timeout' | 'error' = 'executed'
+  status: CommandStatus.Executed | CommandStatus.Failed | CommandStatus.Timeout | CommandStatus.Error = CommandStatus.Executed
 ): Promise<void> {
   const db = getRealtimeDb()
 
@@ -237,7 +238,7 @@ export async function markCommandExecuted(
     status,
     executedAt: new Date(),
   }
-  if (status === 'executed') {
+  if (status === CommandStatus.Executed) {
     commandUpdate.acknowledgedAt = new Date()
   }
   const command = await Command.findByIdAndUpdate(commandId, commandUpdate, { returnDocument: 'after' })
@@ -249,7 +250,7 @@ export async function markCommandExecuted(
     'runtimeState.activeCommand': command.commandStr ?? command.command,
     'runtimeState.lastCommand': command.commandStr ?? command.command,
     'runtimeState.commandStatus': status,
-    'runtimeState.commandAcknowledged': status === 'executed',
+    'runtimeState.commandAcknowledged': status === CommandStatus.Executed,
     'runtimeState.updatedAt': new Date(),
   }
   const firebaseRuntimeSet: Record<string, unknown> = {
@@ -257,44 +258,44 @@ export async function markCommandExecuted(
     activeCommand: command.commandStr ?? command.command,
     lastCommand: command.commandStr ?? command.command,
     commandStatus: status,
-    commandAcknowledged: status === 'executed',
+    commandAcknowledged: status === CommandStatus.Executed,
     lastSeen: Date.now(),
     updatedAt: Date.now(),
   }
 
-  if (status === 'executed') {
-    if (command.command === 'START') {
+  if (status === CommandStatus.Executed) {
+    if (command.command === CommandType.Start) {
       runtimeSet['runtimeState.isRunning'] = true
       runtimeSet['runtimeState.currentMode'] = command.mode
-      runtimeSet['runtimeState.fan1State'] = 'ON'
-      runtimeSet['runtimeState.fan2State'] = 'ON'
-      runtimeSet['runtimeState.heaterState'] = 'ON'
-      runtimeSet['runtimeState.stepperState'] = 'ON'
-      Object.assign(firebaseRuntimeSet, { isRunning: true, currentMode: command.mode, fan1State: 'ON', fan2State: 'ON', heaterState: 'ON', stepperState: 'ON' })
-    } else if (command.command === 'STOP') {
+      runtimeSet['runtimeState.fan1State'] = FanAction.On
+      runtimeSet['runtimeState.fan2State'] = FanAction.On
+      runtimeSet['runtimeState.heaterState'] = FanAction.On
+      runtimeSet['runtimeState.stepperState'] = FanAction.On
+      Object.assign(firebaseRuntimeSet, { isRunning: true, currentMode: command.mode, fan1State: FanAction.On, fan2State: FanAction.On, heaterState: FanAction.On, stepperState: FanAction.On })
+    } else if (command.command === CommandType.Stop) {
       runtimeSet['runtimeState.isRunning'] = false
-      runtimeSet['runtimeState.fan1State'] = 'OFF'
-      runtimeSet['runtimeState.fan2State'] = 'OFF'
-      runtimeSet['runtimeState.heaterState'] = 'OFF'
-      runtimeSet['runtimeState.stepperState'] = 'OFF'
-      Object.assign(firebaseRuntimeSet, { isRunning: false, fan1State: 'OFF', fan2State: 'OFF', heaterState: 'OFF', stepperState: 'OFF' })
-    } else if (command.command === 'FAN_CONTROL') {
-      if (command.fanTarget === 'FAN1' || command.fanTarget === 'ALL') {
+      runtimeSet['runtimeState.fan1State'] = FanAction.Off
+      runtimeSet['runtimeState.fan2State'] = FanAction.Off
+      runtimeSet['runtimeState.heaterState'] = FanAction.Off
+      runtimeSet['runtimeState.stepperState'] = FanAction.Off
+      Object.assign(firebaseRuntimeSet, { isRunning: false, fan1State: FanAction.Off, fan2State: FanAction.Off, heaterState: FanAction.Off, stepperState: FanAction.Off })
+    } else if (command.command === CommandType.FanControl) {
+      if (command.fanTarget === FanTarget.Fan1 || command.fanTarget === FanTarget.All) {
         runtimeSet['runtimeState.fan1State'] = command.fanAction
         firebaseRuntimeSet.fan1State = command.fanAction
       }
-      if (command.fanTarget === 'FAN2' || command.fanTarget === 'ALL') {
+      if (command.fanTarget === FanTarget.Fan2 || command.fanTarget === FanTarget.All) {
         runtimeSet['runtimeState.fan2State'] = command.fanAction
         firebaseRuntimeSet.fan2State = command.fanAction
       }
-    } else if (command.command === 'HEATER_CONTROL') {
+    } else if (command.command === CommandType.HeaterControl) {
       runtimeSet['runtimeState.heaterState'] = command.heaterAction
       firebaseRuntimeSet.heaterState = command.heaterAction
-    } else if (command.command === 'STEPPER_CONTROL') {
-      const stepperState = command.stepperAction === 'START' ? 'ON' : command.stepperAction === 'STOP' ? 'OFF' : command.stepperAction
+    } else if (command.command === CommandType.StepperControl) {
+      const stepperState = command.stepperAction === StepperAction.Start ? FanAction.On : command.stepperAction === StepperAction.Stop ? FanAction.Off : command.stepperAction
       runtimeSet['runtimeState.stepperState'] = stepperState
       firebaseRuntimeSet.stepperState = stepperState
-    } else if (command.command === 'RELAY_CONTROL') {
+    } else if (command.command === CommandType.RelayControl) {
       runtimeSet['runtimeState.relayState'] = command.relayAction
       firebaseRuntimeSet.relayState = command.relayAction
     }

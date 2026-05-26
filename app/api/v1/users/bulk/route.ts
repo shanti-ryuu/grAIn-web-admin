@@ -2,6 +2,7 @@ import User from '@/lib/models/User'
 import Device from '@/lib/models/Device'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { withAuth } from '@/lib/utils/handler'
+import { UserRole } from '@/lib/enums'
 
 export const DELETE = withAuth(async (request, authUser) => {
   const { ids } = await request.json()
@@ -20,4 +21,4 @@ export const DELETE = withAuth(async (request, authUser) => {
   const result = await User.deleteMany({ _id: { $in: filteredIds } })
 
   return successResponse({ deletedCount: result.deletedCount })
-}, { role: 'admin' })
+}, { role: UserRole.Admin })

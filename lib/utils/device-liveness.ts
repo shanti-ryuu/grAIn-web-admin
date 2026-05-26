@@ -1,9 +1,10 @@
 import { getRealtimeDb } from '@/lib/firebase-admin'
+import { DeviceStatus } from '@/lib/enums'
 
 export const DEVICE_ONLINE_TIMEOUT_MS = 2 * 60 * 1000
 
 export interface DeviceLiveness {
-  status: 'online' | 'offline'
+  status: DeviceStatus
   isOnline: boolean
   lastActive: Date | null
 }
@@ -46,10 +47,10 @@ export async function getDeviceLiveness(
       const lastActiveMs = toTimestampMs(data?.lastActive)
       const sensorUpdatedAtMs = toTimestampMs(data?.sensors?.updatedAt)
       const heartbeatMs = Math.max(lastActiveMs ?? 0, sensorUpdatedAtMs ?? 0)
-      const online = data?.status === 'online' && isFresh(heartbeatMs || null)
+      const online = data?.status === DeviceStatus.Online && isFresh(heartbeatMs || null)
 
       return {
-        status: online ? 'online' : 'offline',
+        status: online ? DeviceStatus.Online : DeviceStatus.Offline,
         isOnline: online,
         lastActive: heartbeatMs ? new Date(heartbeatMs) : toDate(fallback?.lastActive),
       }
@@ -59,9 +60,9 @@ export async function getDeviceLiveness(
   }
 
   const fallbackMs = toTimestampMs(fallback?.lastActive)
-  const online = fallback?.status === 'online' && isFresh(fallbackMs)
+  const online = fallback?.status === DeviceStatus.Online && isFresh(fallbackMs)
   return {
-    status: online ? 'online' : 'offline',
+    status: online ? DeviceStatus.Online : DeviceStatus.Offline,
     isOnline: online,
     lastActive: toDate(fallback?.lastActive),
   }

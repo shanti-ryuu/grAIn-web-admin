@@ -9,12 +9,16 @@ import DataTable from '@/components/ui/data-table'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useDevices, useBulkDeleteUsers } from '@/hooks/useApi'
 import { useQueryClient } from '@tanstack/react-query'
+import { useToast } from '@/hooks/useToast'
+import { LoadingTable } from '@/components/LoadingTable'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/lib/auth-store'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
-import { useToast } from '@/hooks/useToast'
+import type { CreateUserInput, Device, PaginatedUsers, User } from '@/lib/types'
+import { UserRole, UserStatus } from '@/lib/enums'
 
- type IdLike = string | { id?: string; _id?: string } | null | undefined
+ type IdLike = string | User | null | undefined
 
  const toIdString = (value: unknown): string | null => {
    if (typeof value === 'string' && value.length > 0) return value
@@ -31,13 +35,8 @@ import { useToast } from '@/hooks/useToast'
    return value.id || value._id || null
  }
 
-interface UserRow {
+type UserRow = Pick<User, 'name' | 'email' | 'role' | 'status' | 'createdAt'> & {
   id: string
-  name: string
-  email: string
-  role: string
-  status: string
-  createdAt: string
   deviceCount: number
 }
 
@@ -53,44 +52,40 @@ export default function UsersPage() {
   const { isHydrated } = useAuthStore()
 
   const [showAddModal, setShowAddModal] = useState(false)
-  const [addForm, setAddForm] = useState({ name: '', email: '', password: '', role: 'farmer' })
+  const [addForm, setAddForm] = useState<CreateUserInput>({ name: '', email: '', password: '', role: UserRole.Farmer })
   const [addErrors, setAddErrors] = useState<Record<string, string>>({})
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
 
   const { data: usersData, isLoading, error, refetch } = useUsers()
-  const { data: devices } = useDevices()
+  const { data: devicesData } = useDevices()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const deleteUser = useDeleteUser()
   const bulkDeleteUsers = useBulkDeleteUsers()
 
-  const users = (usersData as { users?: Array<Record<string, unknown>> } | undefined)?.users || []
+  const users = Array.isArray(usersData)
+    ? usersData
+    : (usersData as PaginatedUsers | undefined)?.users || []
 
+  const devices = Array.isArray(devicesData) ? devicesData : []
   const deviceCounts: Record<string, number> = {}
-  ;(devices || []).forEach((d: { assignedUser?: IdLike }) => {
+  devices.forEach((d: Device) => {
     const uid = getIdFromIdLike(d.assignedUser)
     if (uid) deviceCounts[uid] = (deviceCounts[uid] || 0) + 1
   })
 
-  const tableData: UserRow[] = (users || []).flatMap((u: Record<string, unknown>) => {
-    const id = toIdString((u as { _id?: unknown })._id) ?? toIdString((u as { id?: unknown }).id)
+  const tableData: UserRow[] = (users || []).flatMap((u) => {
+    const id = toIdString(u._id) ?? toIdString(u.id)
     if (!id) return []
-
-    const name = typeof (u as { name?: unknown }).name === 'string' ? (u as { name: string }).name : ''
-    const email = typeof (u as { email?: unknown }).email === 'string' ? (u as { email: string }).email : ''
-    const role = typeof (u as { role?: unknown }).role === 'string' ? (u as { role: string }).role : ''
-    const status = typeof (u as { status?: unknown }).status === 'string' ? (u as { status: string }).status : ''
-    const createdAtRaw = (u as { createdAt?: unknown }).createdAt
-    const createdAt = typeof createdAtRaw === 'string' ? createdAtRaw : createdAtRaw ? new Date(createdAtRaw as Date).toISOString() : ''
 
     return [{
       id,
-      name,
-      email,
-      role,
-      status,
-      createdAt,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      status: u.status,
+      createdAt: u.createdAt,
       deviceCount: deviceCounts[id] || 0,
     }]
   })
@@ -113,7 +108,7 @@ export default function UsersPage() {
     try {
       await createUser.mutateAsync(addForm)
       setShowAddModal(false)
-      setAddForm({ name: '', email: '', password: '', role: 'farmer' })
+      setAddForm({ name: '', email: '', password: '', role: UserRole.Farmer })
       setAddErrors({})
       queryClient.invalidateQueries({ queryKey: ['users'] })
     } catch (err: unknown) {
@@ -132,13 +127,17 @@ export default function UsersPage() {
 
     try {
       if (type === 'make_farmer') {
-        await updateUser.mutateAsync({ id: user!.id, role: 'farmer' })
+        await updateUser.mutateAsync({ id: user!.id, role: UserRole.Farmer })
+        toast({ title: 'Role Updated', description: `${user!.name} is now a Farmer` })
       } else if (type === 'make_admin') {
-        await updateUser.mutateAsync({ id: user!.id, role: 'admin' })
+        await updateUser.mutateAsync({ id: user!.id, role: UserRole.Admin })
+        toast({ title: 'Role Updated', description: `${user!.name} is now an Admin` })
       } else if (type === 'deactivate') {
-        await updateUser.mutateAsync({ id: user!.id, status: 'inactive' })
+        await updateUser.mutateAsync({ id: user!.id, status: UserStatus.Inactive })
+        toast({ title: 'Account Deactivated', description: `${user!.name}'s account has been deactivated` })
       } else if (type === 'activate') {
-        await updateUser.mutateAsync({ id: user!.id, status: 'active' })
+        await updateUser.mutateAsync({ id: user!.id, status: UserStatus.Active })
+        toast({ title: 'Account Activated', description: `${user!.name}'s account has been activated` })
       } else if (type === 'delete') {
         await deleteUser.mutateAsync(user!.id)
       } else if (type === 'bulk_delete') {
@@ -164,7 +163,7 @@ export default function UsersPage() {
 
   const handleAddModalClose = (open: boolean) => {
     if (!open) {
-      setAddForm({ name: '', email: '', password: '', role: 'farmer' })
+      setAddForm({ name: '', email: '', password: '', role: UserRole.Farmer })
       setAddErrors({})
     }
     setShowAddModal(open)
@@ -277,8 +276,8 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const role = row.original.role
         return (
-          <span className={role === 'admin' ? 'badge-admin' : 'badge-farmer'}>
-            {role === 'admin' ? 'Admin' : 'Farmer'}
+          <span className={role === UserRole.Admin ? 'badge-admin' : 'badge-farmer'}>
+            {role === UserRole.Admin ? 'Admin' : 'Farmer'}
           </span>
         )
       },
@@ -289,8 +288,8 @@ export default function UsersPage() {
       cell: ({ row }) => {
         const status = row.original.status
         return (
-          <span className={status === 'active' ? 'badge-online' : 'badge-offline'}>
-            {status === 'active' ? 'Active' : 'Inactive'}
+          <span className={status === UserStatus.Active ? 'badge-online' : 'badge-offline'}>
+            {status === UserStatus.Active ? 'Active' : 'Inactive'}
           </span>
         )
       },
@@ -327,18 +326,18 @@ export default function UsersPage() {
               collisionPadding={16}
             >
               <DropdownMenuItem onClick={() => setPendingAction({
-                type: user.role === 'admin' ? 'make_farmer' : 'make_admin',
+                type: user.role === UserRole.Admin ? 'make_farmer' : 'make_admin',
                 user,
               })}>
                 <Shield className="w-4 h-4" />
-                {user.role === 'admin' ? 'Make Farmer' : 'Make Admin'}
+                {user.role === UserRole.Admin ? 'Make Farmer' : 'Make Admin'}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setPendingAction({
-                type: user.status === 'active' ? 'deactivate' : 'activate',
+                type: user.status === UserStatus.Active ? 'deactivate' : 'activate',
                 user,
               })}>
-                {user.status === 'active' ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
-                {user.status === 'active' ? 'Deactivate' : 'Activate'}
+                {user.status === UserStatus.Active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
+                {user.status === UserStatus.Active ? 'Deactivate' : 'Activate'}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push(`/dashboard/devices?userId=${user.id}&userName=${encodeURIComponent(user.name)}`)}>
                 <Eye className="w-4 h-4" />
@@ -363,8 +362,13 @@ export default function UsersPage() {
   if (!isHydrated || isLoading) {
     return (
       <div className="space-y-8">
-        <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-64 mb-2" /><div className="h-4 bg-gray-200 rounded w-96" /></div>
-        <div className="animate-pulse"><div className="h-64 bg-gray-200 rounded" /></div>
+        <div>
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96 max-w-full" />
+        </div>
+        <Card className="p-6">
+          <LoadingTable rows={5} cols={6} />
+        </Card>
       </div>
     )
   }
@@ -411,7 +415,7 @@ export default function UsersPage() {
         </div>
       )}
 
-      {tableData.length === 0 ? (
+      {!isLoading && !error && tableData.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
@@ -454,10 +458,10 @@ export default function UsersPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
-                <select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value })}
+                <select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value as CreateUserInput['role'] })}
                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-800 bg-white">
-                  <option value="farmer">Farmer</option>
-                  <option value="admin">Admin</option>
+                  <option value={UserRole.Farmer}>Farmer</option>
+                  <option value={UserRole.Admin}>Admin</option>
                 </select>
               </div>
               <div className="flex gap-3 pt-4">

@@ -3,7 +3,7 @@ import User from '@/lib/models/User'
 import Device from '@/lib/models/Device'
 import { successResponse, errorResponse, ErrorCodes } from '@/lib/utils/response'
 import { withAuth } from '@/lib/utils/handler'
-import { BCRYPT_ROUNDS } from '@/lib/enums'
+import { BCRYPT_ROUNDS, UserRole } from '@/lib/enums'
 import { sanitizeObject } from '@/lib/utils/validation'
 
 export const PATCH = withAuth(async (request, authUser, { params }) => {
@@ -11,7 +11,7 @@ export const PATCH = withAuth(async (request, authUser, { params }) => {
   const body = sanitizeObject(await request.json())
   const { name, email, role, status, password, currentPassword } = body
 
-  const isAdmin = authUser.role === 'admin'
+  const isAdmin = authUser.role === UserRole.Admin
   const isSelf = authUser.userId === id
 
   if (!isAdmin && !isSelf) {
@@ -79,4 +79,4 @@ export const DELETE = withAuth(async (_request, authUser, { params }) => {
   await User.findByIdAndDelete(id)
 
   return successResponse({ id, name: user.name, email: user.email })
-}, { role: 'admin' })
+}, { role: UserRole.Admin })

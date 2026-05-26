@@ -1,8 +1,9 @@
 import { withAuth } from '@/lib/utils/handler'
 import { createDryerCommand } from '@/lib/utils/dryer-command'
 import { errorResponse, ErrorCodes } from '@/lib/utils/response'
+import { CommandType, FanAction } from '@/lib/enums'
 
-const VALID_HEATER_ACTIONS = ['ON', 'OFF'] as const
+const VALID_HEATER_ACTIONS = Object.values(FanAction)
 
 export const POST = withAuth(async (request, user, { params }) => {
   let body: { heaterAction?: string }
@@ -19,9 +20,9 @@ export const POST = withAuth(async (request, user, { params }) => {
   }
 
   return createDryerCommand(request, user, params, {
-    command: 'HEATER_CONTROL',
+    command: CommandType.HeaterControl,
     extraFields: {
-      commandStr: heaterAction === 'ON' ? 'H1:1' : 'H1:0',
+      commandStr: heaterAction === FanAction.On ? 'H1:1' : 'H1:0',
       heaterAction,
     },
   })

@@ -12,42 +12,20 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useToast } from '@/hooks/useToast'
 import ErrorState from '@/components/ErrorState'
 import ConfirmModal from '@/components/ConfirmModal'
+import type { Device, PaginatedUsers, UpdateDeviceInput, User } from '@/lib/types'
+import { LoadingTable } from '@/components/LoadingTable'
+import { Skeleton } from '@/components/ui/skeleton'
+import { DeviceStatus } from '@/lib/enums'
 
-interface DeviceRow {
+type DeviceRow = Pick<Device, 'deviceId' | 'location' | 'status'> & {
   id: string
-  deviceId: string
-  location: string
   assignedUser: string
   assignedUserId: string
-  status: string
   lastActive: string
   moisture: string
 }
 
-interface AssignedUser {
-  name?: string
-  id?: string
-  _id?: string
-  email?: string
-}
-
-interface DeviceApiItem {
-  id: string
-  deviceId: string
-  location?: string
-  assignedUser?: AssignedUser | string
-  status: string
-  lastActive: string
-}
-
-interface FarmerItem {
-  id: string
-  _id?: string
-  name: string
-  email: string
-  role: string
-  status: string
-}
+type FarmerItem = User
 
 function timeAgo(dateStr: string): string {
   if (!dateStr) return 'Never'
@@ -93,16 +71,19 @@ export default function DevicesPage() {
   const updateDevice = useUpdateDevice()
   const bulkDeleteDevices = useBulkDeleteDevices()
 
-  const farmers = ((allUsers as { users: FarmerItem[] } | undefined)?.users || []).filter((u) => u.role === 'farmer' && u.status === 'active')
+  const farmers = (Array.isArray(allUsers)
+    ? allUsers
+    : (allUsers as PaginatedUsers | undefined)?.users || []
+  ).filter((u): u is FarmerItem => u.role === 'farmer' && u.status === 'active')
 
-  const allTableData: DeviceRow[] = (devices as DeviceApiItem[] || []).map((d) => ({
-    id: d.id,
+  const allTableData: DeviceRow[] = ((devices || []) as Device[]).map((d) => ({
+    id: d.id || d._id,
     deviceId: d.deviceId,
     location: d.location || '—',
     assignedUser: typeof d.assignedUser === 'object' ? d.assignedUser?.name || 'Unassigned' : 'Unassigned',
     assignedUserId: typeof d.assignedUser === 'object' ? d.assignedUser?.id || d.assignedUser?._id || '' : d.assignedUser || '',
     status: d.status,
-    lastActive: d.lastActive,
+    lastActive: d.lastActive || '',
     moisture: '—',
   }))
 
@@ -135,7 +116,8 @@ export default function DevicesPage() {
         toast({ title: 'Location Updated', description: `Location updated for ${device.deviceId}` })
       } else if (type === 'reassign_user') {
         const newFarmer = farmers.find((f) => f.id === reassignUserId)
-        await updateDevice.mutateAsync({ id: device.id, assignedUser: reassignUserId })
+        const update: UpdateDeviceInput = { assignedUser: reassignUserId }
+        await updateDevice.mutateAsync({ id: device.id, ...update })
         toast({ title: 'Device Reassigned', description: `Device ${device.deviceId} reassigned to ${newFarmer?.name || 'new user'}` })
       } else if (type === 'delete') {
         await deleteDevice.mutateAsync(device.id)
@@ -202,8 +184,8 @@ export default function DevicesPage() {
       cell: ({ row }) => {
         const status = row.original.status
         return (
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${status === 'online' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
-            {status === 'online' ? 'Online' : 'Offline'}
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${status === DeviceStatus.Online ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-600'}`}>
+            {status === DeviceStatus.Online ? 'Online' : 'Offline'}
           </span>
         )
       },
@@ -259,9 +241,13 @@ export default function DevicesPage() {
   if (isLoading) {
     return (
       <div className="space-y-8">
-        <div className="animate-pulse"><div className="h-8 bg-gray-200 rounded w-48 mb-2" /><div className="h-4 bg-gray-200 rounded w-96" /></div>
-        <Card className="p-4 animate-pulse"><div className="h-10 bg-gray-200 rounded" /></Card>
-        <Card className="p-6 animate-pulse"><div className="h-64 bg-gray-200 rounded" /></Card>
+        <div>
+          <Skeleton className="h-8 w-48 mb-2" />
+          <Skeleton className="h-4 w-96 max-w-full" />
+        </div>
+        <Card className="p-6">
+          <LoadingTable rows={5} cols={7} />
+        </Card>
       </div>
     )
   }
@@ -328,7 +314,7 @@ export default function DevicesPage() {
         </div>
       )}
 
-      {tableData.length === 0 ? (
+      {!isLoading && !error && tableData.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-800" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
